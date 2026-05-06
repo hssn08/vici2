@@ -1,0 +1,32 @@
+version: "2"
+
+run:
+  go: "1.22"
+  tests: true
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errcheck
+    - errorlint
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - staticcheck
+    - unused
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
