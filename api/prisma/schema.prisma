@@ -1,5 +1,34 @@
-// vici2 Prisma schema — F02 fills in the actual models.
-// F01 only provisions the datasource + generator so `make db-migrate` runs.
+// vici2 — F02 MySQL 8 schema (Prisma source of truth)
+//
+// Conventions (FROZEN per F02 PLAN §3):
+//  - PK: BigInt auto-increment, except phone_codes / phone_codes_overrides /
+//    zip_codes (NANP reference) and join tables with composite PKs.
+//  - tenant_id: BigInt @default(1) on every table except the four global
+//    reference tables noted above.
+//  - Timestamps: DateTime(6) created_at / updated_at on every table.
+//  - VARBINARY(512) ciphertext columns + kek_version SMALLINT for envelope
+//    encryption (F05 owns the cipher).
+//  - JSON columns are MySQL native JSON; Zod-validated in app code.
+//  - Enums for fixed business vocabularies; lookup tables for vocabularies
+//    that grow (statuses, pause_codes, audit_log.action / entity_type).
+//  - Composite indexes lead with tenant_id (CI script enforces).
+//
+// Migrations FROZEN sequence (Prisma autogenerates timestamps; logical order):
+//   0_init                 → all non-partitioned tables + audit_log model
+//   1_partition_log_tables → drops Prisma-emitted CREATE TABLE for the 5
+//                            log tables and re-creates with PARTITION BY
+//                            RANGE COLUMNS (+3 months pre-creation)
+//   2_drop_partition_fks   → drops any FK Prisma emitted for those tables
+//   3_audit_grants         → creates vici2_app/backup/root + REVOKEs
+//                            UPDATE/DELETE on audit_log from vici2_app
+//
+// Amendments applied (per orchestrator brief):
+//   A1: phone_codes PK extended to (area_code, exchange_code) — NXX granular
+//   A2: users.totp_required BOOLEAN DEFAULT false (F05 hook)
+//   A3: auth_config single-row table (F05 hook)
+//   A4: zip_codes table (D03 ZIP cascade)
+//   A5: phone_codes_overrides (D03 manual override resolver)
+//   A6: bootstrap super_admin shape (no row seeded — F05 owns)
 
 generator client {
   provider = "prisma-client-js"
@@ -8,4 +37,1065 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// 4.1  tenants
+// =============================================================================
+
+model Tenant {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @db.VarChar(128)
+  slug      String   @unique @db.VarChar(64)
+  active    Boolean  @default(true)
+  settings  Json
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  users          User[]
+  userGroups     UserGroup[]
+  sipCredentials SipCredential[]
+  campaigns      Campaign[]
+  lists          List[]
+  leads          Lead[]
+  statuses       Status[]
+  pauseCodes     PauseCode[]
+  scripts        Script[]
+  callTimes      CallTime[]
+  dnc            Dnc[]
+  callbacks      Callback[]
+  hopperMirror   HopperMirror[]
+  recordings     Recording[]
+  dispositions   Disposition[]
+  carriers       Carrier[]
+  gateways       Gateway[]
+  didNumbers     DidNumber[]
+  ingroups       Ingroup[]
+  ingroupAgents  IngroupAgent[]
+  ivrTrees       IvrTree[]
+  settingsRows   Setting[]
+
+  @@map("tenants")
+}
+
+// =============================================================================
+// 4.2  users   (A2 amendment: totp_required)
+// =============================================================================
+
+enum UserRole {
+  agent
+  supervisor
+  admin
+  superadmin
+  integrator
+}
+
+model User {
+  id            BigInt    @id @default(autoincrement())
+  tenantId      BigInt    @default(1) @map("tenant_id")
+  username      String    @db.VarChar(64)
+  email         String?   @db.VarChar(128)
+  // F02 ships VARCHAR(255) per amendment A6 — Argon2id encoded length;
+  // F05 owns hashing and may persist its own width when it lands.
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  fullName      String?   @map("full_name") @db.VarChar(128)
+  role          UserRole
+  userGroupId   BigInt?   @map("user_group_id")
+  active        Boolean   @default(true)
+  hotkeysActive Boolean   @default(true) @map("hotkeys_active")
+  totpRequired  Boolean   @default(false) @map("totp_required")
+  lastLoginAt   DateTime? @map("last_login_at") @db.DateTime(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_users_tenant")
+  userGroup      UserGroup?      @relation(fields: [userGroupId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_users_user_group")
+  sipCredentials SipCredential[]
+  callbacks      Callback[]      @relation("CallbacksOwner")
+  callbacksMade  Callback[]      @relation("CallbacksCreatedBy")
+  ingroupAgents  IngroupAgent[]
+  ownedLeads     Lead[]
+  dispositions   Disposition[]
+
+  @@unique([tenantId, username], map: "uk_users_tenant_username")
+  @@unique([tenantId, email], map: "uk_users_tenant_email")
+  @@index([tenantId, userGroupId], map: "idx_users_t_group")
+  @@index([tenantId, role, active], map: "idx_users_t_role_active")
+  @@map("users")
+}
+
+// =============================================================================
+// 4.3  user_groups
+// =============================================================================
+
+model UserGroup {
+  id               BigInt   @id @default(autoincrement())
+  tenantId         BigInt   @default(1) @map("tenant_id")
+  name             String   @db.VarChar(64)
+  allowedCampaigns Json     @map("allowed_campaigns")
+  allowedIngroups  Json     @map("allowed_ingroups")
+  createdAt        DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_user_groups_tenant")
+  users  User[]
+
+  @@unique([tenantId, name], map: "uk_user_groups_tenant_name")
+  @@map("user_groups")
+}
+
+// =============================================================================
+// 4.4  sip_credentials  (envelope-encrypted)
+// =============================================================================
+
+model SipCredential {
+  id            BigInt    @id @default(autoincrement())
+  tenantId      BigInt    @default(1) @map("tenant_id")
+  userId        BigInt    @map("user_id")
+  sipUsername   String    @map("sip_username") @db.VarChar(64)
+  sipPasswordCt Bytes     @map("sip_password_ct") @db.VarBinary(512)
+  kekVersion    Int       @default(1) @map("kek_version") @db.SmallInt
+  lastRotatedAt DateTime? @map("last_rotated_at") @db.DateTime(6)
+  revokedAt     DateTime? @map("revoked_at") @db.DateTime(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_sip_creds_tenant")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sip_creds_user")
+
+  @@unique([tenantId, sipUsername], map: "uk_sip_creds_tenant_user")
+  @@index([tenantId, userId, kekVersion], map: "idx_sip_creds_t_user_kek")
+  @@map("sip_credentials")
+}
+
+// =============================================================================
+// 4.5  audit_log  (partitioned in 1_partition_log_tables migration)
+//
+// Composite PK (id, ts). Partitioned RANGE COLUMNS(ts).
+// Prisma cannot emit PARTITION BY; Prisma's CREATE TABLE is dropped and
+// re-issued in the partition migration. INSERT-only at the grant level.
+// =============================================================================
+
+enum AuditActorKind {
+  user
+  system
+  worker
+  external_api
+}
+
+model AuditLog {
+  id          BigInt         @default(autoincrement())
+  tenantId    BigInt         @default(1) @map("tenant_id")
+  actorUserId BigInt?        @map("actor_user_id")
+  actorKind   AuditActorKind @default(user) @map("actor_kind")
+  action      String         @db.VarChar(64)
+  entityType  String         @map("entity_type") @db.VarChar(32)
+  entityId    String?        @map("entity_id") @db.VarChar(64)
+  beforeJson  Json?          @map("before_json")
+  afterJson   Json?          @map("after_json")
+  requestId   String?        @map("request_id") @db.VarChar(64)
+  ipAddress   String?        @map("ip_address") @db.VarChar(45)
+  userAgent   String?        @map("user_agent") @db.VarChar(255)
+  ts          DateTime       @db.DateTime(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime       @default(now()) @map("updated_at") @db.DateTime(6)
+
+  @@id([id, ts])
+  @@index([tenantId, actorUserId, ts], map: "idx_audit_t_actor_ts")
+  @@index([tenantId, entityType, entityId, ts], map: "idx_audit_t_entity_ts")
+  @@index([tenantId, action, ts], map: "idx_audit_t_action_ts")
+  @@map("audit_log")
+}
+
+// =============================================================================
+// 4.6  campaigns   (composite PK tenant_id, id)
+// =============================================================================
+
+enum DialMethod {
+  MANUAL
+  RATIO
+  PROGRESSIVE
+  ADAPT_HARD
+  ADAPT_AVG
+  ADAPT_TAPERED
+}
+
+enum NextAgentCall {
+  longest_wait
+  random
+  fewest_calls
+  rank
+}
+
+enum RecordingMode {
+  NEVER
+  ONDEMAND
+  ALL
+  ALLFORCE
+}
+
+enum AmdAction {
+  drop
+  vmdrop
+  agent
+}
+
+enum PauseCodesRequired {
+  OFF
+  OPTIONAL
+  FORCE
+}
+
+model Campaign {
+  tenantId           BigInt             @default(1) @map("tenant_id")
+  id                 String             @db.VarChar(32)
+  name               String             @db.VarChar(128)
+  active             Boolean            @default(true)
+  dialMethod         DialMethod         @default(MANUAL) @map("dial_method")
+  autoDialLevel      Decimal            @default(0.00) @map("auto_dial_level") @db.Decimal(4, 2)
+  adaptiveMaxLevel   Decimal            @default(3.00) @map("adaptive_max_level") @db.Decimal(4, 2)
+  adaptiveDropPct    Decimal            @default(1.50) @map("adaptive_drop_pct") @db.Decimal(4, 2)
+  dialTimeoutSec     Int                @default(22) @map("dial_timeout_sec") @db.SmallInt
+  wrapupSeconds      Int                @default(10) @map("wrapup_seconds") @db.SmallInt
+  nextAgentCall      NextAgentCall      @default(longest_wait) @map("next_agent_call")
+  availableOnlyTally Boolean            @default(false) @map("available_only_tally")
+  hopperSizeTarget   Int                @default(0) @map("hopper_size_target")
+  hopperMultiplier   Decimal            @default(2.0) @map("hopper_multiplier") @db.Decimal(3, 1)
+  callerIdCarrierId  BigInt?            @map("caller_id_carrier_id")
+  callerIdOverride   String?            @map("caller_id_override") @db.VarChar(16)
+  recordingMode      RecordingMode      @default(ALL) @map("recording_mode")
+  amdEnabled         Boolean            @default(false) @map("amd_enabled")
+  amdAction          AmdAction          @default(drop) @map("amd_action")
+  vmdropAudio        String?            @map("vmdrop_audio") @db.VarChar(255)
+  safeHarborAudio    String?            @map("safe_harbor_audio") @db.VarChar(255)
+  scriptId           BigInt?            @map("script_id")
+  webformUrl         String?            @map("webform_url") @db.VarChar(512)
+  dialStatusFilter   Json               @map("dial_status_filter")
+  callTimeId         BigInt?            @map("call_time_id")
+  useInternalDnc     Boolean            @default(true) @map("use_internal_dnc")
+  useFederalDnc      Boolean            @default(true) @map("use_federal_dnc")
+  useStateDnc        Boolean            @default(true) @map("use_state_dnc")
+  pauseCodesRequired PauseCodesRequired @default(OPTIONAL) @map("pause_codes_required")
+  hotKeysActive      Boolean            @default(true) @map("hot_keys_active")
+  closerIngroups     Json               @map("closer_ingroups")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_campaigns_tenant")
+  callerIdCarrier Carrier?       @relation("CampaignCallerCarrier", fields: [callerIdCarrierId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_caller_carrier")
+  script          Script?        @relation(fields: [scriptId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_script")
+  callTime        CallTime?      @relation(fields: [callTimeId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_calltime")
+  campaignLists   CampaignList[]
+  pauseCodes      PauseCode[]
+  scripts         Script[]       @relation("ScriptCampaign")
+  callbacks       Callback[]
+  hopperMirror    HopperMirror[]
+  dispositions    Disposition[]
+
+  @@id([tenantId, id])
+  @@index([tenantId, active, dialMethod], map: "idx_campaigns_t_active_method")
+  @@map("campaigns")
+}
+
+// =============================================================================
+// 4.7  lists
+// =============================================================================
+
+model List {
+  id          BigInt    @id @default(autoincrement())
+  tenantId    BigInt    @default(1) @map("tenant_id")
+  name        String    @db.VarChar(128)
+  description String?   @db.Text
+  active      Boolean   @default(true)
+  resetTime   DateTime? @map("reset_time") @db.Time(0)
+  expiration  DateTime? @db.Date
+  source      String?   @db.VarChar(64)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_lists_tenant")
+  campaignLists CampaignList[]
+  leads         Lead[]
+
+  @@unique([tenantId, name], map: "uk_lists_tenant_name")
+  @@index([tenantId, active], map: "idx_lists_t_active")
+  @@map("lists")
+}
+
+// =============================================================================
+// 4.8  campaign_lists
+// =============================================================================
+
+model CampaignList {
+  tenantId   BigInt   @default(1) @map("tenant_id")
+  campaignId String   @map("campaign_id") @db.VarChar(32)
+  listId     BigInt   @map("list_id")
+  priority   Int      @default(0) @db.SmallInt
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
+
+  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_camp_lists_campaign")
+  list     List     @relation(fields: [listId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_camp_lists_list")
+
+  @@id([tenantId, campaignId, listId])
+  @@index([tenantId, listId], map: "idx_camp_lists_t_list")
+  @@map("campaign_lists")
+}
+
+// =============================================================================
+// 4.9  statuses (per-campaign or system default with __SYS__ sentinel)
+// =============================================================================
+
+model Status {
+  tenantId      BigInt   @default(1) @map("tenant_id")
+  campaignId    String   @map("campaign_id") @db.VarChar(32)
+  status        String   @db.VarChar(8)
+  description   String   @default("") @db.VarChar(128)
+  selectable    Boolean  @default(true)
+  humanAnswered Boolean  @default(false) @map("human_answered")
+  sale          Boolean  @default(false)
+  dnc           Boolean  @default(false)
+  callback      Boolean  @default(false)
+  notInterested Boolean  @default(false) @map("not_interested")
+  hotkey        String?  @db.Char(1)
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_statuses_tenant")
+  // Note: no DB-level FK to campaigns because the __SYS__ sentinel does not
+  // exist in `campaigns`. App-layer enforces "real" campaign rows.
+
+  @@id([tenantId, campaignId, status])
+  @@map("statuses")
+}
+
+// =============================================================================
+// 4.10  pause_codes
+// =============================================================================
+
+model PauseCode {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   BigInt   @default(1) @map("tenant_id")
+  campaignId String?  @map("campaign_id") @db.VarChar(32)
+  code       String   @db.VarChar(16)
+  name       String   @db.VarChar(64)
+  billable   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_pause_codes_tenant")
+  campaign Campaign? @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pause_codes_campaign")
+
+  // Functional UNIQUE coalesced campaign_id added in extra-indexes migration:
+  //   UNIQUE (tenant_id, IFNULL(campaign_id,'__SYS__'), code)
+  @@index([tenantId, campaignId, code], map: "idx_pause_codes_t_camp_code")
+  @@map("pause_codes")
+}
+
+// =============================================================================
+// 4.11  scripts
+// =============================================================================
+
+model Script {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   BigInt   @default(1) @map("tenant_id")
+  name       String   @db.VarChar(64)
+  body       String   @db.MediumText
+  campaignId String?  @map("campaign_id") @db.VarChar(32)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_scripts_tenant")
+  campaign  Campaign?  @relation("ScriptCampaign", fields: [tenantId, campaignId], references: [tenantId, id], onDelete: NoAction, onUpdate: NoAction, map: "fk_scripts_campaign")
+  campaigns Campaign[] // back-relation for campaigns.scriptId
+
+  @@index([tenantId, campaignId], map: "idx_scripts_t_camp")
+  @@map("scripts")
+}
+
+// =============================================================================
+// 4.12  call_times
+// =============================================================================
+
+model CallTime {
+  id             BigInt   @id @default(autoincrement())
+  tenantId       BigInt   @default(1) @map("tenant_id")
+  name           String   @db.VarChar(64)
+  defaultStart   DateTime @default(dbgenerated("'09:00:00'")) @map("default_start") @db.Time(0)
+  defaultEnd     DateTime @default(dbgenerated("'21:00:00'")) @map("default_end") @db.Time(0)
+  stateOverrides Json     @map("state_overrides")
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_call_times_tenant")
+  campaigns Campaign[]
+
+  @@unique([tenantId, name], map: "uk_call_times_tenant_name")
+  @@map("call_times")
+}
+
+// =============================================================================
+// 4.13  leads  (the heart)
+// =============================================================================
+
+enum Gender {
+  M
+  F
+  U
+}
+
+model Lead {
+  id                BigInt    @id @default(autoincrement())
+  tenantId          BigInt    @default(1) @map("tenant_id")
+  listId            BigInt    @map("list_id")
+  status            String    @default("NEW") @db.VarChar(8)
+  vendorLeadCode    String?   @map("vendor_lead_code") @db.VarChar(64)
+  sourceId          String?   @map("source_id") @db.VarChar(64)
+  phoneE164         String    @map("phone_e164") @db.VarChar(16)
+  phoneAlt          String?   @map("phone_alt") @db.VarChar(16)
+  phoneAlt2         String?   @map("phone_alt2") @db.VarChar(16)
+  countryCode       String    @default("US") @map("country_code") @db.Char(2)
+  title             String?   @db.VarChar(8)
+  firstName         String?   @map("first_name") @db.VarChar(64)
+  middleInitial     String?   @map("middle_initial") @db.VarChar(4)
+  lastName          String?   @map("last_name") @db.VarChar(64)
+  address1          String?   @db.VarChar(128)
+  address2          String?   @db.VarChar(128)
+  city              String?   @db.VarChar(64)
+  state             String?   @db.Char(2)
+  postalCode        String?   @map("postal_code") @db.VarChar(16)
+  email             String?   @db.VarChar(128)
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  gender            Gender    @default(U)
+  comments          String?   @db.Text
+  rank              Int       @default(0)
+  ownerUserId       BigInt?   @map("owner_user_id")
+  customData        Json      @map("custom_data")
+  calledCount       Int       @default(0) @map("called_count")
+  lastCalledAt      DateTime? @map("last_called_at") @db.DateTime(6)
+  lastLocalCallTime DateTime? @map("last_local_call_time") @db.Time(0)
+  tzOffsetMin       Int?      @map("tz_offset_min") @db.SmallInt
+  knownTimezone     String?   @map("known_timezone") @db.VarChar(40)
+  deletedAt         DateTime? @map("deleted_at") @db.DateTime(6)
+  entryAt           DateTime  @default(now()) @map("entry_at") @db.DateTime(6)
+  modifyAt          DateTime  @default(now()) @map("modify_at") @db.DateTime(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_leads_tenant")
+  list         List           @relation(fields: [listId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_leads_list")
+  ownerUser    User?          @relation(fields: [ownerUserId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_leads_owner")
+  callbacks    Callback[]
+  hopper       HopperMirror[]
+  dispositions Disposition[]
+
+  @@index([tenantId, listId, status, modifyAt], map: "idx_leads_t_list_status_modify")
+  @@index([tenantId, phoneE164], map: "idx_leads_t_phone")
+  @@index([tenantId, status, modifyAt], map: "idx_leads_t_status_modify")
+  @@index([tenantId, ownerUserId, status], map: "idx_leads_t_owner_status")
+  @@index([tenantId, calledCount], map: "idx_leads_t_called_count")
+  @@index([tenantId, state], map: "idx_leads_t_state")
+  @@index([tenantId, postalCode], map: "idx_leads_t_postal")
+  @@index([tenantId, vendorLeadCode], map: "idx_leads_t_vendor")
+  @@index([tenantId, deletedAt], map: "idx_leads_t_deleted")
+  @@map("leads")
+}
+
+// =============================================================================
+// 4.14  dnc
+// =============================================================================
+
+enum DncSource {
+  federal
+  state
+  internal
+  litigator
+  reassigned
+}
+
+model Dnc {
+  tenantId   BigInt    @default(1) @map("tenant_id")
+  phoneE164  String    @map("phone_e164") @db.VarChar(16)
+  source     DncSource
+  state      String    @default("__") @db.Char(2)
+  campaignId String    @default("__GLOBAL__") @map("campaign_id") @db.VarChar(32)
+  addedAt    DateTime  @default(now()) @map("added_at") @db.DateTime(6)
+  addedBy    BigInt?   @map("added_by")
+  expiresAt  DateTime? @map("expires_at") @db.DateTime(6)
+  notes      String?   @db.VarChar(255)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dnc_tenant")
+
+  @@id([tenantId, phoneE164, source, state, campaignId])
+  @@index([phoneE164], map: "idx_dnc_phone_only")
+  @@index([tenantId, source, addedAt], map: "idx_dnc_t_source_added")
+  @@map("dnc")
+}
+
+// =============================================================================
+// 4.15  phone_codes  (A1 amendment: NPA + NXX granularity)
+//                   No tenant_id (sole exception — global NANP reference)
+// =============================================================================
+
+enum PhoneCodeConfidence {
+  NPA
+  NXX
+}
+
+model PhoneCode {
+  areaCode     String              @map("area_code") @db.Char(3)
+  exchangeCode String              @map("exchange_code") @db.Char(3)
+  state        String?             @db.Char(2)
+  county       String?             @db.VarChar(64)
+  tzIana       String              @map("tz_iana") @db.VarChar(40)
+  confidence   PhoneCodeConfidence @default(NXX)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.DateTime(6)
+
+  @@id([areaCode, exchangeCode])
+  @@index([state], map: "idx_phone_codes_state")
+  @@index([tzIana], map: "idx_phone_codes_tz")
+  @@map("phone_codes")
+}
+
+// =============================================================================
+// A5  phone_codes_overrides  (manual override resolver per D03)
+//     Same shape as phone_codes plus reason / created_by / created_at.
+// =============================================================================
+
+model PhoneCodeOverride {
+  areaCode        String              @map("area_code") @db.Char(3)
+  exchangeCode    String              @map("exchange_code") @db.Char(3)
+  state           String?             @db.Char(2)
+  county          String?             @db.VarChar(64)
+  tzIana          String              @map("tz_iana") @db.VarChar(40)
+  confidence      PhoneCodeConfidence @default(NXX)
+  reason          String?             @db.VarChar(255)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.DateTime(6)
+  createdByUserId BigInt?             @map("created_by_user_id")
+
+  @@id([areaCode, exchangeCode])
+  @@index([state], map: "idx_phone_overrides_state")
+  @@map("phone_codes_overrides")
+}
+
+// =============================================================================
+// A4  zip_codes  (D03 ZIP → IANA cascade tier 2)
+//                No tenant_id (global reference)
+// =============================================================================
+
+enum ZipConfidence {
+  ZIP
+}
+
+model ZipCode {
+  zip        String        @id @db.Char(5)
+  tzIana     String        @map("tz_iana") @db.VarChar(40)
+  state      String?       @db.Char(2)
+  confidence ZipConfidence @default(ZIP)
+
+  @@index([state], map: "idx_zip_codes_state")
+  @@index([tzIana], map: "idx_zip_codes_tz")
+  @@map("zip_codes")
+}
+
+// =============================================================================
+// 4.16  callbacks
+// =============================================================================
+
+enum CallbackStatus {
+  LIVE
+  PENDING
+  DONE
+  DEAD
+}
+
+model Callback {
+  id         BigInt         @id @default(autoincrement())
+  tenantId   BigInt         @default(1) @map("tenant_id")
+  leadId     BigInt         @map("lead_id")
+  campaignId String         @map("campaign_id") @db.VarChar(32)
+  userId     BigInt?        @map("user_id")
+  callbackAt DateTime       @map("callback_at") @db.DateTime(6)
+  comments   String?        @db.Text
+  status     CallbackStatus @default(PENDING)
+  createdBy  BigInt?        @map("created_by")
+  createdAt  DateTime       @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_callbacks_tenant")
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_callbacks_lead")
+  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Restrict, onUpdate: NoAction, map: "fk_callbacks_campaign")
+  user     User?    @relation("CallbacksOwner", fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_user")
+  creator  User?    @relation("CallbacksCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_creator")
+
+  @@index([tenantId, status, callbackAt], map: "idx_callbacks_t_status_due")
+  @@index([tenantId, userId, callbackAt], map: "idx_callbacks_t_user_due")
+  @@index([tenantId, leadId], map: "idx_callbacks_t_lead")
+  @@map("callbacks")
+}
+
+// =============================================================================
+// 4.17  hopper_mirror
+// =============================================================================
+
+model HopperMirror {
+  id           BigInt    @id @default(autoincrement())
+  tenantId     BigInt    @default(1) @map("tenant_id")
+  campaignId   String    @map("campaign_id") @db.VarChar(32)
+  leadId       BigInt    @map("lead_id")
+  priority     Int       @default(0)
+  scheduledAt  DateTime  @map("scheduled_at") @db.DateTime(6)
+  claimedBy    String?   @map("claimed_by") @db.VarChar(64)
+  claimedUntil DateTime? @map("claimed_until") @db.DateTime(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_hopper_tenant")
+  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_hopper_campaign")
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_hopper_lead")
+
+  @@unique([tenantId, campaignId, leadId], map: "uk_hopper_t_camp_lead")
+  @@index([tenantId, campaignId, scheduledAt], map: "idx_hopper_t_camp_scheduled")
+  @@map("hopper_mirror")
+}
+
+// =============================================================================
+// 4.18  recordings  (lifecycle / sharing — non-partitioned counterpart)
+// =============================================================================
+
+enum RecordingLifecycle {
+  encoding
+  available
+  archived
+  deleted
+}
+
+model Recording {
+  id                  BigInt             @id @default(autoincrement())
+  tenantId            BigInt             @default(1) @map("tenant_id")
+  recordingLogId      BigInt             @map("recording_log_id")
+  shareToken          Bytes?             @unique(map: "uk_recordings_share_token") @map("share_token") @db.Binary(16)
+  shareTokenExpiresAt DateTime?          @map("share_token_expires_at") @db.DateTime(6)
+  legalHold           Boolean            @default(false) @map("legal_hold")
+  lifecycleState      RecordingLifecycle @default(encoding) @map("lifecycle_state")
+  s3StorageClass      String?            @map("s3_storage_class") @db.VarChar(32)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_recordings_tenant")
+
+  @@index([tenantId, lifecycleState], map: "idx_recordings_t_lifecycle")
+  @@map("recordings")
+}
+
+// =============================================================================
+// 4.19  dispositions
+// =============================================================================
+
+model Disposition {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   BigInt   @default(1) @map("tenant_id")
+  callLogId  BigInt   @map("call_log_id")
+  leadId     BigInt   @map("lead_id")
+  campaignId String   @map("campaign_id") @db.VarChar(32)
+  userId     BigInt?  @map("user_id")
+  statusCode String   @map("status_code") @db.VarChar(8)
+  comments   String?  @db.Text
+  disposedAt DateTime @map("disposed_at") @db.DateTime(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_disp_tenant")
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_disp_lead")
+  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Restrict, onUpdate: NoAction, map: "fk_disp_campaign")
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_disp_user")
+
+  @@index([tenantId, leadId, disposedAt], map: "idx_disp_t_lead_disposed")
+  @@index([tenantId, campaignId, disposedAt], map: "idx_disp_t_camp_disposed")
+  @@map("dispositions")
+}
+
+// =============================================================================
+// 4.20  carriers
+// =============================================================================
+
+enum CarrierKind {
+  twilio
+  telnyx
+  signalwire
+  ringcentral
+  byoc
+}
+
+model Carrier {
+  id           BigInt      @id @default(autoincrement())
+  tenantId     BigInt      @default(1) @map("tenant_id")
+  name         String      @db.VarChar(64)
+  kind         CarrierKind
+  proxy        String      @db.VarChar(255)
+  usernameCt   Bytes?      @map("username_ct") @db.VarBinary(512)
+  passwordCt   Bytes?      @map("password_ct") @db.VarBinary(512)
+  kekVersion   Int         @default(1) @map("kek_version") @db.SmallInt
+  register     Boolean     @default(false)
+  callerIdE164 String?     @map("caller_id_e164") @db.VarChar(16)
+  active       Boolean     @default(true)
+  ipAllowlist  Json        @map("ip_allowlist")
+  configJson   Json        @map("config_json")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_carriers_tenant")
+  gateways   Gateway[]
+  didNumbers DidNumber[]
+  campaigns  Campaign[]  @relation("CampaignCallerCarrier")
+
+  @@unique([tenantId, name], map: "uk_carriers_tenant_name")
+  @@index([tenantId, active], map: "idx_carriers_t_active")
+  @@map("carriers")
+}
+
+// =============================================================================
+// 4.21  gateways
+// =============================================================================
+
+enum GatewayTransport {
+  udp
+  tcp
+  tls
+}
+
+model Gateway {
+  id                BigInt           @id @default(autoincrement())
+  tenantId          BigInt           @default(1) @map("tenant_id")
+  carrierId         BigInt           @map("carrier_id")
+  name              String           @db.VarChar(64)
+  proxy             String           @db.VarChar(255)
+  realm             String?          @db.VarChar(255)
+  fromUser          String?          @map("from_user") @db.VarChar(64)
+  fromDomain        String?          @map("from_domain") @db.VarChar(255)
+  extension         String?          @db.VarChar(64)
+  register          Boolean          @default(false)
+  expireSeconds     Int              @default(3600) @map("expire_seconds")
+  retrySeconds      Int              @default(30) @map("retry_seconds")
+  transport         GatewayTransport @default(udp)
+  priority          Int              @default(100) @db.SmallInt
+  active            Boolean          @default(true)
+  templateOverrides Json             @map("template_overrides")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_gateways_tenant")
+  carrier Carrier @relation(fields: [carrierId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gateways_carrier")
+
+  @@unique([tenantId, name], map: "uk_gateways_tenant_name")
+  @@index([tenantId, carrierId, active, priority], map: "idx_gateways_t_carrier_active_pri")
+  @@map("gateways")
+}
+
+// =============================================================================
+// 4.22  did_numbers
+// =============================================================================
+
+enum DidRouteKind {
+  ingroup
+  ivr
+  agent
+  ext
+  voicemail
+}
+
+model DidNumber {
+  id           BigInt       @id @default(autoincrement())
+  tenantId     BigInt       @default(1) @map("tenant_id")
+  e164         String       @db.VarChar(16)
+  carrierId    BigInt       @map("carrier_id")
+  routeKind    DidRouteKind @map("route_kind")
+  routeTarget  String       @map("route_target") @db.VarChar(64)
+  callerIdName String?      @map("caller_id_name") @db.VarChar(64)
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_tenant")
+  carrier Carrier @relation(fields: [carrierId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_carrier")
+
+  @@unique([tenantId, e164], map: "uk_dids_tenant_e164")
+  @@index([tenantId, carrierId], map: "idx_dids_t_carrier")
+  @@index([tenantId, routeKind, routeTarget], map: "idx_dids_t_route")
+  @@map("did_numbers")
+}
+
+// =============================================================================
+// 4.23  ingroups, ingroup_agents, ivr_trees
+// =============================================================================
+
+enum RingStrategy {
+  ring_all
+  longest_idle_agent
+  round_robin
+  top_down
+  agent_with_least_talk_time
+}
+
+enum IngroupOverflowAction {
+  voicemail
+  hangup
+  overflow_ingroup
+}
+
+enum IngroupRecordingMode {
+  NEVER
+  ALL
+}
+
+model Ingroup {
+  tenantId      BigInt                @default(1) @map("tenant_id")
+  id            String                @db.VarChar(32)
+  name          String                @db.VarChar(128)
+  musicOnHold   String                @default("default") @map("music_on_hold") @db.VarChar(128)
+  maxQueue      Int                   @default(100) @map("max_queue")
+  agentWaitSec  Int                   @default(60) @map("agent_wait_sec")
+  ringStrategy  RingStrategy          @default(longest_idle_agent) @map("ring_strategy")
+  priority      Int                   @default(50)
+  closerOnly    Boolean               @default(false) @map("closer_only")
+  recordingMode IngroupRecordingMode  @default(ALL) @map("recording_mode")
+  noAgentAction IngroupOverflowAction @default(voicemail) @map("no_agent_action")
+  noAgentTarget String?               @map("no_agent_target") @db.VarChar(64)
+  createdAt     DateTime              @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime              @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ingroups_tenant")
+  agents IngroupAgent[]
+
+  @@id([tenantId, id])
+  @@map("ingroups")
+}
+
+model IngroupAgent {
+  tenantId  BigInt   @default(1) @map("tenant_id")
+  ingroupId String   @map("ingroup_id") @db.VarChar(32)
+  userId    BigInt   @map("user_id")
+  rank      Int      @default(5)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ingroup_agents_tenant")
+  ingroup Ingroup @relation(fields: [tenantId, ingroupId], references: [tenantId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ingroup_agents_ingroup")
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ingroup_agents_user")
+
+  @@id([tenantId, ingroupId, userId])
+  @@index([tenantId, userId], map: "idx_ingroup_agents_t_user")
+  @@map("ingroup_agents")
+}
+
+model IvrTree {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    BigInt   @default(1) @map("tenant_id")
+  name        String   @db.VarChar(64)
+  description String?  @db.Text
+  treeJson    Json     @map("tree_json")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ivr_trees_tenant")
+
+  @@unique([tenantId, name], map: "uk_ivr_trees_tenant_name")
+  @@map("ivr_trees")
+}
+
+// =============================================================================
+// 4.24  call_log  (partitioned)
+// =============================================================================
+
+enum CallDirection {
+  out
+  in
+}
+
+enum AmdResult {
+  none
+  machine
+  human
+  unknown
+}
+
+model CallLog {
+  id           BigInt        @default(autoincrement())
+  tenantId     BigInt        @default(1) @map("tenant_id")
+  uuid         String        @db.VarChar(40)
+  parentUuid   String?       @map("parent_uuid") @db.VarChar(40)
+  leadId       BigInt?       @map("lead_id")
+  campaignId   String?       @map("campaign_id") @db.VarChar(32)
+  listId       BigInt?       @map("list_id")
+  userId       BigInt?       @map("user_id")
+  direction    CallDirection
+  phoneE164    String        @map("phone_e164") @db.VarChar(16)
+  callerId     String?       @map("caller_id") @db.VarChar(16)
+  carrierId    BigInt?       @map("carrier_id")
+  gatewayId    BigInt?       @map("gateway_id")
+  callStarted  DateTime      @map("call_started") @db.DateTime(6)
+  callAnswered DateTime?     @map("call_answered") @db.DateTime(6)
+  callEnded    DateTime?     @map("call_ended") @db.DateTime(6)
+  ringSeconds  Int?          @map("ring_seconds")
+  talkSeconds  Int?          @map("talk_seconds")
+  holdSeconds  Int?          @map("hold_seconds")
+  wrapSeconds  Int?          @map("wrap_seconds")
+  status       String?       @db.VarChar(8)
+  hangupCause  String?       @map("hangup_cause") @db.VarChar(32)
+  amdResult    AmdResult     @default(none) @map("amd_result")
+  isDrop       Boolean       @default(false) @map("is_drop")
+  recordingId  BigInt?       @map("recording_id")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime      @default(now()) @map("updated_at") @db.DateTime(6)
+
+  @@id([id, callStarted])
+  @@unique([uuid, callStarted], map: "uk_call_log_uuid")
+  @@index([tenantId, campaignId, callStarted], map: "idx_call_log_t_camp_started")
+  @@index([tenantId, leadId, callStarted], map: "idx_call_log_t_lead_started")
+  @@index([tenantId, userId, callStarted], map: "idx_call_log_t_user_started")
+  @@index([tenantId, phoneE164, callStarted], map: "idx_call_log_t_phone_started")
+  @@index([tenantId, status, callStarted], map: "idx_call_log_t_status_started")
+  @@index([tenantId, carrierId, callStarted], map: "idx_call_log_t_carrier_started")
+  @@map("call_log")
+}
+
+// =============================================================================
+// 4.25  agent_log  (partitioned)
+// =============================================================================
+
+enum AgentEvent {
+  login
+  logout
+  pause
+  unpause
+  ready
+  call_start
+  call_end
+  dispo
+  transfer
+  hold
+  retrieve
+}
+
+model AgentLog {
+  id          BigInt     @default(autoincrement())
+  tenantId    BigInt     @default(1) @map("tenant_id")
+  userId      BigInt     @map("user_id")
+  campaignId  String?    @map("campaign_id") @db.VarChar(32)
+  callLogId   BigInt?    @map("call_log_id")
+  eventAt     DateTime   @map("event_at") @db.DateTime(6)
+  event       AgentEvent
+  pauseCode   String?    @map("pause_code") @db.VarChar(16)
+  durationSec Int?       @map("duration_sec")
+  metadata    Json?
+  createdAt   DateTime   @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime   @default(now()) @map("updated_at") @db.DateTime(6)
+
+  @@id([id, eventAt])
+  @@index([tenantId, userId, eventAt], map: "idx_agent_log_t_user_event")
+  @@index([tenantId, campaignId, eventAt], map: "idx_agent_log_t_camp_event")
+  @@index([tenantId, callLogId], map: "idx_agent_log_t_call")
+  @@map("agent_log")
+}
+
+// =============================================================================
+// 4.26  recording_log  (partitioned)
+// =============================================================================
+
+enum ConsentStatus {
+  not_required
+  prompted_accepted
+  prompted_declined
+  assumed
+}
+
+model RecordingLog {
+  id            BigInt        @default(autoincrement())
+  tenantId      BigInt        @default(1) @map("tenant_id")
+  uuid          String        @db.VarChar(40)
+  callLogId     BigInt?       @map("call_log_id")
+  leadId        BigInt?       @map("lead_id")
+  campaignId    String?       @map("campaign_id") @db.VarChar(32)
+  userId        BigInt?       @map("user_id")
+  filename      String        @db.VarChar(255)
+  storageUrl    String?       @map("storage_url") @db.VarChar(512)
+  startTime     DateTime      @map("start_time") @db.DateTime(6)
+  durationSec   Int?          @map("duration_sec")
+  sizeBytes     BigInt?       @map("size_bytes")
+  encodedAt     DateTime?     @map("encoded_at") @db.DateTime(6)
+  consentStatus ConsentStatus @default(not_required) @map("consent_status")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime      @default(now()) @map("updated_at") @db.DateTime(6)
+
+  @@id([id, startTime])
+  @@unique([uuid, startTime], map: "uk_recording_log_uuid")
+  @@index([tenantId, leadId, startTime], map: "idx_recording_log_t_lead_started")
+  @@index([tenantId, campaignId, startTime], map: "idx_recording_log_t_camp_started")
+  @@index([tenantId, callLogId], map: "idx_recording_log_t_call")
+  @@index([tenantId, userId, startTime], map: "idx_recording_log_t_user_started")
+  @@map("recording_log")
+}
+
+// =============================================================================
+// 4.27  drop_log  (partitioned)
+// =============================================================================
+
+enum DropReason {
+  no_agent
+  timeout
+  queue_full
+}
+
+model DropLog {
+  id               BigInt     @default(autoincrement())
+  tenantId         BigInt     @default(1) @map("tenant_id")
+  callLogId        BigInt?    @map("call_log_id")
+  campaignId       String     @map("campaign_id") @db.VarChar(32)
+  phoneE164        String     @map("phone_e164") @db.VarChar(16)
+  droppedAt        DateTime   @map("dropped_at") @db.DateTime(6)
+  dropReason       DropReason @map("drop_reason")
+  safeHarborPlayed Boolean    @default(false) @map("safe_harbor_played")
+  createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt        DateTime   @default(now()) @map("updated_at") @db.DateTime(6)
+
+  @@id([id, droppedAt])
+  @@index([tenantId, campaignId, droppedAt], map: "idx_drop_log_t_camp_dropped")
+  @@index([tenantId, callLogId], map: "idx_drop_log_t_call")
+  @@map("drop_log")
+}
+
+// =============================================================================
+// 4.28  settings (per-tenant key/value)
+// =============================================================================
+
+model Setting {
+  tenantId  BigInt   @default(1) @map("tenant_id")
+  k         String   @db.VarChar(64)
+  v         Json
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_settings_tenant")
+
+  @@id([tenantId, k])
+  @@map("settings")
+}
+
+// =============================================================================
+// A3  auth_config  (single-row F05 hook)
+// =============================================================================
+
+model AuthConfig {
+  id                     Int @id @default(1)
+  totpGracePeriodDays    Int @default(7) @map("totp_grace_period_days")
+  passwordMinLength      Int @default(12) @map("password_min_length")
+  refreshTokenTtlSeconds Int @default(2592000) @map("refresh_token_ttl_seconds")
+  accessTokenTtlSeconds  Int @default(900) @map("access_token_ttl_seconds")
+  lockoutAfterFailures   Int @default(5) @map("lockout_after_failures")
+  lockoutWindowSeconds   Int @default(900) @map("lockout_window_seconds")
+
+  @@map("auth_config")
 }

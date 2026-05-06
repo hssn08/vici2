@@ -1,0 +1,7 @@
+-- Down migration for 20260506201500_partition_log_tables.
+--
+-- Intentionally empty: partitioned-table reorg is non-rollbackable.
+-- The forward migration drops + recreates the five log tables. To undo:
+-- run migration.down.sql for the init migration (which drops the log
+-- tables) and then re-apply init forward (which re-creates them
+-- un-partitioned). Production: forward-fix only — partitions stay.
