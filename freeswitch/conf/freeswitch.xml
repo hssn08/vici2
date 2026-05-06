@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+  vici2 FreeSWITCH master config loader.
+  F01 ships a vanilla loader. F03 (FS base config) replaces / extends it.
+-->
+<document type="freeswitch/xml">
+
+  <X-PRE-PROCESS cmd="include" data="vars.xml"/>
+
+  <section name="configuration" description="Various Configuration">
+    <X-PRE-PROCESS cmd="include" data="autoload_configs/*.xml"/>
+  </section>
+
+  <section name="dialplan" description="Regex/XML Dialplan">
+    <X-PRE-PROCESS cmd="include" data="dialplan/*.xml"/>
+  </section>
+
+  <section name="directory" description="User Directory"/>
+
+</document>
