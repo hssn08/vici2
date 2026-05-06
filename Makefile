@@ -47,7 +47,10 @@ build: build-images ## Alias for build-images.
 build-images: ## Build all docker images in parallel.
 	$(COMPOSE) build --parallel
 
-lint: lint-go lint-node lint-xml ## Lint everything.
+lint: lint-go lint-node lint-xml lint-tenant-index ## Lint everything.
+
+lint-tenant-index: ## Verify every composite index leads with tenant_id (F02 §9).
+	@./scripts/ci/check-tenant-index-leadership.sh
 
 lint-fix: ## Auto-fix lint issues where possible.
 	pnpm exec eslint . --fix
@@ -90,17 +93,33 @@ smoke: ## Smoke-test running stack against /metrics + /health endpoints.
 
 # ----- database --------------------------------------------------------------
 
-db-migrate: ## Run prisma migrate dev (interactive).
-	$(COMPOSE) run --rm api pnpm exec prisma migrate dev
+db-generate: ## Regenerate Prisma client without touching the DB.
+	cd api && pnpm exec prisma generate
 
-db-deploy: ## Run prisma migrate deploy (CI / prod).
-	$(COMPOSE) run --rm api pnpm exec prisma migrate deploy
+db-migrate: ## Apply migrations to the DB (idempotent; CI/prod-safe).
+	cd api && pnpm exec prisma migrate deploy
 
-db-reset: ## Reset the dev database (drops data).
-	$(COMPOSE) run --rm api pnpm exec prisma migrate reset --skip-seed --force
+db-migrate-dev: ## Generate new migration from schema diff (dev only).
+	cd api && pnpm exec prisma migrate dev
 
-db-seed: ## Seed dev data (after F02 ships).
-	$(COMPOSE) run --rm api pnpm exec ts-node prisma/seed.ts
+db-deploy: db-migrate ## Alias for db-migrate (CI/prod naming).
+
+db-reset: ## Drop + re-create the dev database (DESTRUCTIVE).
+	cd api && pnpm exec prisma migrate reset --force --skip-seed
+
+db-seed: ## Seed reference data (tenants, statuses, phone_codes, …).
+	cd api && pnpm exec prisma db seed
+
+db-studio: ## Launch Prisma Studio against the dev DB.
+	cd api && pnpm exec prisma studio
+
+db-bootstrap-superadmin: ## Create the initial super-admin user (F05 owns).
+	@echo "[db-bootstrap-superadmin] Not yet implemented — F05 IMPLEMENT will provide."
+	@echo "[db-bootstrap-superadmin] Per F02 amendment A6, F02 ships the users.password_hash"
+	@echo "[db-bootstrap-superadmin] column shape but does NOT seed the super-admin row."
+	@echo "[db-bootstrap-superadmin] Set BOOTSTRAP_SUPERADMIN_{EMAIL,PASSWORD,TENANT_ID} in"
+	@echo "[db-bootstrap-superadmin] .env, then re-run after F05 lands."
+	@exit 0
 
 # ----- freeswitch helpers ----------------------------------------------------
 
@@ -137,8 +156,9 @@ hooks: ## Install lefthook git hooks.
 	pnpm exec lefthook install
 
 .PHONY: help dev dev-watch dev-down logs logs-fs ps build build-images \
-	lint lint-fix lint-go lint-node lint-xml typecheck \
+	lint lint-fix lint-go lint-node lint-xml lint-tenant-index typecheck \
 	test test-go test-node smoke \
-	db-migrate db-deploy db-reset db-seed \
+	db-generate db-migrate db-migrate-dev db-deploy db-reset db-seed \
+	db-studio db-bootstrap-superadmin \
 	fs-up fs-down fs-reload fs-cli redis-cli mysql-cli \
 	clean reset hooks
