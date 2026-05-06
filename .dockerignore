@@ -1,0 +1,43 @@
+# Top-level
+.git
+.github
+.vscode
+.idea
+
+# Docs
+*.md
+!README.md
+DESIGN.md
+SPEC.md
+spec/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+node_modules
+dialer/bin
+dialer/tmp
+**/dist
+**/.next
+**/.turbo
+**/.cache
+**/coverage
+
+# Tests
+**/test
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+**/*_test.go
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+
+# TLS
+freeswitch/tls/*
+!freeswitch/tls/.gitkeep

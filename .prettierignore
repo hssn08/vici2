@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+dialer/
+freeswitch/
+kamailio/
+rtpengine/
+spec/
+scripts/
+*.md
+package-lock.json
+pnpm-lock.yaml
+go.sum

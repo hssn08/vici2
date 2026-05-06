@@ -1,0 +1,63 @@
+# --- env files ---
+.env
+.env.*
+!.env.example
+
+# --- node ---
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+*.tsbuildinfo
+.next/
+.turbo/
+.cache/
+coverage/
+dist/
+out/
+build/
+
+# --- go ---
+dialer/bin/
+dialer/tmp/
+*.out
+*.test
+*.prof
+
+# --- prisma ---
+api/prisma/*.db
+api/prisma/*.db-journal
+
+# --- docker / runtime ---
+.docker/
+*.pid
+*.sock
+
+# --- editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- secrets / certs ---
+freeswitch/tls/*.pem
+freeswitch/tls/*.key
+freeswitch/tls/*.crt
+!freeswitch/tls/.gitkeep
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- generated artifacts ---
+shared/proto/gen/
+shared/openapi/gen/
+
+# --- logs ---
+logs/
+*.log
+
+# --- OS junk ---
+.tool-versions.local
