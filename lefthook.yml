@@ -1,0 +1,54 @@
+# Lefthook hooks per SPEC.md §3 — runs lint, format, secret-scan on staged files.
+# Install with: pnpm install (root prepare script calls `lefthook install`)
+
+pre-commit:
+  parallel: true
+  commands:
+    go-lint:
+      glob: "dialer/**/*.go"
+      run: |
+        if command -v golangci-lint >/dev/null 2>&1; then
+          (cd dialer && golangci-lint run --new-from-rev=HEAD~1 ./...)
+        else
+          echo "[lefthook] golangci-lint not installed — skipping"
+        fi
+    ts-lint:
+      glob: "{api,web,workers,shared}/**/*.{ts,tsx,js,mjs,cjs}"
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+    prettier:
+      glob: "*.{json,yaml,yml}"
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+    xmllint:
+      glob: "freeswitch/conf/**/*.xml"
+      run: |
+        if command -v xmllint >/dev/null 2>&1; then
+          xmllint --noout {staged_files}
+        else
+          echo "[lefthook] xmllint not installed — skipping"
+        fi
+    gitleaks:
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks protect --staged --redact --no-banner
+        else
+          echo "[lefthook] gitleaks not installed — skipping (CI will catch)"
+        fi
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+pre-push:
+  commands:
+    typecheck-go:
+      run: |
+        if command -v go >/dev/null 2>&1; then
+          (cd dialer && go vet ./...)
+        else
+          echo "[lefthook] go not installed — skipping"
+        fi
+    typecheck-ts:
+      run: pnpm -r --if-present run typecheck
