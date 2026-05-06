@@ -1,0 +1,2 @@
+-- Down migration for 20260506201600_drop_partition_fks.
+-- Intentionally empty: the forward migration is a verification SELECT.
