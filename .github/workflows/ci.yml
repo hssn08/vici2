@@ -1,0 +1,59 @@
+# Stub CI workflow — F01 wires up the entry points; O04 expands.
+# CI calls the same Make targets a developer runs locally so local == CI.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: dialer/go.mod
+          cache: true
+          cache-dependency-path: dialer/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: make lint
+
+      - name: Type-check
+        run: make typecheck
+
+      - name: Test
+        run: make test
+
+  build-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build docker images
+        # SIGNALWIRE_TOKEN must be configured as a repo secret for FS image.
+        run: |
+          cp .env.example .env
+          echo "SIGNALWIRE_TOKEN=${{ secrets.SIGNALWIRE_TOKEN }}" >> .env
+          make build-images
