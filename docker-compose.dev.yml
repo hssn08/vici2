@@ -1,0 +1,262 @@
+# vici2 — local dev stack.
+# Per F01 PLAN §3. Single source of truth for `make dev`.
+# macOS overrides live in docker-compose.macos.yml.
+
+name: vici2
+
+x-common-env: &common-env
+  TZ: UTC
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  NODE_ENV: ${NODE_ENV:-development}
+  GO_ENV: ${GO_ENV:-development}
+
+services:
+  mysql:
+    image: mysql:8.0.40
+    container_name: vici2_mysql
+    restart: unless-stopped
+    command:
+      - "--default-authentication-plugin=caching_sha2_password"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--max-connections=500"
+      - "--innodb-buffer-pool-size=512M"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${VICI2_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${VICI2_DB_NAME}
+      MYSQL_USER: ${VICI2_DB_USER}
+      MYSQL_PASSWORD: ${VICI2_DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "${VICI2_DB_USER}",
+          "-p${VICI2_DB_PASSWORD}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [vici2_default]
+
+  redis:
+    image: redis:7.4.1-alpine
+    container_name: vici2_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+      start_period: 5s
+    networks: [vici2_default]
+
+  freeswitch:
+    build:
+      context: ./freeswitch
+      args:
+        FREESWITCH_VERSION: "1.10.12"
+        SIGNALWIRE_TOKEN: ${SIGNALWIRE_TOKEN}
+    image: vici2/freeswitch:1.10.12
+    container_name: vici2_freeswitch
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - SYS_NICE
+      - IPC_LOCK
+    ulimits:
+      rtprio: 99
+      memlock: -1
+    volumes:
+      - ./freeswitch/conf:/etc/freeswitch:ro
+      - freeswitch_recordings:/var/lib/freeswitch/recordings
+      - freeswitch_log:/var/log/freeswitch
+    environment:
+      <<: *common-env
+      FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -p ${FS_EVENT_SOCKET_PASSWORD} -x status | grep -q ^UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      target: dev
+    image: vici2/api:dev
+    container_name: vici2_api
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      PORT: ${API_HTTP_PORT:-3000}
+      METRICS_PORT: ${API_METRICS_PORT:-9101}
+      DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      FS_ESL_HOST: host.docker.internal
+      FS_ESL_PORT: 8021
+      FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+      API_JWT_SECRET: ${API_JWT_SECRET}
+      VICI2_DEFAULT_TENANT_ID: ${VICI2_DEFAULT_TENANT_ID:-1}
+    ports:
+      - "${API_HTTP_PORT:-3000}:3000"
+      - "${API_METRICS_PORT:-9101}:9101"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    develop:
+      watch:
+        - action: sync
+          path: ./api/src
+          target: /app/api/src
+          ignore:
+            - node_modules/
+        - action: sync
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: ./api/package.json
+        - action: rebuild
+          path: ./api/prisma/schema.prisma
+    networks: [vici2_default]
+
+  dialer:
+    build:
+      context: ./dialer
+      target: dev
+    image: vici2/dialer:dev
+    container_name: vici2_dialer
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      METRICS_PORT: ${DIALER_METRICS_PORT:-9102}
+      GRPC_PORT: ${DIALER_GRPC_PORT:-7000}
+      DATABASE_DSN: ${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@tcp(mysql:3306)/${VICI2_DB_NAME}?parseTime=true
+      REDIS_URL: redis://redis:6379/0
+      FS_ESL_HOST: host.docker.internal
+      FS_ESL_PORT: 8021
+      FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+    ports:
+      - "${DIALER_METRICS_PORT:-9102}:9102"
+      - "${DIALER_GRPC_PORT:-7000}:7000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9102/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    develop:
+      watch:
+        - action: sync
+          path: ./dialer
+          target: /app
+          ignore:
+            - tmp/
+            - bin/
+        - action: rebuild
+          path: ./dialer/go.mod
+    networks: [vici2_default]
+
+  workers:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+      target: dev
+    image: vici2/workers:dev
+    container_name: vici2_workers
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      METRICS_PORT: ${WORKERS_METRICS_PORT:-9103}
+      DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${WORKERS_METRICS_PORT:-9103}:9103"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9103/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    develop:
+      watch:
+        - action: sync
+          path: ./workers/src
+          target: /app/workers/src
+        - action: sync
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: ./workers/package.json
+    networks: [vici2_default]
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: dev
+    image: vici2/web:dev
+    container_name: vici2_web
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      PORT: ${WEB_PORT:-4000}
+      WATCHPACK_POLLING: "true"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+    ports:
+      - "${WEB_PORT:-4000}:4000"
+    depends_on:
+      api: { condition: service_healthy }
+    develop:
+      watch:
+        - action: sync
+          path: ./web/src
+          target: /app/web/src
+        - action: sync
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: ./web/package.json
+    networks: [vici2_default]
+
+volumes:
+  mysql_data:
+  redis_data:
+  freeswitch_recordings:
+  freeswitch_log:
+
+networks:
+  vici2_default:
+    driver: bridge

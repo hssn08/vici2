@@ -1,0 +1,107 @@
+# Reference production compose. NOT used by `make dev`.
+# Differences vs docker-compose.dev.yml:
+#   - no `develop.watch` (no hot reload)
+#   - no source bind-mounts (images self-contained)
+#   - service `target: prod` instead of `dev`
+#   - metrics ports NOT published to host (Prometheus scrapes within network)
+#   - secrets via `secrets:` (Docker secrets) instead of plain env where sensitive
+# Copy to docker-compose.prod.yml and fill in for your production environment.
+
+name: vici2
+
+x-common-env: &common-env
+  TZ: UTC
+  LOG_LEVEL: info
+  NODE_ENV: production
+  GO_ENV: production
+
+services:
+  mysql:
+    image: mysql:8.0.40
+    restart: unless-stopped
+    volumes:
+      - mysql_data:/var/lib/mysql
+    secrets:
+      - mysql_root_password
+      - mysql_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [vici2_internal]
+
+  redis:
+    image: redis:7.4.1-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+    networks: [vici2_internal]
+
+  freeswitch:
+    image: vici2/freeswitch:1.10.12
+    restart: unless-stopped
+    network_mode: host
+    cap_add: [SYS_NICE, IPC_LOCK]
+    volumes:
+      - freeswitch_recordings:/var/lib/freeswitch/recordings
+
+  api:
+    image: vici2/api:prod
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [vici2_internal, vici2_public]
+
+  dialer:
+    image: vici2/dialer:prod
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [vici2_internal]
+
+  workers:
+    image: vici2/workers:prod
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [vici2_internal]
+
+  web:
+    image: vici2/web:prod
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+    depends_on:
+      api: { condition: service_started }
+    networks: [vici2_public]
+
+volumes:
+  mysql_data:
+  redis_data:
+  freeswitch_recordings:
+
+networks:
+  vici2_internal:
+    driver: bridge
+    internal: true
+  vici2_public:
+    driver: bridge
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password
+  mysql_password:
+    file: ./secrets/mysql_password
