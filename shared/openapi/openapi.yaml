@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: vici2 API
+  version: "0.0.0"
+  description: |
+    OpenAPI surface for the vici2 REST API.
+    F01 ships only the stub. N01 (External REST API) and the per-feature
+    modules (D01, A04, etc.) extend this document with their endpoints.
+servers:
+  - url: http://localhost:3000
+    description: Local dev
+paths:
+  /health:
+    get:
+      summary: Service health check
+      operationId: health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unhealthy]
+        service:
+          type: string

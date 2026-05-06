@@ -1,0 +1,11 @@
+// vici2 Prisma schema — F02 fills in the actual models.
+// F01 only provisions the datasource + generator so `make db-migrate` runs.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
