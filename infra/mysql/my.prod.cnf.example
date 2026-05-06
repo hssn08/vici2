@@ -1,0 +1,60 @@
+# =============================================================================
+# vici2 MySQL 8.x — Phase 2 production preset (64 GB RAM box).
+# Per F02 PLAN §2.2. Operator copies to my.cnf and tunes for hardware.
+#
+# Differences from Phase 1 (infra/mysql/my.cnf):
+#   - innodb_buffer_pool_size 16G → 48G (~75% of 64GB)
+#   - innodb_buffer_pool_instances 8 → 16
+#   - innodb_redo_log_capacity 4G → 8G
+#   - innodb_io_capacity 8000 → 12000
+#   - innodb_io_capacity_max 16000 → 24000
+#   - max_connections 500 → 1000 (200 agents × ~3 + workers + ProxySQL)
+#   - table_open_cache 4000 → 8000
+# =============================================================================
+
+[mysqld]
+default_storage_engine            = InnoDB
+default_authentication_plugin     = caching_sha2_password
+character_set_server              = utf8mb4
+collation_server                  = utf8mb4_0900_ai_ci
+default_time_zone                 = '+00:00'
+sql_mode = 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'
+
+innodb_buffer_pool_size           = 48G
+innodb_buffer_pool_instances      = 16
+innodb_buffer_pool_chunk_size     = 128M
+innodb_dedicated_server           = OFF
+
+innodb_redo_log_capacity          = 8G
+
+innodb_flush_log_at_trx_commit    = 1
+sync_binlog                       = 1
+innodb_flush_method               = O_DIRECT
+innodb_doublewrite                = ON
+
+innodb_io_capacity                = 12000
+innodb_io_capacity_max            = 24000
+innodb_read_io_threads            = 8
+innodb_write_io_threads           = 8
+
+innodb_thread_concurrency         = 0
+innodb_purge_threads              = 4
+innodb_adaptive_hash_index        = ON
+innodb_adaptive_hash_index_parts  = 8
+
+log_bin                           = mysql-bin
+binlog_format                     = ROW
+binlog_row_image                  = MINIMAL
+binlog_expire_logs_seconds        = 604800
+gtid_mode                         = ON
+enforce_gtid_consistency          = ON
+
+max_connections                   = 1000
+thread_cache_size                 = 200
+table_open_cache                  = 8000
+
+slow_query_log                    = ON
+long_query_time                   = 0.5
+log_queries_not_using_indexes     = ON
+
+local_infile                      = OFF

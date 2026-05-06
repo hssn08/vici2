@@ -15,12 +15,9 @@ services:
     image: mysql:8.0.40
     container_name: vici2_mysql
     restart: unless-stopped
-    command:
-      - "--default-authentication-plugin=caching_sha2_password"
-      - "--character-set-server=utf8mb4"
-      - "--collation-server=utf8mb4_unicode_ci"
-      - "--max-connections=500"
-      - "--innodb-buffer-pool-size=512M"
+    # Per F02 PLAN §2.1: full tuning lives in infra/mysql/my.cnf, mounted
+    # at /etc/mysql/conf.d/vici2.cnf. The container CLI flags here are
+    # intentionally minimal (only what every layer needs).
     environment:
       MYSQL_ROOT_PASSWORD: ${VICI2_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${VICI2_DB_NAME}
@@ -28,24 +25,23 @@ services:
       MYSQL_PASSWORD: ${VICI2_DB_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./infra/mysql/my.cnf:/etc/mysql/conf.d/vici2.cnf:ro
+      - ./infra/mysql/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "3306:3306"
     healthcheck:
+      # Verifies the app DB exists in addition to ping (catches half-init
+      # states where the container is up but data dir initialisation
+      # failed).
       test:
         [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u",
-          "${VICI2_DB_USER}",
-          "-p${VICI2_DB_PASSWORD}",
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u ${VICI2_DB_USER} -p${VICI2_DB_PASSWORD} && mysql -u ${VICI2_DB_USER} -p${VICI2_DB_PASSWORD} -e 'SELECT 1 FROM ${VICI2_DB_NAME}.tenants LIMIT 1' >/dev/null 2>&1 || mysql -u ${VICI2_DB_USER} -p${VICI2_DB_PASSWORD} -e 'USE ${VICI2_DB_NAME}'",
         ]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 20
+      start_period: 60s
     networks: [vici2_default]
 
   redis:

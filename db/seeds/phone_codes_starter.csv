@@ -1,0 +1,21 @@
+area_code,exchange_code,state,county,tz_iana,confidence
+212,555,NY,New York,America/New_York,NPA
+213,555,CA,Los Angeles,America/Los_Angeles,NPA
+312,555,IL,Cook,America/Chicago,NPA
+317,555,IN,Marion,America/Indiana/Indianapolis,NXX
+219,555,IN,Lake,America/Chicago,NXX
+574,555,IN,St. Joseph,America/Indiana/Indianapolis,NXX
+812,555,IN,Vanderburgh,America/Chicago,NXX
+812,200,IN,Monroe,America/Indiana/Indianapolis,NXX
+850,555,FL,Leon,America/New_York,NXX
+850,200,FL,Escambia,America/Chicago,NXX
+208,555,ID,Ada,America/Boise,NXX
+208,200,ID,Kootenai,America/Los_Angeles,NXX
+605,555,SD,Minnehaha,America/Chicago,NXX
+605,200,SD,Pennington,America/Denver,NXX
+615,555,TN,Davidson,America/Chicago,NXX
+865,555,TN,Knox,America/New_York,NXX
+702,555,NV,Clark,America/Los_Angeles,NPA
+602,555,AZ,Maricopa,America/Phoenix,NPA
+303,555,CO,Denver,America/Denver,NPA
+416,555,ON,Toronto,America/Toronto,NPA
