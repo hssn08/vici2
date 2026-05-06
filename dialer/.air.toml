@@ -1,0 +1,33 @@
+# Air hot-reload config for the dialer binary.
+# Triggered by Compose Watch (see docker-compose.dev.yml).
+
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/dialer ./cmd/dialer"
+  bin = "./tmp/dialer"
+  full_bin = "./tmp/dialer"
+  include_ext = ["go", "tpl", "tmpl"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "bin"]
+  include_dir = []
+  exclude_file = []
+  exclude_regex = ["_test\\.go"]
+  delay = 1000
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = "2s"
+  log = "build-errors.log"
+
+[log]
+  time = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true
