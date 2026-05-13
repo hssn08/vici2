@@ -2,56 +2,61 @@
 
 ## Status
 
-NOT_STARTED (spec complete; awaiting implementation agent)
+IMPLEMENTED — commit `e023dee` on branch `feat/N05-implement`
 
-## Key Deliverables for Implementer
+## What Was Built
 
-- Migration: `api/prisma/migrations/20260513320000_n05_branded_calling/migration.sql`
-- Provider clients: `api/src/integrations/branded-calling/{first-orion,hiya,tns}.ts`
-- Provider interface + types: `api/src/integrations/branded-calling/types.ts`
-- Provider registry: `api/src/integrations/branded-calling/registry.ts`
-- Admin routes: `api/src/routes/admin/branded-calling/`
-- Workers: `workers/src/jobs/branded-calling/`
-- Admin UI: `web/src/app/(admin)/integrations/branded-calling/`
-- RBAC: `shared/types/src/rbac.ts` — add `branded_calling:configure`, `branded_calling:register_did`
+- **Migration** `api/prisma/migrations/20260513320000_n05_branded_calling/migration.sql`: tables `branded_calling_providers` + `branded_did_registrations`, column `did_numbers.brand_reputation_score`, extended `QuarantineReason` enum with `brand_reputation`.
+- **Prisma schema** (`api/prisma/schema.prisma`): `BrandedCallingProvider`, `BrandedDidRegistration` models; `BrandedCallingProviderKind`, `BrandVertical`, `BrandStatus`, `BrandedDidStatus` enums; `DidNumber.brandReputationScore` field.
+- **Provider interface** `api/src/integrations/branded-calling/types.ts`: `IBrandedCallingProvider`, `BrandedCallingReputationHook`, all payload types.
+- **Clients**: `first-orion.ts` (OAuth2 client-credentials), `hiya.ts` (API key), `tns.ts` (HMAC-SHA256).
+- **Vocab maps**: `vertical-map.ts`, `call-reason-map.ts` — canonical → provider enum translation.
+- **Registry** `api/src/integrations/branded-calling/registry.ts`: 15-min credential cache with explicit `invalidate()`.
+- **X04 hook** `api/src/services/number-pool/quarantine-hook.ts`: quarantines ALL pool memberships for a DID when `normalizedScore < BRAND_QUARANTINE_THRESHOLD` (default 30).
+- **Admin routes** `api/src/routes/admin/branded-calling/`: 12 endpoints across `provider.ts`, `dids.ts`, `reputation.ts`, `index.ts`, `schemas.ts`.
+- **Workers** `workers/src/jobs/branded-calling/`: `register-did.ts`, `bulk-register.ts`, `deregister-did.ts`, `poll-reputation.ts`, `scheduler.ts`.
+- **Metrics** added to `workers/src/lib/metrics.ts`: `vici2_branded_did_reputation_score` gauge, `vici2_branded_did_count` gauge.
+- **RBAC** `shared/types/src/rbac.ts`: `branded_calling:configure` and `branded_calling:register_did` verbs; both sensitive, granted to super_admin + admin.
+- **Audit** `api/src/auth/audit.ts`: 9 new `AuditAction` values for all N05 write operations.
+- **Tests** `api/test/branded-calling/`: 25 passing unit tests covering score normalization, registry caching, and quarantine hook threshold logic.
 
-## Per-Provider Configuration (Operator Reference)
+## What Is NOT Done (Phase 2 Deferred)
+
+- Admin UI (`web/src/app/(admin)/integrations/branded-calling/`) — full React page with tabs, DID table, reputation badges, dispute modal, bulk-register modal. Not implemented; wire up when UI sprint begins.
+- Workers not wired into `workers/src/index.ts` — add the `vici2:queue:branded-calling` queue + worker registrations + scheduler cron when deploying.
+- `prisma generate` needed after migration before deploying API.
+
+## Deployment Checklist
+
+1. Run `pnpm --filter @vici2/api exec prisma migrate deploy` (stamps `20260513320000_n05_branded_calling`).
+2. Run `pnpm --filter @vici2/api exec prisma generate` (regenerates Prisma client with new models).
+3. Deploy API — new routes are registered; no existing routes changed.
+4. Wire `vici2:queue:branded-calling` + `processRegisterDid/processBulkRegister/processDeregisterDid/processPollReputation` workers + `runBrandedCallingScheduler` cron into `workers/src/index.ts`.
+5. Set `BRAND_QUARANTINE_THRESHOLD` env var (default 30) in workers process.
+6. Admin configures provider credentials via API/UI; admin registers brand; admin registers DIDs.
+
+## Per-Provider Configuration
 
 ### First Orion
-- OAuth2 client-credentials flow; credentials: `client_id` + `client_secret`.
-- Token endpoint: `https://auth.firstorion.com/oauth/token`.
-- API base: `https://api.firstorion.com/engage/v2/`.
-- Requires enterprise contract; contact First Orion sales for credentials.
-- STIR/SHAKEN A-attestation preferred for full T-Mobile display.
+- OAuth2 client-credentials; credentials JSON: `{ "client_id": "...", "client_secret": "..." }`
+- Token: `https://auth.firstorion.com/oauth/token`
+- API: `https://api.firstorion.com/engage/v2/`
+- Score: 0–100 (as-is); A-attestation recommended for full T-Mobile display.
 
 ### Hiya
-- API key only; credentials: `api_key`.
-- Header: `X-API-Key`.
-- API base: `https://api.connect.hiya.com/v1/`.
-- Self-serve portal available for smaller brands; enterprise API access via sales.
+- API key only; credentials JSON: `{ "api_key": "..." }`
+- API: `https://api.connect.hiya.com/v1/`
+- Score: 0–10 → normalized ×10 → 0–100.
 - 30-day cooling period for numbers with existing spam flags.
 
 ### TNS
-- HMAC-SHA256 signed requests; credentials: `api_key` + `api_secret`.
-- Signature over `METHOD\nPATH\nTIMESTAMP\nBODY_HASH`.
-- API base: `https://ecid-api.tnsi.com/v3/`.
-- Requires enterprise contract + DUNS number.
-
-## Cost Reporting
-
-`vici2_branded_did_count` Prometheus gauge (labeled by provider + status) shows active registered DID counts. Multiply by provider cost-per-DID-per-month for cost estimates. Actual billing is via direct provider contracts.
+- HMAC-SHA256; credentials JSON: `{ "api_key": "...", "api_secret": "..." }`
+- API: `https://ecid-api.tnsi.com/v3/`
+- Score: `overall_risk_score` 0–100 (0=lowest risk); inverted to 100–score.
 
 ## X04 Quarantine Integration
 
-`BRAND_QUARANTINE_THRESHOLD` env var (default: `30`) controls the normalized score below which a DID is auto-quarantined. The hook fires from `workers/src/jobs/branded-calling/poll-reputation.ts` after every reputation poll. X04's `quarantineDidGlobally()` sets `number_pool_dids.quarantined = true` with `quarantine_reason = 'BRAND_REPUTATION'` across all pool memberships. Admin must manually unquarantine via X04 UI after remediation (dispute resolution with provider typically takes 48–72 hours).
-
-## How "Branded" Status Surfaces on DID Detail
-
-The T02 DID detail page (admin UI) reads `did_numbers.brand_reputation_score` and displays it as a badge:
-- Score ≥ 60: green "Branded Active"
-- Score 30–59: yellow "At Risk"
-- Score < 30: red "Flagged"
-- Score NULL: gray "Not Registered"
+`BRAND_QUARANTINE_THRESHOLD` (default 30) controls auto-quarantine. When poll-reputation writes a score below threshold, `quarantineDidGlobally()` sets `number_pool_dids.quarantined = true` with `quarantine_reason = 'brand_reputation'` across **all** pool memberships for that DID. Manual unquarantine via X04 UI after dispute resolution (typically 48–72h).
 
 ## API Summary
 
