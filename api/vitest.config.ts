@@ -22,6 +22,9 @@ export default defineConfig({
         "src/statuses/**/*.ts",
         "src/reporting/**/*.ts",
         "src/scripts/**/*.ts",
+        "src/routes/internal/alerts.ts",
+        "src/routes/admin/alert-receivers/**/*.ts",
+        "src/workers/alert-delivery-internals.ts",
       ],
       exclude: ["src/auth/lua/**", "src/auth/index.ts", "src/dnc/lua/**"],
       thresholds: {

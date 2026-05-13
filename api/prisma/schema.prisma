@@ -2030,3 +2030,32 @@ enum QueueLogEvent {
   timeout
   full_block
 }
+
+// =============================================================================
+// O03 — alert_receivers
+//
+// Per-tenant alert receiver config. Delivery via BullMQ worker.
+// config JSON shape varies by kind (see O03 PLAN §2).
+// =============================================================================
+
+enum AlertReceiverKind {
+  slack
+  pagerduty
+  webhook
+}
+
+model AlertReceiver {
+  id             BigInt            @id @default(autoincrement())
+  tenantId       BigInt            @default(1) @map("tenant_id")
+  name           String            @db.VarChar(128)
+  kind           AlertReceiverKind
+  config         Json
+  active         Boolean           @default(true)
+  severityFilter String            @default("page,warn,info") @map("severity_filter") @db.VarChar(32)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.DateTime(6)
+
+  @@index([tenantId, kind], map: "idx_ar_tenant_kind")
+  @@index([tenantId, active], map: "idx_ar_tenant_active")
+  @@map("alert_receivers")
+}
