@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@vici2/auth": "workspace:*",
     "@vici2/types": "workspace:*",
     "bullmq": "^5.76.8",
     "chardet": "^2.1.1",
