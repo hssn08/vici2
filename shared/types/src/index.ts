@@ -13,3 +13,4 @@ export const VICI2_VERSION = "0.0.0" as const;
 
 export * from "./rbac.js";
 export * from "./auth-claims.js";
+export * from "./status.js";

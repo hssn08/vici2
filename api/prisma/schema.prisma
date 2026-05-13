@@ -495,19 +495,26 @@ model CampaignList {
 // =============================================================================
 
 model Status {
-  tenantId      BigInt   @default(1) @map("tenant_id")
-  campaignId    String   @map("campaign_id") @db.VarChar(32)
-  status        String   @db.VarChar(8)
-  description   String   @default("") @db.VarChar(128)
-  selectable    Boolean  @default(true)
-  humanAnswered Boolean  @default(false) @map("human_answered")
-  sale          Boolean  @default(false)
-  dnc           Boolean  @default(false)
-  callback      Boolean  @default(false)
-  notInterested Boolean  @default(false) @map("not_interested")
-  hotkey        String?  @db.Char(1)
-  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+  tenantId             BigInt   @default(1) @map("tenant_id")
+  campaignId           String   @map("campaign_id") @db.VarChar(32)
+  // D04 amendment: widened from VARCHAR(8) to VARCHAR(24) for GATEWAY_LIMIT_TRY_LATER
+  status               String   @db.VarChar(24)
+  description          String   @default("") @db.VarChar(128)
+  selectable           Boolean  @default(true)
+  humanAnswered        Boolean  @default(false) @map("human_answered")
+  sale                 Boolean  @default(false)
+  dnc                  Boolean  @default(false)
+  callback             Boolean  @default(false)
+  notInterested        Boolean  @default(false) @map("not_interested")
+  hotkey               String?  @db.Char(1)
+  // D04 amendment: recycle-delay semantics (NULL=campaign default, 0=immediate, -1=terminal, >0=seconds)
+  recycleDelaySeconds  Int?     @map("recycle_delay_seconds")
+  // D04 amendment: status taxonomy category
+  category             String?  @db.VarChar(20)
+  // D04 amendment: which module emits this status
+  systemOwner          String?  @map("system_owner") @db.VarChar(8)
+  createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_statuses_tenant")
   // Note: no DB-level FK to campaigns because the __SYS__ sentinel does not
