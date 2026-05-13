@@ -105,7 +105,17 @@ export type AuditAction =
   | "sf_integration.oauth_complete"
   | "sf_integration.patched"
   | "sf_integration.disconnected"
-  | "sf_integration.lead_imported";
+  | "sf_integration.lead_imported"
+  // N05 — branded calling
+  | "branded_calling.provider.created"
+  | "branded_calling.provider.updated"
+  | "branded_calling.provider.deleted"
+  | "branded_calling.did.registration_requested"
+  | "branded_calling.did.deregistration_requested"
+  | "branded_calling.did.bulk_registration_requested"
+  | "branded_calling.did.dispute_submitted"
+  | "branded_calling.did.registered"
+  | "branded_calling.did.deregistered";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 

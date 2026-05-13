@@ -36,6 +36,8 @@ import { registerAdminRndRoutes } from "./rnd/index.js";
 import { registerAdminNumberPoolRoutes } from "./number-pools/index.js";
 // N03 — Salesforce Open CTI integration
 import { registerSfIntegrationRoutes } from "../adapters/sf-integration/index.js";
+// N05 — Branded calling
+import { registerAdminBrandedCallingRoutes } from "./branded-calling/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -88,4 +90,6 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   await registerAdminNumberPoolRoutes(app);
   // N03 — Salesforce Open CTI integration
   await registerSfIntegrationRoutes(app);
+  // N05 — Branded calling
+  await registerAdminBrandedCallingRoutes(app);
 }
