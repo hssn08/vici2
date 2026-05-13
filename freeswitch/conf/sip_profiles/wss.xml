@@ -44,10 +44,14 @@
     <param name="outbound-codec-prefs" value="$${wss_codec_prefs}"/>
     <param name="inbound-codec-negotiation" value="generous"/>
 
-    <!-- DTLS-SRTP mandatory for browsers -->
-    <param name="rtp-secure-media" value="mandatory"/>
-    <param name="rtp-secure-media-inbound" value="mandatory"/>
-    <param name="rtp-secure-media-outbound" value="mandatory"/>
+    <!-- X01: rtpengine handles DTLS-SRTP toward the browser.
+         FS uses plain RTP on the FS↔rtpengine loopback leg.
+         mod_rtpengine rewrites SDPs per-call via ng-protocol; "optional" allows
+         FS to accept plain RTP when rtpengine rewrites the offer, while still
+         accepting SRTP on calls in pass-through mode (rtpengine unavailable).
+         IMPORTANT: apply atomically with enabling mod_rtpengine in modules.conf.xml.
+         Rollback: restore "mandatory" and remove mod_rtpengine before FS restart. -->
+    <param name="rtp-secure-media" value="optional"/>
 
     <!-- WebRTC ICE -->
     <param name="apply-candidate-acl" value="webrtc_candidates"/>
