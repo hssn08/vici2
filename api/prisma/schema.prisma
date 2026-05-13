@@ -176,6 +176,8 @@ model Tenant {
   callScorecards     CallScorecard[]
   callAnnotations    CallAnnotation[]
   agentFeedback      AgentFeedback[]
+  // X04: number pools
+  numberPools        NumberPool[]
 
   @@map("tenants")
 }
@@ -502,6 +504,8 @@ model Campaign {
   callbackNoAnswerPolicy        CallbackNoAnswerPolicy @default(leave_callbk) @map("callback_no_answer_policy")
   callbackGraceWindowSeconds    Int                    @default(30) @map("callback_grace_window_seconds")
   callbackStaleThresholdSeconds Int                    @default(14400) @map("callback_stale_threshold_seconds")
+  // X04: number pool assignment (overrides CID waterfall tier 3)
+  numberPoolId   BigInt?            @map("number_pool_id")
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -511,6 +515,8 @@ model Campaign {
   callTime        CallTime?                @relation(fields: [callTimeId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_calltime")
   /// I05: VM drop audio asset
   vmdropAsset     VoicemailDropAsset?      @relation(fields: [vmdropAssetId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_camp_vmdrop_asset")
+  /// X04: number pool assignment
+  numberPool      NumberPool?              @relation(fields: [numberPoolId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_number_pool")
   campaignLists   CampaignList[]
   pauseCodes      PauseCode[]
   scripts         Script[]                 @relation("ScriptCampaign")
@@ -1175,8 +1181,9 @@ model DidNumber {
   createdAt       DateTime     @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.DateTime(6)
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_tenant")
-  carrier Carrier @relation(fields: [carrierId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_carrier")
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_tenant")
+  carrier        Carrier         @relation(fields: [carrierId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_carrier")
+  numberPoolDids NumberPoolDid[]
 
   @@unique([tenantId, e164], map: "uk_dids_tenant_e164")
   @@index([tenantId, carrierId], map: "idx_dids_t_carrier")
@@ -2589,6 +2596,89 @@ model CallAnnotation {
   @@index([tenantId, callUuid, timestampMs], map: "idx_ca_t_call")
   @@index([scorecardId, timestampMs], map: "idx_ca_scorecard")
   @@map("call_annotations")
+}
+
+// =============================================================================
+// X04 — Number Pool + Rotation
+// =============================================================================
+
+enum PoolStrategy {
+  health_weighted_lru
+  round_robin
+  random
+  least_recently_used
+}
+
+enum QuarantineReason {
+  low_answer_rate
+  high_complaint_rate
+  manual
+  label_detected
+}
+
+enum AttestLevel {
+  A
+  B
+  C
+  unknown
+}
+
+model NumberPool {
+  id            BigInt        @id @default(autoincrement())
+  tenantId      BigInt        @default(1) @map("tenant_id")
+  name          String        @db.VarChar(128)
+  description   String?       @db.Text
+  strategy      PoolStrategy  @default(health_weighted_lru)
+  arFloor       Decimal       @default(0.0800) @map("ar_floor") @db.Decimal(5, 4)
+  arMinSample   Int           @default(200)    @map("ar_min_sample")
+  crCeil        Decimal       @default(0.0500) @map("cr_ceil") @db.Decimal(5, 4)
+  crMinSample   Int           @default(100)    @map("cr_min_sample")
+  dailyCap      Int           @default(200)    @map("daily_cap") @db.UnsignedSmallInt
+  minActiveSize Int           @default(3)      @map("min_active_size") @db.UnsignedTinyInt
+  maxConcurrent Int           @default(5)      @map("max_concurrent") @db.UnsignedTinyInt
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_pools_tenant")
+  dids      NumberPoolDid[]
+  campaigns Campaign[]
+
+  @@unique([tenantId, name], map: "uk_pools_tenant_name")
+  @@index([tenantId, active], map: "idx_pools_tenant_active")
+  @@map("number_pools")
+}
+
+model NumberPoolDid {
+  id                 BigInt            @id @default(autoincrement())
+  poolId             BigInt            @map("pool_id")
+  didId              BigInt            @map("did_id")
+  tenantId           BigInt            @default(1) @map("tenant_id")
+  areaCode           String            @default("") @map("area_code") @db.Char(3)
+  quarantined        Boolean           @default(false)
+  quarantinedAt      DateTime?         @map("quarantined_at") @db.DateTime(6)
+  quarantineReason   QuarantineReason? @map("quarantine_reason")
+  quarantineMeta     Json?             @map("quarantine_meta")
+  firstUsedAt        DateTime?         @map("first_used_at") @db.DateTime(6)
+  lastUsedAt         DateTime?         @map("last_used_at") @db.DateTime(6)
+  callCount7d        Int               @default(0) @map("call_count_7d")
+  answerCount7d      Int               @default(0) @map("answer_count_7d")
+  callCount30d       Int               @default(0) @map("call_count_30d")
+  shortCallCount30d  Int               @default(0) @map("short_call_count_30d")
+  complaintCount30d  Int               @default(0) @map("complaint_count_30d")
+  healthScore        Int               @default(100) @map("health_score") @db.UnsignedTinyInt
+  attestLevel        AttestLevel       @default(unknown) @map("attest_level")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.DateTime(6)
+
+  pool NumberPool @relation(fields: [poolId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_npd_pool")
+  did  DidNumber  @relation(fields: [didId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_npd_did")
+
+  @@unique([poolId, didId], map: "uk_pool_did")
+  @@index([tenantId, poolId, quarantined, healthScore], map: "idx_npd_tenant_pool")
+  @@index([didId], map: "idx_npd_did")
+  @@index([poolId, areaCode, quarantined], map: "idx_npd_area_code")
+  @@map("number_pool_dids")
 }
 
 model AgentFeedback {

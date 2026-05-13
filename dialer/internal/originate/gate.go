@@ -47,15 +47,18 @@ type GateResult struct {
 
 // GateScratch carries side-band state across gates within one Originate call.
 type GateScratch struct {
-	CallerID           string
-	CallerIDName       string
-	CallerIDSource     OriginateCidSource
-	ResolvedCarrierID  int64
-	ResolvedGatewayID  int64
+	CallerID            string
+	CallerIDName        string
+	CallerIDSource      OriginateCidSource
+	ResolvedCarrierID   int64
+	ResolvedGatewayID   int64
 	ResolvedGatewayName string
-	TcpaTzIANA         string
+	TcpaTzIANA          string
 	// ConsentDecision is the final consent mode (for channel-var assembly).
-	ConsentDecision    string
+	ConsentDecision string
+	// PoolNPID is the number_pool_dids.id that supplied the CID via X04 pool picker.
+	// Zero means pool was not used. Set alongside CidSourceLocalPresence.
+	PoolNPID int64
 }
 
 // Gate represents one compliance check in the 5-gate pipeline.

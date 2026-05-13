@@ -66,6 +66,38 @@ func TestKeysHashTagsColocate(t *testing.T) {
 	}
 }
 
+// TestX04PoolKeys verifies X04 pool key format and hash-tag colocating.
+func TestX04PoolKeys(t *testing.T) {
+	k := NewKeys(1)
+	poolID := int64(99)
+	didID := int64(55)
+
+	cases := []struct{ got, want string }{
+		{k.PoolRRCursor(poolID), "t:1:pool:{99}:rr_cursor"},
+		{k.PoolMembers(poolID), "t:1:pool:{99}:members"},
+		{k.PoolInvalidate(poolID), "t:1:pool:{99}:invalidate"},
+		{k.DIDDailyCalls(didID), "t:1:did:{55}:daily_calls"},
+		{k.DIDConcurrent(didID), "t:1:did:{55}:concurrent"},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("X04 key: got %q want %q", c.got, c.want)
+		}
+	}
+
+	// All pool keys must share the same hash tag {99}
+	tag := "{99}"
+	for _, key := range []string{
+		k.PoolRRCursor(poolID),
+		k.PoolMembers(poolID),
+		k.PoolInvalidate(poolID),
+	} {
+		if !contains(key, tag) {
+			t.Errorf("pool key %q missing hash tag %q", key, tag)
+		}
+	}
+}
+
 func TestKeysPanicsOnBadTenant(t *testing.T) {
 	defer func() {
 		if recover() == nil {

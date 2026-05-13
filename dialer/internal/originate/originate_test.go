@@ -212,7 +212,7 @@ func TestPickCallerID_Waterfall(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			num, _, src, err := originate.PickCallerID(&tt.req)
+			num, _, src, err := originate.PickCallerID(context.Background(), &tt.req, nil)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error but got nil")

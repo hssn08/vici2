@@ -122,6 +122,11 @@ type OriginateRequest struct {
 	// treats the call as consent-required even if recording policy is NEVER.
 	AMDAction             string // "drop" | "vmdrop" | "message" | "park" | "transfer"
 	VMDropRequiresConsent bool   // campaigns.vmdrop_requires_consent (default true)
+
+	// X04: number pool — 0 = no pool; non-zero triggers Tier 3 CID waterfall.
+	NumberPoolID int64
+	// X05: local-presence area code hint — "" = no filter.
+	LocalPresenceAreaCode string
 }
 
 // OriginateResult is returned on full pipeline pass or idempotent replay.

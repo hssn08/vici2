@@ -39,6 +39,13 @@ import {
   instrumentWorker,
   startMetricsPoller,
 } from './lib/metrics.js';
+import {
+  POOL_REAPER_QUEUE_NAME,
+  POOL_REAPER_CRON,
+  POOL_REAPER_JOB_ID,
+  POOL_REAPER_JOB_OPTS,
+  runPoolReaperJob,
+} from './jobs/number-pool-reaper/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE = 'workers';
@@ -184,6 +191,7 @@ const DLQ_STREAMS = new Map([
   ['recording-log-writer',    dlqStream('recording-log-writer')],
   ['freeswitch-event-router', dlqStream('freeswitch-event-router')],
   ['callback-fire',           dlqStream('callback-fire')],
+  ['number-pool-reaper',      dlqStream('number-pool-reaper')],
 ]);
 
 // ---- Workers startup -------------------------------------------------------
@@ -193,6 +201,7 @@ async function startWorkers(): Promise<{
   auditAttestWorker: Worker;
   federalDncWorker: Worker;
   stateDncWorker: Worker;
+  poolReaperWorker: Worker;
   intervals: NodeJS.Timeout[];
 }> {
   // -- Lead Import (sandboxed processor, PLAN §4) ---------------------------
@@ -313,6 +322,34 @@ async function startWorkers(): Promise<{
     logger.error({ err }, 'state-dnc-worker: error'),
   );
 
+  // -- X04 Number Pool Reaper (hourly cron 0 * * * * UTC) ------------------
+  const poolReaperQueueName = POOL_REAPER_QUEUE_NAME;
+  const poolReaperQueue = registerQueue(poolReaperQueueName);
+
+  await poolReaperQueue.add('reap', {}, {
+    repeat: { pattern: POOL_REAPER_CRON, tz: 'UTC' },
+    jobId: POOL_REAPER_JOB_ID,
+    ...POOL_REAPER_JOB_OPTS,
+  });
+
+  const poolReaperWorker = new Worker(
+    poolReaperQueueName,
+    async (_job) => {
+      await runPoolReaperJob(prisma, logger);
+    },
+    {
+      ...BASE_CONNECTION,
+      concurrency: 1,
+      lockDuration: 300_000,
+      stalledInterval: 60_000,
+    },
+  );
+  instrumentWorker(poolReaperWorker, poolReaperQueueName);
+  attachDlqOnFailed(poolReaperWorker, 'number-pool-reaper', poolReaperQueueName);
+  poolReaperWorker.on('error', (err) =>
+    logger.error({ err }, 'pool-reaper-worker: error'),
+  );
+
   // -- Callback tick workers (setInterval + Valkey lock, PLAN §2.3) ---------
   // D06 IMPLEMENT replaces these stubs with full tick logic.
   const intervals: NodeJS.Timeout[] = [];
@@ -341,6 +378,7 @@ async function startWorkers(): Promise<{
     auditAttestWorker,
     federalDncWorker,
     stateDncWorker,
+    poolReaperWorker,
     intervals,
   };
 }
@@ -362,6 +400,7 @@ async function main(): Promise<void> {
     auditAttestWorker,
     federalDncWorker,
     stateDncWorker,
+    poolReaperWorker,
     intervals,
   } = await startWorkers();
 
@@ -401,6 +440,15 @@ async function main(): Promise<void> {
   });
 
   // BullMQ workers — drain with timeout (in reverse order of shutdown priority)
+  shutdownMgr.register({
+    name: 'pool-reaper-worker',
+    close: async () => {
+      await poolReaperWorker.pause(true);
+      await poolReaperWorker.close(false);
+    },
+    timeoutMs: SHUTDOWN_TIMEOUT_MS,
+  });
+
   shutdownMgr.register({
     name: 'state-dnc-worker',
     close: async () => {
