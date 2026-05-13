@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 import { DispositionPicker } from "../DispositionPicker";
 import { useCallStore } from "@/lib/stores/call";
 import { useUiStore } from "@/lib/stores/ui";
@@ -125,7 +127,7 @@ describe("DispositionPicker", () => {
     });
   });
 
-  it("shows callback datetime when checkbox checked", () => {
+  it("shows Schedule Callback button (A08)", () => {
     useCallStore.setState({
       phase: "wrapup",
       callUuid: "call-1",
@@ -133,7 +135,9 @@ describe("DispositionPicker", () => {
       campaign: defaultCampaign,
     });
     render(<DispositionPicker />);
-    fireEvent.click(screen.getByLabelText(/Schedule callback/i));
-    expect(screen.getByLabelText(/Callback date and time/i)).toBeInTheDocument();
+    // A08 replaced the inline checkbox+datetime with a button that opens CallbackPicker modal
+    expect(
+      screen.getByRole("button", { name: /Schedule Callback/i }),
+    ).toBeInTheDocument();
   });
 });

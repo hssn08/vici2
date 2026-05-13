@@ -1,153 +1,116 @@
 # A08 — Callback Scheduling UI: HANDOFF
 
-> For: IMPLEMENT agent
-> Prerequisite reading: RESEARCH.md + PLAN.md in this directory
+> Status: IMPLEMENTED
+> Implemented by: IMPLEMENT agent (Claude Sonnet 4.6)
+> Commit: a4bbaa0
+> Branch: worktree-agent-a1a792bc696afca2a (target: feat/A08-implement)
+> Date: 2026-05-13
 
 ---
 
-## What you are building
+## What was built
 
-Five deliverables for the agent-facing callback UI:
-1. `CallbackPicker` modal (schedule callback from dispo screen)
-2. `CallbackList` / `CallbackRow` (view, snooze, cancel on `/callbacks` page)
-3. `SnoozeMenu` (preset snooze options dropdown)
-4. `DueCallbackToast` (urgent WS-triggered toast with Dial / Snooze actions)
-5. Shared hooks: `useCallbacks`, `useCallbackPicker`, `useCallbacksDue`
+Five surface areas implemented per PLAN.md:
 
----
+1. **CallbackPicker modal** — `web/src/components/call/CallbackPicker.tsx`
+   - Uses `Dialog` + `useCallbackPicker` hook
+   - Native `<input type="datetime-local">`, no external date picker
+   - TCPA advisory banner (amber, non-blocking) using `isOutsideTcpaWindow()`
+   - Scope fieldset (Me only / Anyone), 255-char comments textarea
+   - Client-side validation: ≥5 min, ≤1 year, required field
+   - Displays lead's local time preview using `formatLeadLocalTime()`
 
-## Files to read first (in order)
+2. **CallbackList / CallbackRow / SnoozeMenu** — `/callbacks` page
+   - `web/src/components/call/CallbackList.tsx` — self-contained, uses `useCallbacks()`
+   - `web/src/components/call/CallbackRow.tsx` — status badge, TCPA badge, Dial/Snooze/Cancel
+   - `web/src/components/call/SnoozeMenu.tsx` — 30m/1h/3h/Tomorrow-9am/Custom presets
+   - Cancel uses inline confirm (no modal), with optimistic removal + revert on error
 
-1. `/root/vici2/api/src/callbacks/index.ts` — exact API routes
-2. `/root/vici2/api/src/callbacks/schemas.ts` — request/response shapes + `validateCallbackAt`
-3. `/root/vici2/api/src/callbacks/service.ts` — `serializeCallback` response shape
-4. `/root/vici2/web/src/components/call/CallbackScheduler.tsx` — the existing stub to replace
-5. `/root/vici2/web/src/components/call/DispositionPicker.tsx` — where CallbackPicker is triggered from (lines 167-188 are the inline block to replace)
-6. `/root/vici2/web/src/components/ui/dialog.tsx` — Dialog primitives to use
-7. `/root/vici2/web/src/components/ui/toast.tsx` — Toaster to extend with `actions`
-8. `/root/vici2/web/src/lib/hooks/useNotifications.ts` — exact pattern for hook with WS + fetch
-9. `/root/vici2/web/src/app/(agent)/auto/_components/AutoDialShell.tsx` — WS subscribe pattern
-10. `/root/vici2/web/src/lib/ws.ts` — `createReconnectingWs` API
+3. **DueCallbackToast** — `web/src/components/call/CallbackToast.tsx`
+   - `useCallbackToast()` hook pushes persistent toast with Dial/Snooze/Dismiss actions
+   - Actions array extension to Toast type (backward-compatible)
 
----
+4. **useCallbacksDue** — `web/src/lib/hooks/useCallbacksDue.ts`
+   - WS subscription to `callback_due` events via `createReconnectingWs`
+   - 30s poll fallback: checks LIVE callbacks not in `dueShown`
+   - BroadcastChannel `"vici2-callbacks"` for multi-tab dedup
+   - `CallbackDueWatcher` component mounted in `AgentShell`
 
-## Implementation sequence
-
-**Step 1 — Types and utilities**
-- Create `web/src/lib/types/callbacks.ts`
-- Include: `Callback` interface, `isOutsideTcpaWindow()`, `formatCallbackTime()`, `formatLeadLocalTime()`
-
-**Step 2 — Zustand store**
-- Create `web/src/lib/stores/callbacks.ts`
-- In-memory only (no `persist`): `{ dueShown: Set<string>, addDueShown, clearDueShown }`
-
-**Step 3 — Extend Toast**
-- Edit `web/src/components/ui/toast.tsx`
-- Add optional `actions?: Array<{ label: string; onClick: () => void; variant?: "primary" | "secondary" }>` to `Toast` interface
-- Update Toaster render to show action buttons if present
-
-**Step 4 — `useCallbacks` hook**
-- Create `web/src/lib/hooks/useCallbacks.ts`
-- Fetches `GET /api/agent/callbacks/mine`
-- Exposes: `callbacks`, `loading`, `hasMore`, `refresh`, `snooze(id, callbackAt)`, `cancel(id)`
-- Snooze and cancel use optimistic updates, revert on error
-
-**Step 5 — `useCallbackPicker` hook**
-- Create `web/src/lib/hooks/useCallbackPicker.ts`
-- Manages form state for the picker modal
-- Calls `POST /api/agent/callbacks`
-- Computes `tcpaWarning` via `isOutsideTcpaWindow`
-
-**Step 6 — `CallbackRow` and `SnoozeMenu`**
-- Create `web/src/components/call/CallbackRow.tsx`
-- Create `web/src/components/call/SnoozeMenu.tsx` (presets: 30min, 1h, 3h, Tomorrow 9am, Custom)
-
-**Step 7 — `CallbackList` and page**
-- Create `web/src/components/call/CallbackList.tsx` — uses `useCallbacks()`
-- Replace stub in `web/src/app/(agent)/callbacks/page.tsx` with `<CallbackListClient />`
-
-**Step 8 — `CallbackPicker` modal**
-- Create `web/src/components/call/CallbackPicker.tsx`
-- Uses `<Dialog>`, `<DialogContent>`, `<DialogHeader>`, `<DialogTitle>` from `web/src/components/ui/dialog.tsx`
-- Uses `useCallbackPicker` hook internally
-
-**Step 9 — Wire CallbackPicker into DispositionPicker**
-- Edit `web/src/components/call/DispositionPicker.tsx`
-- Remove inline datetime-local block (lines ~167-188)
-- Add `callbackOpen` state, `<Button>Schedule Callback</Button>`, and `<CallbackPicker ...>`
-
-**Step 10 — `useCallbacksDue` and toast**
-- Create `web/src/lib/hooks/useCallbacksDue.ts`
-- WS subscribe to `"callback_due"` + 30s poll fallback
-- Create `web/src/components/call/CallbackToast.tsx` (the `useCallbackToast` hook)
-- Mount `<CallbackDueWatcher>` in `web/src/app/(agent)/AgentShell.tsx` alongside `<HotkeyHelpOverlay>`
-
-**Step 11 — Tests**
-- Create `web/src/test/callback.spec.ts`
-- Vitest unit tests for utility functions and hook mock behavior
-- Playwright E2E stubs for the four golden paths
+5. **Shared hooks and types**
+   - `web/src/lib/hooks/useCallbacks.ts` — list, snooze, cancel with optimistic updates
+   - `web/src/lib/hooks/useCallbackPicker.ts` — form state + submit to `POST /api/agent/callbacks`
+   - `web/src/lib/types/callbacks.ts` — `Callback` interface, TCPA utilities, formatters
+   - `web/src/lib/stores/callbacks.ts` — in-memory Zustand store (no persist, PII safe)
 
 ---
 
-## API paths (exact)
+## Files changed (16 total)
 
-| Action | Path |
+### New files (11)
+
+| File | Purpose |
 |---|---|
-| List mine | `GET /api/agent/callbacks/mine` |
-| Create | `POST /api/agent/callbacks` |
-| Snooze | `POST /api/agent/callbacks/:id/snooze` |
-| Cancel | `POST /api/agent/callbacks/:id/cancel` |
+| `web/src/lib/types/callbacks.ts` | Types + TCPA utilities + formatters |
+| `web/src/lib/stores/callbacks.ts` | Zustand dueShown store (in-memory) |
+| `web/src/lib/hooks/useCallbacks.ts` | List fetch + optimistic snooze/cancel |
+| `web/src/lib/hooks/useCallbackPicker.ts` | Picker form state + submit |
+| `web/src/lib/hooks/useCallbacksDue.ts` | WS + poll + BroadcastChannel watcher |
+| `web/src/components/call/CallbackPicker.tsx` | Schedule modal |
+| `web/src/components/call/CallbackList.tsx` | /callbacks page client component |
+| `web/src/components/call/CallbackRow.tsx` | Single callback row |
+| `web/src/components/call/SnoozeMenu.tsx` | Snooze preset dropdown |
+| `web/src/components/call/CallbackToast.tsx` | useCallbackToast hook |
+| `web/src/test/unit/callback.test.ts` | 18 Vitest unit tests |
 
-Use `apiFetch` from `web/src/lib/api/index.ts` for all calls.
+### Modified files (5)
 
----
-
-## WS event to handle
-
-Event type: `"callback_due"`
-
-Expected data shape:
-```ts
-{
-  callback_id: string;
-  lead_id: string;
-  lead_name: string;
-  phone: string;
-  callback_at: string;
-  comments: string | null;
-}
-```
-
-Subscribe pattern (from AutoDialShell):
-```ts
-const ws = createReconnectingWs({ url: () => getWsUrl(), token: () => useAuthStore.getState().wsToken });
-const unsub = ws.subscribe("callback_due", (event) => { ... });
-ws.start();
-return () => { unsub(); ws.stop(); };
-```
+| File | Change |
+|---|---|
+| `web/src/app/(agent)/callbacks/page.tsx` | Replace stub → `<CallbackListClient />` |
+| `web/src/components/ui/toast.tsx` | Add optional `actions?: ToastAction[]` to Toast type |
+| `web/src/components/call/DispositionPicker.tsx` | Replace inline checkbox block with `<CallbackPicker>` button |
+| `web/src/components/call/__tests__/DispositionPicker.test.tsx` | Update test for A08 changes |
+| `web/src/app/(agent)/AgentShell.tsx` | Mount `<CallbackDueWatcher>` |
 
 ---
 
-## Where M02 surfaces the campaign toggle
+## Test results
 
-PLAN.md §12 (Non-Goals) — M02 will import `<CallbackPicker>` from this module.
-The public interface to export from `CallbackPicker.tsx` is:
-```tsx
-export { CallbackPicker } from "./CallbackPicker";
-export type { CallbackPickerProps } from "./CallbackPicker";
 ```
-
-M02 mounts `<CallbackPicker>` in the campaign settings form to test the
-"scheduled callbacks enabled" toggle. No additional work needed in A08 for M02;
-just ensure the props interface is stable.
+Test Files  41 passed (41)
+Tests       349 passed (349)   (+18 new A08 tests)
+Lint        0 errors, 44 warnings (all pre-existing warnings)
+TypeCheck   0 errors in A08 files (pre-existing errors in unrelated files)
+```
 
 ---
 
-## Critical constraints
+## Key design decisions
 
-- **No new npm packages.** Use `datetime-local` input, `Intl.DateTimeFormat`, existing components.
-- **No PII in localStorage or Zustand persist.** All callback data is in-memory only.
-- **Optimistic updates must revert on error.** Always call `refresh()` on API failure.
-- **`callback_at` must be ISO-8601 UTC** before posting. Convert with `new Date(datetimeLocalValue).toISOString()`.
-- **TCPA warning is advisory.** Never block submission; only show a yellow banner.
-- **Minimum callback time is 5 minutes** (server enforced, validate client-side too with same threshold).
+- `leadTzIana` is passed as `null` from DispositionPicker (the `LeadSnapshot` has
+  `tzOffsetMin` not IANA string). TCPA check is still client-side advisory using
+  the `null` guard in `isOutsideTcpaWindow()`. Phase 2 can add IANA mapping.
+- `CallbackDueWatcher` creates its own WS connection (separate from A03's
+  `useAgentStateSync` connection). This is consistent with how AutoDialShell does it.
+  A future cleanup could share a single WS connection.
+- The `useCallbackToast` hook calls `useCallbacks()` internally to get `snooze()`.
+  This means the toast's snooze action operates on a separate hook instance from
+  the list page. Both will eventually sync via the 30s poll or page refresh.
+- BroadcastChannel guard: `typeof BroadcastChannel !== "undefined"` protects SSR.
+
+---
+
+## Follow-ups for future modules
+
+- **M02**: Import `<CallbackPicker>` from `web/src/components/call/CallbackPicker.tsx`.
+  The `CallbackPickerProps` interface is exported and stable.
+- **C04**: When TCPA gate is wired, the API will return `tcpa_warning` in the POST
+  response; the `CallbackPicker` already reads `response.tcpa_warning` and displays
+  the banner.
+- **Phase 2**: Add `leadTzIana` to `LeadSnapshot` in `web/src/lib/stores/call.ts`
+  to enable real TCPA warnings in the picker. Currently passes `null`.
+- **Phase 2**: Wire `onScheduleCallback` in `ReservationOverlay.tsx` to open
+  `<CallbackPicker>` for preview-mode pre-call scheduling.
+- **I04**: Inbound callback queue integration is out of scope for A08.
+- **Shared WS**: Consider single reconnecting WS instance shared across A03 agent
+  sync and A08 callback due watcher hooks.
