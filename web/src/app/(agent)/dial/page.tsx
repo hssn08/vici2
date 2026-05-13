@@ -1,25 +1,15 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+"use client";
 
-export const metadata = { title: "Dial" };
+import { DialShell } from "@/components/dial/DialShell";
+import { DialWsSubscriber } from "@/components/dial/DialWsSubscriber";
 
 export default function DialPage(): React.ReactElement {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Manual dial</CardTitle>
-        <CardDescription>A04 fills this view with a dialpad.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-[var(--color-fg-muted)]">
-          Reserved slot. Implementation lands with module A04.
-        </p>
-      </CardContent>
-    </Card>
+    <>
+      {/* WS subscriber: drives store from server-push events */}
+      <DialWsSubscriber />
+      {/* Main pre-call UI */}
+      <DialShell />
+    </>
   );
 }
