@@ -38,7 +38,10 @@ export type AuditAction =
   | "alert.receiver.deleted"
   | "alert.receiver.test_fired"
   // M05 settings
-  | "tenant.settings.updated";
+  | "tenant.settings.updated"
+  // R03 recording playback UI access
+  | "recording.list"
+  | "recording.accessed";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
