@@ -22,6 +22,8 @@ import { registerAdminDidRoutes } from "./dids/index.js";
 import { registerAdminJobRoutes } from "./jobs/index.js";
 // I03 — Voicemail box admin
 import { registerAdminVoicemailBoxRoutes } from "./voicemail-boxes.js";
+// S05 — Coaching admin
+import { registerAdminCoachingRoutes } from "./coaching/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -56,4 +58,7 @@ export async function registerAdminRoutes(app: any): Promise<void> {
 
   // I03 — Voicemail box admin
   await registerAdminVoicemailBoxRoutes(app);
+
+  // S05 — Coaching admin (templates, unlock, calibration stubs)
+  await registerAdminCoachingRoutes(app);
 }

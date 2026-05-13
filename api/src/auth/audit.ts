@@ -61,7 +61,20 @@ export type AuditAction =
   | "email_template.updated"
   | "email_template.deleted"
   | "email_template.test_sent"
-  | "notification_prefs.email_unsubscribed";
+  | "notification_prefs.email_unsubscribed"
+  // S05 coaching / quality management
+  | "coaching.template.created"
+  | "coaching.template.updated"
+  | "coaching.template.versioned"
+  | "coaching.template.deactivated"
+  | "coaching.scorecard.draft_saved"
+  | "coaching.scorecard.finalized"
+  | "coaching.scorecard.unlocked"
+  | "coaching.annotation.created"
+  | "coaching.annotation.updated"
+  | "coaching.annotation.deleted"
+  | "coaching.feedback.created"
+  | "coaching.feedback.acknowledged";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
