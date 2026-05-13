@@ -1,0 +1,227 @@
+[
+  {
+    "id": 1,
+    "desc": "TX→TX baseline 1-party",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 1, "callUUID": "uuid-1",
+      "leadState": "TX", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "ALLOW",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 2,
+    "desc": "CA→CA 2-party default",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 2, "callUUID": "uuid-2",
+      "leadState": "CA", "callerState": "CA",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_both" }
+  },
+  {
+    "id": 3,
+    "desc": "CA→TX Kearney interstate (lead in CA)",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 3, "callUUID": "uuid-3",
+      "leadState": "CA", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_lead" }
+  },
+  {
+    "id": 4,
+    "desc": "TX→CA caller-state interstate",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 4, "callUUID": "uuid-4",
+      "leadState": "TX", "callerState": "CA",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_caller" }
+  },
+  {
+    "id": 5,
+    "desc": "Campaign tries to loosen below legal floor (CA lead, override=ALLOW)",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 5, "callUUID": "uuid-5",
+      "leadState": "CA", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": "ALLOW",
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_lead" }
+  },
+  {
+    "id": 6,
+    "desc": "PA B2B carveout with training purpose",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 6, "callUUID": "uuid-6",
+      "leadState": "PA", "callerState": "TX",
+      "leadIsBusiness": true,
+      "campaignRecordingPurpose": "training",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "ALLOW", "reason": "b2b_pa_carveout" }
+  },
+  {
+    "id": 7,
+    "desc": "PA B2B but general purpose — no carveout",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 7, "callUUID": "uuid-7",
+      "leadState": "PA", "callerState": "TX",
+      "leadIsBusiness": true,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_lead" }
+  },
+  {
+    "id": 8,
+    "desc": "FL B2B does NOT carveout (only PA)",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 8, "callUUID": "uuid-8",
+      "leadState": "FL", "callerState": "TX",
+      "leadIsBusiness": true,
+      "campaignRecordingPurpose": "training",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_lead" }
+  },
+  {
+    "id": 9,
+    "desc": "Tenant SKIP overrides everything",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 9, "callUUID": "uuid-9",
+      "leadState": "TX", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "SKIP",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "SKIP", "reason": "tenant_policy_skip" }
+  },
+  {
+    "id": 10,
+    "desc": "Campaign REQUIRE_ACTIVE in 1-party state",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 10, "callUUID": "uuid-10",
+      "leadState": "TX", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": "REQUIRE_ACTIVE",
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "hangup"
+    },
+    "want": { "decision": "REQUIRE_ACTIVE", "reason": "require_active_campaign" }
+  },
+  {
+    "id": 11,
+    "desc": "Lead state unknown defaults to PROMPT_MESSAGE",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 11, "callUUID": "uuid-11",
+      "leadState": "", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "lead_state_unknown" }
+  },
+  {
+    "id": 12,
+    "desc": "Caller state unknown but lead is TX (1-party)",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 12, "callUUID": "uuid-12",
+      "leadState": "TX", "callerState": "",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "tenant_minimum_floor" }
+  },
+  {
+    "id": 13,
+    "desc": "Campaign recording NEVER → SKIP",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 13, "callUUID": "uuid-13",
+      "leadState": "CA", "callerState": "CA",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "NEVER",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "SKIP", "reason": "campaign_disabled" }
+  },
+  {
+    "id": 14,
+    "desc": "OR conservative 2-party posture",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 14, "callUUID": "uuid-14",
+      "leadState": "OR", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "PROMPT_MESSAGE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "continue_no_record"
+    },
+    "want": { "decision": "PROMPT_MESSAGE", "reason": "state_2party_lead" }
+  },
+  {
+    "id": 15,
+    "desc": "Tenant minimum REQUIRE_ACTIVE wins over 1-party state",
+    "req": {
+      "tenantID": 1, "campaignID": 1, "leadID": 15, "callUUID": "uuid-15",
+      "leadState": "TX", "callerState": "TX",
+      "leadIsBusiness": false,
+      "campaignRecordingPurpose": "general",
+      "campaignRecordingPolicy": "ALWAYS",
+      "tenantMinimumMode": "REQUIRE_ACTIVE",
+      "campaignOverrideMode": null,
+      "consentMsgAudioPath": "/sounds/consent/default.wav", "optOutAction": "hangup"
+    },
+    "want": { "decision": "REQUIRE_ACTIVE", "reason": "require_active_tenant" }
+  }
+]
