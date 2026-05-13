@@ -79,6 +79,14 @@ func buildChannelVars(req *OriginateRequest, scratch *GateScratch) map[string]st
 	vars["sip_h_X-Vici2-Campaign"] = req.CampaignID
 	vars["sip_h_X-Vici2-Attempt"] = req.AttemptUUID
 
+	// ── Group F: X04 pool tracking ────────────────────────────────────────────
+	// vici2_pool_npid carries the number_pool_dids.id when a pool DID was used.
+	// The FreeSWITCH event router reads this on CHANNEL_HANGUP_COMPLETE to
+	// update per-number health stats asynchronously.
+	if scratch.PoolNPID != 0 {
+		vars["vici2_pool_npid"] = fmt.Sprintf("%d", scratch.PoolNPID)
+	}
+
 	return vars
 }
 
