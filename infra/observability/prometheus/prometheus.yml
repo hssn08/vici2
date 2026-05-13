@@ -5,8 +5,8 @@
 # Native histograms enabled by default; classic dual-emit during migration.
 
 global:
-  scrape_interval:     15s
-  scrape_timeout:      10s
+  scrape_interval: 15s
+  scrape_timeout: 10s
   evaluation_interval: 15s
   external_labels:
     cluster: vici2-phase1
@@ -25,13 +25,12 @@ rule_files:
   - /etc/prometheus/rules/recording/*.yml
 
 scrape_configs:
-
   # --- vici2 services (per F01 HANDOFF: api 9101, dialer 9102, workers 9103) ---
 
   - job_name: vici2-api
     metrics_path: /metrics
     scrape_interval: 15s
-    scrape_timeout:  7s
+    scrape_timeout: 7s
     static_configs:
       - targets: ["api:9101"]
         labels:
@@ -42,7 +41,7 @@ scrape_configs:
     # 5 s — drop-rate accounting moves fast (FCC compliance window).
     metrics_path: /metrics
     scrape_interval: 5s
-    scrape_timeout:  4s
+    scrape_timeout: 4s
     static_configs:
       - targets: ["dialer:9102"]
         labels:
@@ -52,18 +51,29 @@ scrape_configs:
   - job_name: vici2-workers
     metrics_path: /metrics
     scrape_interval: 15s
-    scrape_timeout:  7s
+    scrape_timeout: 7s
     static_configs:
       - targets: ["workers:9103"]
         labels:
           service: workers
           layer: app
 
+  - job_name: vici2-recording-uploader
+    # W01: recording-uploader on port 9104 (separate docker-compose service)
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 7s
+    static_configs:
+      - targets: ["recording-uploader:9104"]
+        labels:
+          service: recording-uploader
+          layer: app
+
   - job_name: vici2-web
     # web exports on /api/metrics via Next.js route; 60 s — thin UI metrics.
     metrics_path: /api/metrics
     scrape_interval: 60s
-    scrape_timeout:  20s
+    scrape_timeout: 20s
     static_configs:
       - targets: ["web:4000"]
         labels:
@@ -78,7 +88,7 @@ scrape_configs:
     # Marked optional via `honor_labels: false` and short scrape_timeout.
     metrics_path: /metrics
     scrape_interval: 15s
-    scrape_timeout:  7s
+    scrape_timeout: 7s
     static_configs:
       - targets: ["fs-exporter:9104"]
         labels:
@@ -89,7 +99,7 @@ scrape_configs:
   - job_name: vici2-mysqld-exporter
     metrics_path: /metrics
     scrape_interval: 30s
-    scrape_timeout:  10s
+    scrape_timeout: 10s
     static_configs:
       - targets: ["mysqld-exporter:9105"]
         labels:
@@ -99,7 +109,7 @@ scrape_configs:
   - job_name: vici2-redis-exporter
     metrics_path: /metrics
     scrape_interval: 15s
-    scrape_timeout:  7s
+    scrape_timeout: 7s
     static_configs:
       - targets: ["redis-exporter:9106"]
         labels:
@@ -109,7 +119,7 @@ scrape_configs:
   - job_name: vici2-node-exporter
     metrics_path: /metrics
     scrape_interval: 15s
-    scrape_timeout:  7s
+    scrape_timeout: 7s
     static_configs:
       - targets: ["node-exporter:9107"]
         labels:
