@@ -1,0 +1,17 @@
+IMPORT COMPLETE
+===============
+
+Hi {{user.name}},
+
+Your import of {{import.fileName}} into list {{import.listName}} has completed.
+
+Rows Imported: {{import.rowsImported}}
+Rows Skipped:  {{import.rowsSkipped}}
+Rows Failed:   {{import.rowsFailed}}
+Completed At:  {{formatDate import.completedAt "MMMM d, yyyy h:mm a"}}
+
+View List: {{import.link}}
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}

@@ -55,7 +55,13 @@ export type AuditAction =
   | "did.created"
   | "did.updated"
   | "did.deleted"
-  | "did.bulk_imported";
+  | "did.bulk_imported"
+  // N02 email templates
+  | "email_template.created"
+  | "email_template.updated"
+  | "email_template.deleted"
+  | "email_template.test_sent"
+  | "notification_prefs.email_unsubscribed";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 

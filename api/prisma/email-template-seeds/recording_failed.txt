@@ -1,0 +1,16 @@
+RECORDING FAILED
+================
+
+Hi {{user.name}},
+
+A call recording failed to complete.
+
+Call UUID: {{recording.callUuid}}
+Failed At: {{formatDate recording.failedAt "MMMM d, yyyy h:mm a"}}
+Reason:    {{recording.reason}}
+
+Please check system resources and contact support if the issue persists.
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}
