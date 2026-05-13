@@ -209,8 +209,7 @@ func (k Keys) DNCBypassToken(token string) string {
 
 // --- E05 drop-gate keys (FROZEN: E05 PLAN §5.2, §6.3) -----------------------
 
-// CampaignDropPct30d is the per-campaign 30-day rolling drop rate (decimal text, e.g. "1.23").
-// Read by: E02, E03, T04, S01. Written by: E05 ticker (every 15 s).
+// CampaignDropPct30d is the per-campaign 30-day rolling drop rate (decimal text).
 func (k Keys) CampaignDropPct30d(cid int64) string {
 	return fmt.Sprintf("t:%d:campaign:{%d}:drop_pct_30d", k.tid, cid)
 }
@@ -226,10 +225,11 @@ func (k Keys) CampaignDropDenominator30d(cid int64) string {
 }
 
 // CampaignDropGated is the drop-gate STRING key. FROZEN contract:
-//   Set:    SET key "1"   (no TTL; persistent until DEL)
-//   Read:   EXISTS key    (E02 uses EXISTS, not GET)
-//   Clear:  DEL key
-//   Absent: gate NOT engaged
+//
+//	Set:    SET key "1"   (no TTL; persistent until DEL)
+//	Read:   EXISTS key    (E02 uses EXISTS, not GET)
+//	Clear:  DEL key
+//	Absent: gate NOT engaged
 func (k Keys) CampaignDropGated(cid int64) string {
 	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gated", k.tid, cid)
 }
@@ -240,9 +240,25 @@ func (k Keys) CampaignDropGateEngagedAt(cid int64) string {
 }
 
 // CampaignDropGateTransitions is the Valkey STREAM for gate engage/release events.
-// Mirrored to drop_gate_transition_log MySQL table for 7-year TCPA retention.
 func (k Keys) CampaignDropGateTransitions(cid int64) string {
 	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gate_transitions", k.tid, cid)
+}
+
+// --- S02 monitor session keys ------------------------------------------------
+
+// MonitorSession is the per-supervisor-session HASH (S02 PLAN §12.1).
+func (k Keys) MonitorSession(tenantID int64, supCallUUID string) string {
+	return fmt.Sprintf("t:%d:monitor:%s", tenantID, supCallUUID)
+}
+
+// AgentMonitors is the ZSET of active supervisor call-UUIDs for a given agent.
+func (k Keys) AgentMonitors(tenantID, userID int64) string {
+	return fmt.Sprintf("t:%d:agent:%d:monitors", tenantID, userID)
+}
+
+// MonitorJTI is the one-time-use JTI lock for a monitor grant token.
+func MonitorJTI(jti string) string {
+	return fmt.Sprintf("vici2:monitor:jti:%s", jti)
 }
 
 // --- F05 refresh-token keys --------------------------------------------------
