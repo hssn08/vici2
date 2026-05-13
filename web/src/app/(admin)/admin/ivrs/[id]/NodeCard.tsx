@@ -1,7 +1,7 @@
 "use client";
 // I02 — IVR node card component.
 
-import type { IvrNodeDto, IvrEdgeDto } from "@vici2/types";
+import type { IvrNodeDto } from "@vici2/types";
 import { TERMINAL_NODE_TYPES } from "@vici2/types";
 import { EdgeRow } from "./EdgeRow";
 import { PromptUpload } from "./PromptUpload";
