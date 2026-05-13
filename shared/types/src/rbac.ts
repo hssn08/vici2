@@ -152,6 +152,9 @@ export const VERBS = [
   // number pool (X04)
   'number_pool:read',
   'number_pool:edit',
+  // SF integration (N03)
+  'integration:sf:configure',    // admin+ — manage SF org credentials, field mappings
+  'integration:sf:click_to_dial', // agent+ — use click-to-dial, sf-import endpoint
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -316,6 +319,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // X04 — number pool
     'number_pool:read':        { scope: 'tenant' },
     'number_pool:edit':        { scope: 'tenant' },
+    // N03 — SF integration
+    'integration:sf:configure':    { scope: 'tenant' },
+    'integration:sf:click_to_dial': { scope: 'tenant' },
   },
 
   admin: {
@@ -410,6 +416,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // X04 — number pool
     'number_pool:read':        { scope: 'tenant' },
     'number_pool:edit':        { scope: 'tenant' },
+    // N03 — SF integration
+    'integration:sf:configure':    { scope: 'tenant' },
+    'integration:sf:click_to_dial': { scope: 'tenant' },
   },
 
   supervisor: {
@@ -467,6 +476,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'feedback:create':      { scope: 'group' },
     // X04 — number pool (supervisor: read-only)
     'number_pool:read':     { scope: 'tenant' },
+    // N03 — SF integration (supervisor: click-to-dial only)
+    'integration:sf:click_to_dial': { scope: 'group' },
   },
 
   agent: {
@@ -495,6 +506,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // S05 — coaching (agent: own scorecards + feedback only)
     'scorecard:read':       { scope: 'own' },
     'feedback:read':        { scope: 'own' },
+    // N03 — SF integration (agent: click-to-dial)
+    'integration:sf:click_to_dial': { scope: 'own' },
   },
 
   viewer: {
