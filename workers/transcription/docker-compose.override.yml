@@ -1,0 +1,67 @@
+# N07 Docker Compose override — local GPU dev
+# N07 PLAN §3.2 (Docker Compose dev)
+# Usage: docker compose -f docker-compose.dev.yml -f workers/transcription/docker-compose.override.yml up
+version: "3.9"
+
+services:
+  n07-python-worker:
+    build:
+      context: workers/transcription/python
+      dockerfile: Dockerfile
+    runtime: nvidia # requires nvidia-container-toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - WHISPER_MODEL=large-v3-turbo
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE_TYPE=int8
+      - N07_SIDECAR_PORT=8765
+      - LOG_LEVEL=info
+    ports:
+      - "8765:8765"
+    volumes:
+      - /tmp:/tmp
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  n07-node-worker:
+    build:
+      context: workers/transcription
+      dockerfile: Dockerfile
+    depends_on:
+      n07-python-worker:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - N07_PYTHON_SIDECAR_URL=http://n07-python-worker:8765
+      - N07_DEFAULT_BUCKET=${R02_DEFAULT_BUCKET:-vici2-recordings-dev}
+      - N07_S3_ENDPOINT=${R02_S3_ENDPOINT:-http://minio:9000}
+      - N07_S3_FORCE_PATH_STYLE=true
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      - N07_CONCURRENCY=4
+      - N07_METRICS_PORT=9107
+      - LOG_LEVEL=info
+    ports:
+      - "9107:9107"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9107/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
