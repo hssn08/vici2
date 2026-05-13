@@ -179,6 +179,67 @@ export function createRegistry(): Registry {
 }
 
 // ---------------------------------------------------------------------------
+// N06 — RND Scrub metrics
+// ---------------------------------------------------------------------------
+
+export const rndQueriesTotal = new client.Counter({
+  name: 'vici2_rnd_queries_total',
+  help: 'Total RND queries issued',
+  labelNames: ['tenant_id', 'result'] as const,
+  registers: [registry],
+});
+
+export const rndFlaggedTotal = new client.Counter({
+  name: 'vici2_rnd_flagged_total',
+  help: 'Numbers flagged as reassigned by RND',
+  labelNames: ['tenant_id'] as const,
+  registers: [registry],
+});
+
+export const rndApiDuration = new client.Histogram({
+  name: 'vici2_rnd_api_duration_seconds',
+  help: 'RND API call latency in seconds',
+  labelNames: ['mode'] as const,
+  buckets: [0.05, 0.1, 0.5, 1, 2, 5, 10, 30],
+  registers: [registry],
+});
+
+export const rndMonthlyCostCents = new client.Gauge({
+  name: 'vici2_rnd_monthly_cost_cents',
+  help: 'Current month estimated RND cost in cents',
+  labelNames: ['tenant_id'] as const,
+  registers: [registry],
+});
+
+export const rndRateLimitTotal = new client.Counter({
+  name: 'vici2_rnd_rate_limit_total',
+  help: 'RND API rate limit (429) hits',
+  labelNames: ['tenant_id'] as const,
+  registers: [registry],
+});
+
+export const rndOutageTotal = new client.Counter({
+  name: 'vici2_rnd_outage_total',
+  help: 'RND API outage (503/502/504) events detected',
+  registers: [registry],
+});
+
+export const rndScrubJobsTotal = new client.Counter({
+  name: 'vici2_rnd_scrub_jobs_total',
+  help: 'Total RND scrub jobs by status and trigger reason',
+  labelNames: ['status', 'trigger_reason'] as const,
+  registers: [registry],
+});
+
+export const rndScrubDuration = new client.Histogram({
+  name: 'vici2_rnd_scrub_duration_seconds',
+  help: 'RND scrub job total duration in seconds',
+  labelNames: ['query_mode'] as const,
+  buckets: [10, 30, 60, 120, 300, 600, 1800, 3600],
+  registers: [registry],
+});
+
+// ---------------------------------------------------------------------------
 // W02 — WS queue event publisher
 // ---------------------------------------------------------------------------
 
