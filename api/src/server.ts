@@ -88,6 +88,7 @@ import { registerInternalAlertsRoutes } from "./routes/internal/alerts.js";
 import { registerSupIngroupRoutes } from "./routes/sup/ingroups.js";
 import { registerScriptRoutes } from "./scripts/routes.js";
 import { registerAgentScriptRoutes } from "./scripts/agent-route.js";
+import { registerNotificationRoutes } from "./notifications/index.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -108,6 +109,7 @@ const start = async (): Promise<void> => {
     await registerInternalQueueRoutes(app);
     await registerInternalAlertsRoutes(app);
     await registerSupIngroupRoutes(app);
+    await registerNotificationRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {

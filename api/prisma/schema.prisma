@@ -153,8 +153,10 @@ model Tenant {
   ingroups       Ingroup[]
   ingroupAgents  IngroupAgent[]
   ivrTrees       IvrTree[]
-  settingsRows   Setting[]
-  imports        Import[]
+  settingsRows      Setting[]
+  imports           Import[]
+  notifications     Notification[]
+  notificationPrefs NotificationPref[]
 
   @@map("tenants")
 }
@@ -192,14 +194,16 @@ model User {
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_users_tenant")
   userGroup      UserGroup?      @relation(fields: [userGroupId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_users_user_group")
-  sipCredentials SipCredential[]
-  callbacks      Callback[]      @relation("CallbacksOwner")
-  callbacksMade  Callback[]      @relation("CallbacksCreatedBy")
-  ingroupAgents  IngroupAgent[]
-  agentSkills    AgentSkill[]
-  ownedLeads     Lead[]
-  dispositions   Disposition[]
-  imports        Import[]
+  sipCredentials    SipCredential[]
+  callbacks         Callback[]        @relation("CallbacksOwner")
+  callbacksMade     Callback[]        @relation("CallbacksCreatedBy")
+  ingroupAgents     IngroupAgent[]
+  agentSkills       AgentSkill[]
+  ownedLeads        Lead[]
+  dispositions      Disposition[]
+  imports           Import[]
+  notifications     Notification[]
+  notificationPrefs NotificationPref[]
 
   @@unique([tenantId, username], map: "uk_users_tenant_username")
   @@unique([tenantId, email], map: "uk_users_tenant_email")
@@ -2058,4 +2062,56 @@ model AlertReceiver {
   @@index([tenantId, kind], map: "idx_ar_tenant_kind")
   @@index([tenantId, active], map: "idx_ar_tenant_active")
   @@map("alert_receivers")
+}
+
+// =============================================================================
+// N01 — Notifications Hub
+// =============================================================================
+
+enum NotifChannel {
+  in_app
+  email
+}
+
+enum NotifSeverity {
+  info
+  warning
+  error
+}
+
+model Notification {
+  id        BigInt        @id @default(autoincrement())
+  tenantId  BigInt        @default(1) @map("tenant_id")
+  userId    BigInt        @map("user_id")
+  channel   NotifChannel
+  category  String        @db.VarChar(64)
+  subject   String        @db.VarChar(255)
+  body      String        @db.Text
+  severity  NotifSeverity @default(info)
+  link      String?       @db.VarChar(512)
+  readAt    DateTime?     @map("read_at") @db.DateTime(6)
+  createdAt DateTime      @default(now()) @map("created_at") @db.DateTime(6)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_user")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_tenant")
+
+  @@index([tenantId, userId, readAt, createdAt], map: "idx_notif_t_user_read")
+  @@index([tenantId, userId, createdAt], map: "idx_notif_t_user_unread")
+  @@map("notifications")
+}
+
+model NotificationPref {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @default(1) @map("tenant_id")
+  userId    BigInt   @map("user_id")
+  category  String   @db.VarChar(64)
+  channels  Json
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notif_prefs_user")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notif_prefs_tenant")
+
+  @@unique([tenantId, userId, category], map: "uk_notif_prefs_t_user_cat")
+  @@map("notification_prefs")
 }
