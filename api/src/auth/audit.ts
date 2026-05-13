@@ -36,7 +36,9 @@ export type AuditAction =
   | "alert.receiver.created"
   | "alert.receiver.updated"
   | "alert.receiver.deleted"
-  | "alert.receiver.test_fired";
+  | "alert.receiver.test_fired"
+  // M05 settings
+  | "tenant.settings.updated";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
