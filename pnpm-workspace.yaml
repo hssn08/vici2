@@ -3,5 +3,6 @@ packages:
   - "web"
   - "workers"
   - "workers/recording-uploader"
+  - "workers/transcription"
   - "shared/types"
   - "shared/auth"
