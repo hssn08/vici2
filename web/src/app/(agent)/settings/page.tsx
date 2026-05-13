@@ -21,6 +21,11 @@ export default function SettingsPage(): React.ReactElement {
   const setDtmfMode = useUiStore((s) => s.setDtmfMode);
   const forceTurn = useUiStore((s) => s.forceTurn);
   const setForceTurn = useUiStore((s) => s.setForceTurn);
+  // A06 auto-dial chime
+  const chimeVolume = useUiStore((s) => s.autoDialChimeVolume);
+  const setChimeVolume = useUiStore((s) => s.setAutoDialChimeVolume);
+  const chimeMuted = useUiStore((s) => s.autoDialChimeMuted);
+  const setChimeMuted = useUiStore((s) => s.setAutoDialChimeMuted);
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,6 +81,47 @@ export default function SettingsPage(): React.ReactElement {
               <option value="comfortable">Comfortable</option>
               <option value="compact">Compact</option>
             </select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auto-Dial Chime (A06) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Auto-Dial Chime</CardTitle>
+          <CardDescription>
+            Audible alert played when an incoming call reservation arrives.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="chime-volume">
+              Chime volume ({Math.round(chimeVolume * 100)}%)
+            </Label>
+            <input
+              id="chime-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={chimeVolume}
+              onChange={(e) => setChimeVolume(Number(e.target.value))}
+              className="w-full"
+              aria-label="Auto-dial chime volume"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              id="chime-muted"
+              type="checkbox"
+              checked={chimeMuted}
+              onChange={(e) => setChimeMuted(e.target.checked)}
+              className="h-4 w-4"
+              aria-label="Mute auto-dial chime"
+            />
+            <Label htmlFor="chime-muted">
+              Mute chime (M hotkey in auto-dial mode)
+            </Label>
           </div>
         </CardContent>
       </Card>

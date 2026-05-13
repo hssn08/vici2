@@ -26,6 +26,10 @@ export interface UiState {
   disableHangupGrace: boolean;
   hotkeyMap: Record<string, string>;
 
+  // A06 auto-dial chime preferences (persisted)
+  autoDialChimeVolume: number;
+  autoDialChimeMuted: boolean;
+
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: Theme) => void;
@@ -40,6 +44,8 @@ export interface UiState {
   setConfirmHotkeyDispo: (v: boolean) => void;
   setDisableHangupGrace: (v: boolean) => void;
   setHotkeyMap: (map: Record<string, string>) => void;
+  setAutoDialChimeVolume: (v: number) => void;
+  setAutoDialChimeMuted: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -63,6 +69,10 @@ export const useUiStore = create<UiState>()(
       disableHangupGrace: false,
       hotkeyMap: {},
 
+      // A06 defaults
+      autoDialChimeVolume: 0.7,
+      autoDialChimeMuted: false,
+
       toggleSidebar: () =>
         set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
@@ -79,10 +89,12 @@ export const useUiStore = create<UiState>()(
       setConfirmHotkeyDispo: (v) => set({ confirmHotkeyDispo: v }),
       setDisableHangupGrace: (v) => set({ disableHangupGrace: v }),
       setHotkeyMap: (map) => set({ hotkeyMap: map }),
+      setAutoDialChimeVolume: (v) => set({ autoDialChimeVolume: Math.max(0, Math.min(1, v)) }),
+      setAutoDialChimeMuted: (v) => set({ autoDialChimeMuted: v }),
     }),
     {
       name: "vici2.ui",
-      version: 3, // bumped for A05 in-call panel prefs
+      version: 4, // bumped for A06 auto-dial chime prefs
       storage: createJSONStorage(() =>
         typeof window !== "undefined" ? window.localStorage : noopStorage(),
       ),
@@ -101,6 +113,11 @@ export const useUiStore = create<UiState>()(
           state.confirmHotkeyDispo = false;
           state.disableHangupGrace = false;
           state.hotkeyMap = {};
+        }
+        if (version < 4) {
+          // A06 new fields — apply defaults
+          state.autoDialChimeVolume = 0.7;
+          state.autoDialChimeMuted = false;
         }
         return state as UiState;
       },
