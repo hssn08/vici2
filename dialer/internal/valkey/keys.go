@@ -131,6 +131,15 @@ func (k Keys) DialerTick(cid int64) string {
 func (k Keys) JanitorLock() string {
 	return fmt.Sprintf("t:%d:janitor:lock", k.tid)
 }
+
+// JanitorEmptyConfs is the HASH tracking when each non-agent conference
+// first became empty (for stale conference detection).
+// Field = conference_name, Value = empty_since_unix_ms (decimal string).
+// No TTL — fields are deleted when the conference is killed or recovers.
+// E06 PLAN §4.3.
+func (k Keys) JanitorEmptyConfs() string {
+	return fmt.Sprintf("t:%d:janitor:empty_confs", k.tid)
+}
 func (k Keys) AdaptLock(cid int64) string {
 	return fmt.Sprintf("t:%d:adapt:lock:{%d}", k.tid, cid)
 }
