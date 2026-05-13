@@ -86,6 +86,7 @@ import { registerReportingRoutes } from "./reporting/index.js";
 import { registerOpsReportRoutes } from "./ops-reports/index.js";
 import { registerInternalQueueRoutes } from "./routes/internal/queue.js";
 import { registerInternalAlertsRoutes } from "./routes/internal/alerts.js";
+import { registerInternalIvrRoutes } from "./routes/internal/ivr-hooks.js";
 import { registerSupIngroupRoutes } from "./routes/sup/ingroups.js";
 import { registerScriptRoutes } from "./scripts/routes.js";
 import { registerAgentScriptRoutes } from "./scripts/agent-route.js";
@@ -110,6 +111,7 @@ const start = async (): Promise<void> => {
     await registerAgentScriptRoutes(app);
     await registerInternalQueueRoutes(app);
     await registerInternalAlertsRoutes(app);
+    await registerInternalIvrRoutes(app);
     await registerSupIngroupRoutes(app);
     await registerNotificationRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });

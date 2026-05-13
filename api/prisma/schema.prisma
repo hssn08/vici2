@@ -153,6 +153,11 @@ model Tenant {
   ingroups       Ingroup[]
   ingroupAgents  IngroupAgent[]
   ivrTrees       IvrTree[]
+  // I02: new normalized IVR tables
+  ivrs           Ivr[]
+  ivrNodes       IvrNode[]
+  ivrEdges       IvrEdge[]
+  ivrPrompts     IvrPrompt[]
   settingsRows      Setting[]
   imports           Import[]
   notifications     Notification[]
@@ -1093,16 +1098,19 @@ enum DidRouteKind {
 }
 
 model DidNumber {
-  id           BigInt       @id @default(autoincrement())
-  tenantId     BigInt       @default(1) @map("tenant_id")
-  e164         String       @db.VarChar(16)
-  carrierId    BigInt       @map("carrier_id")
-  routeKind    DidRouteKind @map("route_kind")
-  routeTarget  String       @map("route_target") @db.VarChar(64)
-  callerIdName String?      @map("caller_id_name") @db.VarChar(64)
-  active       Boolean      @default(true)
-  createdAt    DateTime     @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt    DateTime     @updatedAt @map("updated_at") @db.DateTime(6)
+  id              BigInt       @id @default(autoincrement())
+  tenantId        BigInt       @default(1) @map("tenant_id")
+  e164            String       @db.VarChar(16)
+  carrierId       BigInt       @map("carrier_id")
+  routeKind       DidRouteKind @map("route_kind")
+  routeTarget     String       @map("route_target") @db.VarChar(64)
+  callerIdName    String?      @map("caller_id_name") @db.VarChar(64)
+  active          Boolean      @default(true)
+  // I02 amendments — IVR language + timeout
+  defaultLang     String       @default("en") @map("default_lang") @db.VarChar(5)
+  ivrTimeoutSec   Int          @default(300) @map("ivr_timeout_sec") @db.UnsignedSmallInt
+  createdAt       DateTime     @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_tenant")
   carrier Carrier @relation(fields: [carrierId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_carrier")
@@ -2123,4 +2131,115 @@ model NotificationPref {
 
   @@unique([tenantId, userId, category], map: "uk_notif_prefs_t_user_cat")
   @@map("notification_prefs")
+}
+
+// =============================================================================
+// I02 — IVR Engine
+//
+// Normalized graph model: ivrs → ivr_nodes → ivr_edges + ivr_prompts
+// ivr_traversal_log is partitioned (not managed by Prisma; migration.sql owns it)
+// =============================================================================
+
+enum IvrPhase {
+  xml
+  ivrbridge
+}
+
+enum IvrNodeType {
+  collect
+  lang_select
+  terminal_ingroup
+  terminal_hangup
+  terminal_voicemail
+  terminal_transfer
+  terminal_callback
+}
+
+model Ivr {
+  id                  BigInt    @id @default(autoincrement())
+  tenantId            BigInt    @default(1) @map("tenant_id")
+  name                String    @db.VarChar(128)
+  description         String?   @db.Text
+  entryNodeId         BigInt?   @map("entry_node_id")
+  active              Boolean   @default(true)
+  phase               IvrPhase  @default(xml)
+  maxDepthValidated   Int       @default(0) @map("max_depth_validated") @db.TinyInt
+  createdAt           DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ivrs_tenant")
+  nodes  IvrNode[]
+
+  @@unique([tenantId, name], map: "uk_ivrs_t_name")
+  @@index([tenantId, active], map: "idx_ivrs_t_active")
+  @@map("ivrs")
+}
+
+model IvrNode {
+  id                 BigInt      @id @default(autoincrement())
+  tenantId           BigInt      @default(1) @map("tenant_id")
+  ivrId              BigInt      @map("ivr_id")
+  name               String      @db.VarChar(128)
+  nodeType           IvrNodeType @map("node_type")
+  collectMin         Int         @default(1) @map("collect_min") @db.TinyInt
+  collectMax         Int         @default(1) @map("collect_max") @db.TinyInt
+  collectTerminators String      @default("none") @map("collect_terminators") @db.VarChar(8)
+  timeoutMs          Int         @default(5000) @map("timeout_ms") @db.UnsignedInt
+  interDigitMs       Int         @default(3000) @map("inter_digit_ms") @db.UnsignedInt
+  invalidMax         Int         @default(3) @map("invalid_max") @db.TinyInt
+  actionTarget       String?     @map("action_target") @db.VarChar(128)
+  positionX          Int         @default(0) @map("position_x")
+  positionY          Int         @default(0) @map("position_y")
+  createdAt          DateTime    @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.DateTime(6)
+
+  ivr       Ivr        @relation(fields: [ivrId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ivr_nodes_ivr")
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ivr_nodes_tenant")
+  edgesFrom IvrEdge[]  @relation("EdgeFrom")
+  edgesTo   IvrEdge[]  @relation("EdgeTo")
+  prompts   IvrPrompt[]
+
+  @@index([tenantId, ivrId], map: "idx_ivr_nodes_t_ivr")
+  @@map("ivr_nodes")
+}
+
+model IvrEdge {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   BigInt   @default(1) @map("tenant_id")
+  ivrId      BigInt   @map("ivr_id")
+  fromNodeId BigInt   @map("from_node_id")
+  onInput    String   @map("on_input") @db.VarChar(16)
+  toNodeId   BigInt?  @map("to_node_id")
+  label      String?  @db.VarChar(64)
+  sortOrder  Int      @default(0) @map("sort_order") @db.TinyInt
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  fromNode IvrNode  @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ivr_edges_from")
+  toNode   IvrNode? @relation("EdgeTo",   fields: [toNodeId],   references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ivr_edges_to")
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ivr_edges_tenant")
+
+  @@unique([fromNodeId, onInput], map: "uk_ivr_edges_from_input")
+  @@index([tenantId, ivrId],           map: "idx_ivr_edges_t_ivr")
+  @@index([tenantId, fromNodeId, onInput], map: "idx_ivr_edges_t_from")
+  @@map("ivr_edges")
+}
+
+model IvrPrompt {
+  id            BigInt   @id @default(autoincrement())
+  tenantId      BigInt   @default(1) @map("tenant_id")
+  nodeId        BigInt   @map("node_id")
+  lang          String   @default("en") @db.VarChar(5)
+  fileUri       String   @map("file_uri") @db.VarChar(512)
+  fileSizeBytes Int?     @map("file_size_bytes") @db.UnsignedInt
+  durationMs    Int?     @map("duration_ms") @db.UnsignedInt
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  node   IvrNode @relation(fields: [nodeId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ivr_prompts_node")
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ivr_prompts_tenant")
+
+  @@unique([nodeId, lang], map: "uk_ivr_prompts_node_lang")
+  @@index([tenantId, nodeId], map: "idx_ivr_prompts_t_node")
+  @@map("ivr_prompts")
 }
