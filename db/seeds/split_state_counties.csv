@@ -1,0 +1,225 @@
+state,county_name,county_fips,iana_tz
+# Indiana (8 IANA zones — most complex split state)
+IN,Lake County,18089,America/Chicago
+IN,LaPorte County,18091,America/Chicago
+IN,Porter County,18127,America/Chicago
+IN,Newton County,18111,America/Chicago
+IN,Jasper County,18073,America/Chicago
+IN,Starke County,18149,America/Indiana/Knox
+IN,Pulaski County,18131,America/Indiana/Winamac
+IN,Gibson County,18051,America/Chicago
+IN,Warrick County,18173,America/Chicago
+IN,Vanderburgh County,18163,America/Chicago
+IN,Posey County,18129,America/Chicago
+IN,Knox County,18083,America/Indiana/Vincennes
+IN,Daviess County,18027,America/Indiana/Vincennes
+IN,Pike County,18125,America/Indiana/Petersburg
+IN,Crawford County,18025,America/Indiana/Marengo
+IN,Perry County,18123,America/Indiana/Tell_City
+IN,Switzerland County,18155,America/Indiana/Vevay
+# All other IN counties → Indianapolis
+IN,Adams County,18001,America/Indiana/Indianapolis
+IN,Allen County,18003,America/Indiana/Indianapolis
+IN,Bartholomew County,18005,America/Indiana/Indianapolis
+IN,Benton County,18007,America/Indiana/Indianapolis
+IN,Blackford County,18009,America/Indiana/Indianapolis
+IN,Boone County,18011,America/Indiana/Indianapolis
+IN,Brown County,18013,America/Indiana/Indianapolis
+IN,Carroll County,18015,America/Indiana/Indianapolis
+IN,Cass County,18017,America/Indiana/Indianapolis
+IN,Clark County,18019,America/Indiana/Indianapolis
+IN,Clay County,18021,America/Indiana/Indianapolis
+IN,Clinton County,18023,America/Indiana/Indianapolis
+IN,Dearborn County,18029,America/Indiana/Indianapolis
+IN,Decatur County,18031,America/Indiana/Indianapolis
+IN,DeKalb County,18033,America/Indiana/Indianapolis
+IN,Delaware County,18035,America/Indiana/Indianapolis
+IN,Dubois County,18037,America/Indiana/Indianapolis
+IN,Elkhart County,18039,America/Indiana/Indianapolis
+IN,Fayette County,18041,America/Indiana/Indianapolis
+IN,Floyd County,18043,America/Indiana/Indianapolis
+IN,Fountain County,18045,America/Indiana/Indianapolis
+IN,Franklin County,18047,America/Indiana/Indianapolis
+IN,Fulton County,18049,America/Indiana/Indianapolis
+IN,Grant County,18053,America/Indiana/Indianapolis
+IN,Greene County,18055,America/Indiana/Indianapolis
+IN,Hamilton County,18057,America/Indiana/Indianapolis
+IN,Hancock County,18059,America/Indiana/Indianapolis
+IN,Harrison County,18061,America/Indiana/Indianapolis
+IN,Hendricks County,18063,America/Indiana/Indianapolis
+IN,Henry County,18065,America/Indiana/Indianapolis
+IN,Howard County,18067,America/Indiana/Indianapolis
+IN,Huntington County,18069,America/Indiana/Indianapolis
+IN,Jackson County,18071,America/Indiana/Indianapolis
+IN,Jay County,18075,America/Indiana/Indianapolis
+IN,Jefferson County,18077,America/Indiana/Indianapolis
+IN,Jennings County,18079,America/Indiana/Indianapolis
+IN,Johnson County,18081,America/Indiana/Indianapolis
+IN,Kosciusko County,18085,America/Indiana/Indianapolis
+IN,LaGrange County,18087,America/Indiana/Indianapolis
+IN,Lawrence County,18093,America/Indiana/Indianapolis
+IN,Madison County,18095,America/Indiana/Indianapolis
+IN,Marion County,18097,America/Indiana/Indianapolis
+IN,Marshall County,18099,America/Indiana/Indianapolis
+IN,Martin County,18101,America/Indiana/Indianapolis
+IN,Miami County,18103,America/Indiana/Indianapolis
+IN,Monroe County,18105,America/Indiana/Indianapolis
+IN,Montgomery County,18107,America/Indiana/Indianapolis
+IN,Morgan County,18109,America/Indiana/Indianapolis
+IN,Noble County,18113,America/Indiana/Indianapolis
+IN,Ohio County,18115,America/Indiana/Indianapolis
+IN,Orange County,18117,America/Indiana/Indianapolis
+IN,Owen County,18119,America/Indiana/Indianapolis
+IN,Parke County,18121,America/Indiana/Indianapolis
+IN,Randolph County,18135,America/Indiana/Indianapolis
+IN,Ripley County,18137,America/Indiana/Indianapolis
+IN,Rush County,18139,America/Indiana/Indianapolis
+IN,Scott County,18143,America/Indiana/Indianapolis
+IN,Shelby County,18145,America/Indiana/Indianapolis
+IN,Spencer County,18147,America/Indiana/Indianapolis
+IN,St. Joseph County,18141,America/Indiana/Indianapolis
+IN,Steuben County,18151,America/Indiana/Indianapolis
+IN,Sullivan County,18153,America/Indiana/Indianapolis
+IN,Tippecanoe County,18157,America/Indiana/Indianapolis
+IN,Tipton County,18159,America/Indiana/Indianapolis
+IN,Union County,18161,America/Indiana/Indianapolis
+IN,Vermillion County,18165,America/Indiana/Indianapolis
+IN,Vigo County,18167,America/Indiana/Indianapolis
+IN,Wabash County,18169,America/Indiana/Indianapolis
+IN,Warren County,18171,America/Indiana/Indianapolis
+IN,Washington County,18175,America/Indiana/Indianapolis
+IN,Wayne County,18177,America/Indiana/Indianapolis
+IN,Wells County,18179,America/Indiana/Indianapolis
+IN,White County,18181,America/Indiana/Indianapolis
+IN,Whitley County,18183,America/Indiana/Indianapolis
+# Kentucky (Eastern/Central split)
+KY,Adair County,21001,America/Chicago
+KY,Allen County,21003,America/Chicago
+KY,Ballard County,21007,America/Chicago
+KY,Breckinridge County,21027,America/Chicago
+KY,Caldwell County,21033,America/Chicago
+KY,Calloway County,21035,America/Chicago
+KY,Carlisle County,21039,America/Chicago
+KY,Christian County,21047,America/Chicago
+KY,Clinton County,21053,America/Chicago
+KY,Crittenden County,21055,America/Chicago
+KY,Cumberland County,21057,America/Chicago
+KY,Daviess County,21059,America/Chicago
+KY,Edmonson County,21061,America/Chicago
+KY,Fulton County,21075,America/Chicago
+KY,Graves County,21083,America/Chicago
+KY,Grayson County,21085,America/Chicago
+KY,Green County,21087,America/Chicago
+KY,Hancock County,21091,America/Chicago
+KY,Hart County,21095,America/Chicago
+KY,Henderson County,21101,America/Chicago
+KY,Hickman County,21105,America/Chicago
+KY,Hopkins County,21107,America/Chicago
+KY,Livingston County,21139,America/Chicago
+KY,Logan County,21141,America/Chicago
+KY,Lyon County,21143,America/Chicago
+KY,McCracken County,21145,America/Chicago
+KY,McLean County,21149,America/Chicago
+KY,Marshall County,21157,America/Chicago
+KY,Meade County,21163,America/Chicago
+KY,Metcalfe County,21169,America/Chicago
+KY,Monroe County,21171,America/Chicago
+KY,Muhlenberg County,21177,America/Chicago
+KY,Ohio County,21179,America/Chicago
+KY,Simpson County,21213,America/Chicago
+KY,Todd County,21219,America/Chicago
+KY,Trigg County,21221,America/Chicago
+KY,Union County,21225,America/Chicago
+KY,Warren County,21227,America/Chicago
+KY,Webster County,21233,America/Chicago
+# All other KY counties are Eastern
+# Tennessee (Memphis/Nashville split)
+TN,Shelby County,47157,America/Chicago
+TN,Haywood County,47075,America/Chicago
+TN,Tipton County,47167,America/Chicago
+TN,Fayette County,47047,America/Chicago
+TN,Hardeman County,47069,America/Chicago
+TN,Hardin County,47071,America/Chicago
+TN,Decatur County,47039,America/Chicago
+TN,Benton County,47011,America/Chicago
+TN,Carroll County,47017,America/Chicago
+TN,Chester County,47023,America/Chicago
+TN,Dyer County,47045,America/Chicago
+TN,Gibson County,47053,America/Chicago
+TN,Henderson County,47077,America/Chicago
+TN,Henry County,47079,America/Chicago
+TN,Lake County,47095,America/Chicago
+TN,Lauderdale County,47097,America/Chicago
+TN,Madison County,47113,America/Chicago
+TN,McNairy County,47109,America/Chicago
+TN,Obion County,47131,America/Chicago
+TN,Weakley County,47183,America/Chicago
+# All other TN counties → Eastern
+# Florida (Panhandle/Peninsula split)
+FL,Escambia County,12033,America/Chicago
+FL,Santa Rosa County,12113,America/Chicago
+FL,Okaloosa County,12091,America/Chicago
+FL,Walton County,12131,America/Chicago
+FL,Holmes County,12059,America/Chicago
+FL,Washington County,12133,America/Chicago
+FL,Bay County,12005,America/Chicago
+FL,Jackson County,12063,America/Chicago
+FL,Calhoun County,12013,America/Chicago
+FL,Gulf County,12045,America/Chicago
+# All other FL counties → Eastern
+# Idaho (Mountain/Pacific split — north Idaho is Pacific)
+ID,Benewah County,16009,America/Los_Angeles
+ID,Bonner County,16017,America/Los_Angeles
+ID,Boundary County,16021,America/Los_Angeles
+ID,Clearwater County,16035,America/Los_Angeles
+ID,Idaho County,16049,America/Los_Angeles
+ID,Kootenai County,16055,America/Los_Angeles
+ID,Latah County,16057,America/Los_Angeles
+ID,Lewis County,16061,America/Los_Angeles
+ID,Nez Perce County,16069,America/Los_Angeles
+ID,Shoshone County,16079,America/Los_Angeles
+# All other ID counties → America/Boise
+# Oregon (Malheur County is Mountain)
+OR,Malheur County,41045,America/Boise
+# All other OR counties → America/Los_Angeles
+# North Dakota (Central/Mountain split)
+ND,Adams County,38001,America/Denver
+ND,Billings County,38007,America/Denver
+ND,Bowman County,38011,America/Denver
+ND,Dunn County,38025,America/Denver
+ND,Golden Valley County,38033,America/Denver
+ND,Grant County,38035,America/Denver
+ND,Hettinger County,38041,America/Denver
+ND,Mercer County,38057,America/Denver
+ND,Slope County,38087,America/Denver
+ND,Stark County,38089,America/Denver
+# All other ND counties → America/Chicago
+# South Dakota (Central/Mountain split)
+SD,Butte County,46019,America/Denver
+SD,Corson County,46031,America/Denver
+SD,Custer County,46033,America/Denver
+SD,Dewey County,46041,America/Denver
+SD,Fall River County,46047,America/Denver
+SD,Harding County,46063,America/Denver
+SD,Lawrence County,46081,America/Denver
+SD,Meade County,46093,America/Denver
+SD,Pennington County,46103,America/Denver
+SD,Perkins County,46105,America/Denver
+SD,Shannon County,46113,America/Denver
+SD,Ziebach County,46137,America/Denver
+# All other SD counties → America/Chicago
+# Nebraska (Central/Mountain split — panhandle)
+NE,Banner County,31007,America/Denver
+NE,Box Butte County,31013,America/Denver
+NE,Cheyenne County,31033,America/Denver
+NE,Dawes County,31045,America/Denver
+NE,Deuel County,31049,America/Denver
+NE,Garden County,31069,America/Denver
+NE,Grant County,31075,America/Denver
+NE,Keith County,31101,America/Denver
+NE,Kimball County,31105,America/Denver
+NE,Morrill County,31123,America/Denver
+NE,Scotts Bluff County,31157,America/Denver
+NE,Sheridan County,31161,America/Denver
+NE,Sioux County,31165,America/Denver
+# All other NE counties → America/Chicago

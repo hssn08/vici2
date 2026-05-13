@@ -1,0 +1,53 @@
+// D03 gRPC contract — specified Phase 1, deployed Phase 2.
+// The in-process implementation in Go and TS is the Phase 1 mechanism.
+// This .proto locks the wire contract so Phase 2 deployment is drop-in.
+syntax = "proto3";
+
+package vici2.tz.v1;
+
+option go_package = "github.com/vici2/dialer/internal/tz/proto;tzpb";
+
+service TimezoneService {
+  // Resolve resolves the timezone for a single lead/phone.
+  rpc Resolve(ResolveRequest) returns (ResolveResult);
+  // ResolveBatch resolves timezones for multiple leads (E01 hopper-fill interface).
+  rpc ResolveBatch(ResolveBatchRequest) returns (ResolveBatchResult);
+}
+
+// Confidence levels — frozen; matches Go/TS Confidence enum exactly.
+enum Confidence {
+  CONFIDENCE_UNSPECIFIED = 0;
+  KNOWN = 1;
+  ZIP = 2;
+  NXX = 3;
+  NPA = 4;
+  STATE_DEFAULT = 5;
+  CAMPAIGN_DEFAULT = 6;
+  NONE = 7;
+}
+
+message ResolveRequest {
+  int64  lead_id        = 1;
+  string phone_e164     = 2;
+  string known_timezone = 3; // IANA string; empty = not set
+  string zip            = 4;
+  string state          = 5; // 2-char US state code
+  string campaign_id    = 6;
+}
+
+message ResolveResult {
+  string     iana        = 1; // "" if NONE
+  Confidence confidence  = 2;
+  string     source      = 3; // "lead.known_timezone" | "zip:30024" | "nxx:317-555" | ...
+  string     npa         = 4;
+  string     nxx         = 5;
+  string     number_type = 6; // "MOBILE" | "FIXED_LINE" | "UNKNOWN" | ...
+}
+
+message ResolveBatchRequest {
+  repeated ResolveRequest requests = 1;
+}
+
+message ResolveBatchResult {
+  repeated ResolveResult results = 1;
+}
