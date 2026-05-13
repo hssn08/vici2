@@ -18,6 +18,8 @@ import { registerAdminIvrRoutes } from "./ivr.js";
 // M06 — Carrier / Gateway / DID admin
 import { registerAdminCarrierRoutes } from "./carriers/index.js";
 import { registerAdminDidRoutes } from "./dids/index.js";
+// I03 — Voicemail box admin
+import { registerAdminVoicemailBoxRoutes } from "./voicemail-boxes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -46,4 +48,7 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   // M06 — Carrier / Gateway / DID admin
   await registerAdminCarrierRoutes(app);
   await registerAdminDidRoutes(app);
+
+  // I03 — Voicemail box admin
+  await registerAdminVoicemailBoxRoutes(app);
 }

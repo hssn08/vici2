@@ -123,6 +123,9 @@ export const VERBS = [
   'list:delete',
   'list:reset',
   'list:purge',
+  // voicemail (I03)
+  'voicemail:read',
+  'voicemail:manage',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -250,6 +253,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:delete':          { scope: 'tenant', sensitive: true },
     'list:reset':           { scope: 'tenant', sensitive: true },
     'list:purge':           { scope: 'tenant', sensitive: true },
+    'voicemail:read':       { scope: 'tenant' },
+    'voicemail:manage':     { scope: 'tenant' },
   },
 
   admin: {
@@ -317,6 +322,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:delete':          { scope: 'tenant', sensitive: true },
     'list:reset':           { scope: 'tenant', sensitive: true },
     'list:purge':           { scope: 'tenant', sensitive: true },
+    'voicemail:read':       { scope: 'tenant' },
+    'voicemail:manage':     { scope: 'tenant' },
   },
 
   supervisor: {
@@ -356,6 +363,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:edit':        { scope: 'group' },
     'alert:read':           { scope: 'group' },
     'list:read':            { scope: 'group' },
+    'voicemail:read':       { scope: 'group' },
   },
 
   agent: {
@@ -380,6 +388,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'script:read':          { scope: 'group' },
     'callback:read':        { scope: 'own' },
     'callback:edit':        { scope: 'own' },
+    'voicemail:read':       { scope: 'own' },
   },
 
   viewer: {
@@ -410,6 +419,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:read':        { scope: 'tenant' },
     'alert:read':           { scope: 'tenant' },
     'list:read':            { scope: 'tenant' },
+    'voicemail:read':       { scope: 'tenant' },
   },
 
   integrator: {

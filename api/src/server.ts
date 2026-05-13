@@ -91,6 +91,8 @@ import { registerSupIngroupRoutes } from "./routes/sup/ingroups.js";
 import { registerScriptRoutes } from "./scripts/routes.js";
 import { registerAgentScriptRoutes } from "./scripts/agent-route.js";
 import { registerNotificationRoutes } from "./notifications/index.js";
+import { registerVoicemailRoutes } from "./routes/voicemails.js";
+import { registerInternalVoicemailRoutes } from "./routes/internal/voicemail-hooks.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -114,6 +116,8 @@ const start = async (): Promise<void> => {
     await registerInternalIvrRoutes(app);
     await registerSupIngroupRoutes(app);
     await registerNotificationRoutes(app);
+    await registerVoicemailRoutes(app);
+    await registerInternalVoicemailRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {

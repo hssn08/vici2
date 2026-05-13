@@ -163,6 +163,9 @@ model Tenant {
   notifications     Notification[]
   notificationPrefs NotificationPref[]
   wallboardLayouts  WallboardLayout[]
+  // I03: voicemail
+  voicemailBoxes    VoicemailBox[]
+  voicemailBoxUsers VoicemailBoxUser[]
 
   @@map("tenants")
 }
@@ -210,6 +213,8 @@ model User {
   imports           Import[]
   notifications     Notification[]
   notificationPrefs NotificationPref[]
+  // I03: voicemail box access
+  voicemailBoxUsers VoicemailBoxUser[]
 
   @@unique([tenantId, username], map: "uk_users_tenant_username")
   @@unique([tenantId, email], map: "uk_users_tenant_email")
@@ -2265,4 +2270,78 @@ model WallboardLayout {
 
   @@index([tenantId, active], map: "idx_wallboard_tenant_active")
   @@map("wallboard_layouts")
+}
+
+// =============================================================================
+// I03 — Voicemail + Greetings
+// voicemails table is partitioned monthly (migration.sql owns it; not Prisma-managed)
+// =============================================================================
+
+model VoicemailBox {
+  id             BigInt   @id @default(autoincrement())
+  tenantId       BigInt   @default(1) @map("tenant_id")
+  name           String   @db.VarChar(128)
+  ingroupId      String?  @map("ingroup_id") @db.VarChar(32)
+  userId         BigInt?  @map("user_id")
+  didId          BigInt?  @map("did_id")
+  greetingUri    String?  @map("greeting_uri") @db.VarChar(512)
+  maxDurationSec Int      @default(120) @map("max_duration_sec") @db.UnsignedSmallInt
+  transcribe     Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_vmb_tenant")
+  voicemails Voicemail[]
+  boxUsers   VoicemailBoxUser[]
+
+  @@unique([tenantId, name], map: "uk_vmb_tenant_name")
+  @@index([tenantId, active], map: "idx_vmb_tenant_active")
+  @@map("voicemail_boxes")
+}
+
+model VoicemailBoxUser {
+  voicemailBoxId BigInt   @map("voicemail_box_id")
+  userId         BigInt   @map("user_id")
+  tenantId       BigInt   @default(1) @map("tenant_id")
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(6)
+
+  box    VoicemailBox @relation(fields: [voicemailBoxId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vmbu_box")
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vmbu_user")
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_vmbu_tenant")
+
+  @@id([voicemailBoxId, userId])
+  @@index([tenantId, userId], map: "idx_vmbu_tenant_user")
+  @@map("voicemail_box_users")
+}
+
+enum VoicemailStatus {
+  NEW
+  READ
+  ARCHIVED
+  DELETED
+}
+
+/// voicemails table is partitioned by created_at monthly.
+/// Prisma manages the model shape but NOT the partitioning — see migration.sql.
+model Voicemail {
+  id            BigInt          @id @default(autoincrement())
+  tenantId      BigInt          @default(1) @map("tenant_id")
+  mailboxId     BigInt          @map("mailbox_id")
+  callUuid      String          @map("call_uuid") @db.VarChar(40)
+  recordingUri  String          @map("recording_uri") @db.VarChar(512)
+  durationSec   Int             @default(0) @map("duration_sec") @db.UnsignedSmallInt
+  callerNumber  String?         @map("caller_number") @db.VarChar(20)
+  status        VoicemailStatus @default(NEW)
+  transcribed   Boolean         @default(false)
+  transcriptUri String?         @map("transcript_uri") @db.VarChar(512)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.DateTime(6)
+
+  mailbox VoicemailBox @relation(fields: [mailboxId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_vm_mailbox")
+
+  @@index([tenantId, mailboxId, status, createdAt], map: "idx_vm_tenant_mailbox_status")
+  @@index([tenantId, createdAt], map: "idx_vm_tenant_created")
+  @@index([tenantId, callUuid], map: "idx_vm_call_uuid")
+  @@map("voicemails")
 }
