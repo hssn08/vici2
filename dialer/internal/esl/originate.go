@@ -34,6 +34,18 @@ func (a OnAnswerBridge) asExecuteOnAnswer() string {
 	return fmt.Sprintf("bridge:%s", a.Endpoint)
 }
 
+// OnAnswerConferenceJoinOnly transfers the answered leg into a conference with
+// +flags{join-only}, causing the transfer to fail-closed if the conference
+// does not exist (agent logged out). Used by T03 for 3rd-party origination.
+//
+// FQN is the fully-qualified conference name, e.g. "agent_t1_u1042@default".
+// T03 PLAN §8.4.
+type OnAnswerConferenceJoinOnly struct{ FQN string }
+
+func (a OnAnswerConferenceJoinOnly) asExecuteOnAnswer() string {
+	return fmt.Sprintf("transfer:conference:%s+flags{join-only} inline default", a.FQN)
+}
+
 // OnAnswerCustom allows arbitrary execute_on_answer strings (e.g. eavesdrop).
 type OnAnswerCustom struct{ Raw string }
 
