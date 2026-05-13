@@ -12,7 +12,13 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: ["src/test/unit/**/*.test.ts", "src/test/unit/**/*.test.tsx"],
+    include: [
+      "src/test/unit/**/*.test.ts",
+      "src/test/unit/**/*.test.tsx",
+      "src/components/**/__tests__/**/*.test.ts",
+      "src/components/**/__tests__/**/*.test.tsx",
+      "src/lib/hooks/__tests__/**/*.test.ts",
+    ],
     setupFiles: ["./src/test/setup.ts"],
   },
 });
