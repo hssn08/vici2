@@ -379,6 +379,96 @@ async function seedScripts(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// N02 — Seed 7 default English email templates
+// ---------------------------------------------------------------------------
+
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function readSeed(name: string, ext: 'html' | 'txt'): string {
+  return readFileSync(join(__dirname, `email-template-seeds/${name}.${ext}`), 'utf8');
+}
+
+async function seedEmailTemplates(): Promise<void> {
+  const templates: Array<{
+    category: string;
+    subject: string;
+    htmlBody: string;
+    textBody: string;
+  }> = [
+    {
+      category: 'callback_due',
+      subject: 'Action required: Callback due — {{callback.leadName}}',
+      htmlBody: readSeed('callback_due', 'html'),
+      textBody: readSeed('callback_due', 'txt'),
+    },
+    {
+      category: 'callback_upcoming',
+      subject: 'Reminder: Callback in {{callback.minutesUntilDue}} minutes — {{callback.leadName}}',
+      htmlBody: readSeed('callback_upcoming', 'html'),
+      textBody: readSeed('callback_upcoming', 'txt'),
+    },
+    {
+      category: 'import_complete',
+      subject: 'Import complete: {{import.fileName}} — {{import.rowsImported}} rows',
+      htmlBody: readSeed('import_complete', 'html'),
+      textBody: readSeed('import_complete', 'txt'),
+    },
+    {
+      category: 'import_failed',
+      subject: 'Import failed: {{import.fileName}} — action required',
+      htmlBody: readSeed('import_failed', 'html'),
+      textBody: readSeed('import_failed', 'txt'),
+    },
+    {
+      category: 'recording_failed',
+      subject: 'Recording failed for call {{recording.callUuid}}',
+      htmlBody: readSeed('recording_failed', 'html'),
+      textBody: readSeed('recording_failed', 'txt'),
+    },
+    {
+      category: 'agent_disconnected',
+      subject: 'Agent disconnected: {{agent.name}} at {{formatDate agent.disconnectedAt "h:mm a"}}',
+      htmlBody: readSeed('agent_disconnected', 'html'),
+      textBody: readSeed('agent_disconnected', 'txt'),
+    },
+    {
+      category: 'drop_gate_engaged',
+      subject: 'Drop gate engaged: {{dropGate.campaignName}} ({{dropGate.dropRate}}% drop rate)',
+      htmlBody: readSeed('drop_gate_engaged', 'html'),
+      textBody: readSeed('drop_gate_engaged', 'txt'),
+    },
+  ];
+
+  for (const tpl of templates) {
+    const exists = await prisma.emailTemplate.findFirst({
+      where: { tenantId: TENANT_ID, category: tpl.category, lang: 'en' },
+      select: { id: true },
+    });
+    if (!exists) {
+      await prisma.emailTemplate.create({
+        data: {
+          tenantId: TENANT_ID,
+          category: tpl.category,
+          lang: 'en',
+          subject: tpl.subject,
+          htmlBody: tpl.htmlBody,
+          textBody: tpl.textBody,
+          active: true,
+          version: 1,
+        },
+      });
+      console.log(`[seed] email_templates: created "${tpl.category}" (en)`);
+    } else {
+      console.log(`[seed] email_templates: "${tpl.category}" (en) already exists, skipping`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   await seedTenants();
   await seedAuthConfig();
@@ -388,6 +478,7 @@ async function main(): Promise<void> {
   await seedPhoneCodes();
   await seedZipCodes();
   await seedScripts();
+  await seedEmailTemplates();
   console.log('[seed] done');
   console.log('[seed] note: super_admin user is NOT created here (per F02 amendment A6).');
   console.log('[seed]       Run F05 bootstrap (`make db-bootstrap-superadmin`) after F05 IMPLEMENT lands.');

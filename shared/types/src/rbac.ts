@@ -123,6 +123,9 @@ export const VERBS = [
   'list:delete',
   'list:reset',
   'list:purge',
+  // email templates (N02)
+  'email_templates:read',
+  'email_templates:edit',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -250,6 +253,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:delete':          { scope: 'tenant', sensitive: true },
     'list:reset':           { scope: 'tenant', sensitive: true },
     'list:purge':           { scope: 'tenant', sensitive: true },
+    'email_templates:read': { scope: 'tenant' },
+    'email_templates:edit': { scope: 'tenant' },
   },
 
   admin: {
@@ -317,6 +322,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:delete':          { scope: 'tenant', sensitive: true },
     'list:reset':           { scope: 'tenant', sensitive: true },
     'list:purge':           { scope: 'tenant', sensitive: true },
+    'email_templates:read': { scope: 'tenant' },
+    'email_templates:edit': { scope: 'tenant' },
   },
 
   supervisor: {
@@ -356,6 +363,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:edit':        { scope: 'group' },
     'alert:read':           { scope: 'group' },
     'list:read':            { scope: 'group' },
+    'email_templates:read': { scope: 'tenant' },
   },
 
   agent: {

@@ -1,0 +1,16 @@
+AGENT DISCONNECTED
+==================
+
+Hi {{user.name}},
+
+Agent {{agent.name}} has disconnected unexpectedly.
+
+Agent:           {{agent.name}}
+Disconnected At: {{formatDate agent.disconnectedAt "MMMM d, yyyy 'at' h:mm a"}}
+{{#if agent.callUuid}}Call UUID:       {{agent.callUuid}}
+{{/if}}
+Please check on the agent and any active calls.
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}
