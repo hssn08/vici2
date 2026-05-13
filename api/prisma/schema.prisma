@@ -90,6 +90,15 @@
 //   C02.6  campaigns.consent_msg_audio VARCHAR(255) NULL
 //   C02.7  leads.is_business TINYINT(1) DEFAULT 0
 //   C02.8  consent_log table (partitioned, INSERT-only) — per-call consent audit
+//
+// E04 amendments (feat/F02-amendments — additive only, no DROP):
+//   E04.1  campaigns.lead_lock_ttl_seconds INT NOT NULL DEFAULT 30
+//          (distinct from E01.3 lock_ttl_sec: lock_ttl_sec is the hopper-lock TTL;
+//           lead_lock_ttl_seconds is the SET NX EX fence that prevents double-dial)
+//   E04.2  campaigns.call_strategy ENUM('longest_wait','random','fewest_calls','rank')
+//          NOT NULL DEFAULT 'longest_wait'
+//          (additive alongside E01's next_agent_call; E04 picker reads call_strategy;
+//           Phase 3 will unify; today only longest_wait is implemented)
 
 generator client {
   provider = "prisma-client-js"
@@ -302,6 +311,15 @@ enum NextAgentCall {
   rank
 }
 
+// E04 amendment — agent-selection strategy for PROGRESSIVE dial (mirrors NextAgentCall;
+// kept separate so E04 picker code stays decoupled from the legacy Vicidial field).
+enum CallStrategy {
+  longest_wait
+  random
+  fewest_calls
+  rank
+}
+
 enum RecordingMode {
   NEVER
   ONDEMAND
@@ -393,6 +411,13 @@ model Campaign {
   // C02 amendment §9.3 — FS-local path to consent audio played before bridge.
   // nil = system default (freeswitch/sounds/consent/default/en-US/vici2_consent_msg.wav).
   consentMsgAudio        String?            @map("consent_msg_audio") @db.VarChar(255)
+  // E04 amendment §3.3 — fence-token TTL for double-dial prevention.
+  // Distinct from lock_ttl_sec (hopper-lock). Default 30 s = T04 pipeline (~10 ms)
+  // + T01 ESL roundtrip (~50 ms) + ring timeout (22 s) + 7 s safety margin.
+  leadLockTtlSeconds     Int                @default(30) @map("lead_lock_ttl_seconds")
+  // E04 amendment §3.3 — agent-selection strategy for PROGRESSIVE dial.
+  // Phase 3 ships random/fewest_calls/rank; today only longest_wait is implemented.
+  callStrategy           CallStrategy       @default(longest_wait) @map("call_strategy")
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
