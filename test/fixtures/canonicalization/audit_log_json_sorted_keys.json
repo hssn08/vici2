@@ -1,0 +1,21 @@
+{
+  "_comment": "audit_log with nested JSON having unsorted keys — JCS must sort them. MySQL JSON_EXTRACT also normalizes. Both must produce identical canonical form.",
+  "table": "audit_log",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 10,
+    "ts": "2026-05-12T12:00:00.000000Z",
+    "actor_user_id": 3,
+    "actor_kind": "user",
+    "action": "auth.role.changed",
+    "entity_type": "user",
+    "entity_id": "3",
+    "before_json": { "z_last": "last", "a_first": "first", "m_mid": 42 },
+    "after_json": { "z_last": "admin", "a_first": "changed", "m_mid": 99 },
+    "request_id": "req-sorted-001",
+    "ip_address": "10.0.0.1",
+    "user_agent": "curl/7.81.0"
+  },
+  "_note": "JCS output for before_json: {\"a_first\":\"first\",\"m_mid\":42,\"z_last\":\"last\"}"
+}

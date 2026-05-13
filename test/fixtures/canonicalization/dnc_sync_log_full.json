@@ -1,0 +1,15 @@
+{
+  "_comment": "dnc_sync_log full sync with file hash",
+  "table": "dnc_sync_log",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "id": 1,
+    "source": "federal",
+    "kind": "full",
+    "file_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "added": 1250000,
+    "removed": 0,
+    "started_at": "2026-05-12T03:00:00.000000Z",
+    "completed_at": "2026-05-12T03:45:00.000000Z"
+  }
+}

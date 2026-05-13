@@ -1,0 +1,19 @@
+{
+  "_comment": "originate_audit DNC_BLOCKED with null call_uuid",
+  "table": "originate_audit",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 2,
+    "originated_at": "2026-05-12T14:01:00.000000Z",
+    "lead_id": 43,
+    "phone_e164": "+15550000000",
+    "campaign_id": null,
+    "outcome": "DNC_BLOCKED",
+    "tcpa_reason": null,
+    "dnc_decision": "BLOCK",
+    "dnc_sources": null,
+    "tcpa_decision": null,
+    "call_uuid": null
+  }
+}

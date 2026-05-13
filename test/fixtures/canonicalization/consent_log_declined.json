@@ -1,0 +1,17 @@
+{
+  "_comment": "consent_log declined — DTMF key 2",
+  "table": "consent_log",
+  "row": {
+    "prev_hash": "a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1c2d3e4f5a0b1",
+    "tenant_id": 1,
+    "id": 3,
+    "call_uuid": "call-consent-003",
+    "lead_id": 1003,
+    "phone_e164": "+15559999999",
+    "prompt_id": "tcpa_consent_v2",
+    "dtmf_response": "2",
+    "outcome": "declined",
+    "language": "en",
+    "prompt_played_at": "2026-05-12T16:00:00.500000Z"
+  }
+}

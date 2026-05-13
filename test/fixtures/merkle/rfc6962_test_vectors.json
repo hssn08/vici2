@@ -1,0 +1,46 @@
+{
+  "_comment": "RFC 6962 Merkle tree test vectors. row_hashes are 64-char lowercase hex (as stored in MySQL). roots are 64-char lowercase hex. Domain separation: 0x00 leaf prefix, 0x01 internal prefix.",
+  "_algorithm": "leaf_hash = SHA256(0x00 || bytes_from_hex(row_hash)); internal = SHA256(0x01 || left_hash || right_hash); odd = duplicate last leaf",
+  "vectors": [
+    {
+      "_name": "empty_tree",
+      "row_hashes": [],
+      "merkle_root_hex": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "_note": "SHA256(0x00) — empty-leaf sentinel per PLAN §5.3"
+    },
+    {
+      "_name": "single_leaf",
+      "row_hashes": ["0000000000000000000000000000000000000000000000000000000000000000"],
+      "merkle_root_hex": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "_note": "SHA256(0x00 || 0x00*32) — the single leaf hash IS the root for n=1"
+    },
+    {
+      "_name": "two_leaves",
+      "row_hashes": [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0101010101010101010101010101010101010101010101010101010101010101"
+      ],
+      "_note": "root = SHA256(0x01 || leaf0 || leaf1)"
+    },
+    {
+      "_name": "three_leaves_odd_duplication",
+      "row_hashes": [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0101010101010101010101010101010101010101010101010101010101010101",
+        "0202020202020202020202020202020202020202020202020202020202020202"
+      ],
+      "_note": "leaf[2] is duplicated; level1 has 2 nodes; root = SHA256(0x01 || internal(0,1) || internal(2,2))"
+    },
+    {
+      "_name": "five_leaves",
+      "row_hashes": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "_note": "5 leaves, last duplicated. tree has 3 levels."
+    }
+  ]
+}

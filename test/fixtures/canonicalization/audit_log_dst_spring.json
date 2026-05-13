@@ -1,0 +1,20 @@
+{
+  "_comment": "DST spring-forward fixture: 2026-03-08 07:00 UTC. Server runs UTC so this must serialize as T07:00:00.000000Z regardless of session TZ.",
+  "table": "audit_log",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 5,
+    "ts": "2026-03-08T07:00:00.000000Z",
+    "actor_user_id": null,
+    "actor_kind": "system",
+    "action": "auth.login.success",
+    "entity_type": "user",
+    "entity_id": "1",
+    "before_json": null,
+    "after_json": null,
+    "request_id": null,
+    "ip_address": null,
+    "user_agent": null
+  }
+}

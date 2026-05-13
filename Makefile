@@ -181,6 +181,46 @@ valkey-sync-lua: ## Copy shared/lua/*.lua → dialer + api embed dirs.
 		&& diff -r shared/lua/ api/src/lib/valkey/lua/ >/dev/null \
 		&& echo "[valkey] lua sync OK"
 
+# ----- C03 audit immutability ------------------------------------------------
+#
+# audit-ddl: safe DDL wrapper that writes an audit.schema.modified row before
+# executing the SQL, preventing silent trigger/schema changes (PLAN §7.3).
+# Usage: make audit-ddl FILE=infra/mysql/migrations/fix.sql REASON="short desc"
+#
+# audit-verify-7d: CI shortcut that verifies the last 7 days for all tables.
+# Requires DATABASE_URL_AUDIT_READER in environment.
+
+AUDIT_DDL_FILE   ?= $(error set FILE=path/to/migration.sql)
+AUDIT_DDL_REASON ?= $(error set REASON="short description")
+
+audit-ddl: ## Safe DDL on audit tables: writes audit.schema.modified row first.
+	@if [ -z "$(FILE)" ]; then echo "[audit-ddl] Usage: make audit-ddl FILE=<sql> REASON='<desc>'"; exit 1; fi
+	@if [ -z "$(REASON)" ]; then echo "[audit-ddl] REASON is required"; exit 1; fi
+	@echo "[audit-ddl] Running DDL with audit trail: $(FILE)"
+	@SHA=$$(sha256sum "$(FILE)" | awk '{print $$1}'); \
+	$(COMPOSE) exec -T mysql sh -c "mysql -u\$$VICI2_DBA_USER -p\$$VICI2_DBA_PASSWORD \$$VICI2_DB_NAME" <<'SQL'
+INSERT INTO audit_log (tenant_id, actor_user_id, actor_kind, action, entity_type, entity_id, before_json, after_json, ts)
+VALUES (1, NULL, 'system', 'audit.schema.modified', 'schema', '$(FILE)',
+        JSON_OBJECT('file_path', '$(FILE)', 'file_sha256', '$$SHA'),
+        JSON_OBJECT('reason', '$(REASON)', 'dba_user', USER()), NOW(6));
+SQL
+	@$(COMPOSE) exec -T mysql sh -c "mysql -u\$$VICI2_DBA_USER -p\$$VICI2_DBA_PASSWORD \$$VICI2_DB_NAME" < "$(FILE)"
+	@echo "[audit-ddl] DDL applied: $(FILE)"
+
+audit-verify-7d: ## Verify last 7 days of audit chain for all tables (CI/smoke).
+	@echo "[audit-verify] Running 7-day chain verification for tenant 1..."
+	@FROM=$$(date -u -d '7 days ago' '+%Y-%m-%d' 2>/dev/null || date -u -v-7d '+%Y-%m-%d'); \
+	 TO=$$(date -u '+%Y-%m-%d'); \
+	 for TABLE in audit_log call_window_audit originate_audit consent_log dnc_sync_log; do \
+	   echo "[audit-verify] Checking $$TABLE $$FROM → $$TO"; \
+	   tsx scripts/verify-audit-chain.ts \
+	     --tenant 1 --table $$TABLE \
+	     --from "$$FROM" --to "$$TO" \
+	     --public-keys ./vici2-public-keys \
+	   || { echo "[audit-verify] FAIL: $$TABLE"; exit 2; }; \
+	 done
+	@echo "[audit-verify] All tables OK"
+
 # ----- housekeeping ----------------------------------------------------------
 
 clean: ## Stop stack + remove volumes + remove generated artifacts.
@@ -199,4 +239,4 @@ hooks: ## Install lefthook git hooks.
 	db-generate db-migrate db-migrate-dev db-deploy db-reset db-seed \
 	db-studio db-bootstrap-superadmin \
 	fs-up fs-down fs-reload fs-cli valkey-cli redis-cli mysql-cli \
-	valkey-sync-lua clean reset hooks
+	valkey-sync-lua audit-ddl audit-verify-7d clean reset hooks
