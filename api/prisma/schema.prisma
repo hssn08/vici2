@@ -72,6 +72,16 @@
 //          CARRIER_FAIL, GATEWAY_LIMIT_TRY_LATER (under campaign_id='__SYS__')
 //   T04.3  lists.caller_id_override VARCHAR(16) NULL
 //   T04.4  lists.caller_id_name VARCHAR(32) NULL
+//
+// C02 amendments (feat/C02-implement — additive only, no DROP):
+//   C02.1  tenants.consent_minimum_mode ENUM ConsentMode DEFAULT 'PROMPT_MESSAGE'
+//   C02.2  tenants.default_caller_state CHAR(2) NULL
+//   C02.3  campaigns.consent_policy_override ENUM ConsentMode NULL
+//   C02.4  campaigns.recording_purpose ENUM RecordingPurpose DEFAULT 'general'
+//   C02.5  campaigns.opt_out_action ENUM OptOutAction DEFAULT 'continue_no_record'
+//   C02.6  campaigns.consent_msg_audio VARCHAR(255) NULL
+//   C02.7  leads.is_business TINYINT(1) DEFAULT 0
+//   C02.8  consent_log table (partitioned, INSERT-only) — per-call consent audit
 
 generator client {
   provider = "prisma-client-js"
@@ -94,9 +104,15 @@ model Tenant {
   settings                  Json
   // D05 amendment — per-tenant FCC 64.1200(d) internal-DNC retention,
   // default 5 years (FCC floor); operator may extend up to 99.
-  internalDncRetentionYears Int      @default(5) @map("internal_dnc_retention_years") @db.SmallInt
-  createdAt                 DateTime @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt                 DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+  internalDncRetentionYears Int                  @default(5) @map("internal_dnc_retention_years") @db.SmallInt
+  // C02 amendment §9.2 — recording-consent minimum mode (default PROMPT_MESSAGE = safe floor).
+  // M05 surfaces this in the tenant editor. ModeSkip = no recording ever.
+  consentMinimumMode        ConsentMode          @default(PROMPT_MESSAGE) @map("consent_minimum_mode")
+  // C02 amendment §9.2 — dialer's outbound caller state (Phase 1: per-tenant;
+  // Phase 4: per-user via users.state). Used by CheckConsent's stricter-state-wins.
+  defaultCallerState        String?              @map("default_caller_state") @db.Char(2)
+  createdAt                 DateTime             @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt                 DateTime             @updatedAt @map("updated_at") @db.DateTime(6)
 
   users          User[]
   userGroups     UserGroup[]
@@ -354,6 +370,16 @@ model Campaign {
   machineTerminal        Boolean            @default(true) @map("machine_terminal")
   leadFilterSql          String?            @map("lead_filter_sql") @db.Text
   multiListMix           MultiListMix       @default(EVEN) @map("multi_list_mix")
+  // C02 amendment §9.3 — per-campaign consent policy (stricter-of with tenant minimum).
+  // nil = use tenant's consent_minimum_mode; set to REQUIRE_ACTIVE for high-risk.
+  consentPolicyOverride  ConsentMode?       @map("consent_policy_override")
+  // C02 amendment §9.3 — why calls are recorded (PA §5704(15) B2B carve-out gate).
+  recordingPurpose       RecordingPurpose   @default(general) @map("recording_purpose")
+  // C02 amendment §9.3 — what to do when customer declines REQUIRE_ACTIVE consent.
+  optOutAction           OptOutAction       @default(continue_no_record) @map("opt_out_action")
+  // C02 amendment §9.3 — FS-local path to consent audio played before bridge.
+  // nil = system default (freeswitch/sounds/consent/default/en-US/vici2_consent_msg.wav).
+  consentMsgAudio        String?            @map("consent_msg_audio") @db.VarChar(255)
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -582,6 +608,8 @@ model Lead {
   knownTimezone     String?   @map("known_timezone") @db.VarChar(40)
   // C01 amendment §8.4 — surface BLOCK_INVALID(no_timezone) leads to M03.
   tzBlocked         Boolean   @default(false) @map("tz_blocked")
+  // C02 amendment §9.4 — PA §5704(15) B2B carve-out gate; populated by D01 CSV import.
+  isBusiness        Boolean   @default(false) @map("is_business")
   // D01 amendment §13.1 — optimistic-lock token for /api/leads PATCH (If-Match).
   version           Int       @default(1) @db.SmallInt
   deletedAt         DateTime? @map("deleted_at") @db.DateTime(6)
@@ -1482,4 +1510,82 @@ model OriginateAudit {
   @@index([tenantId, outcome, originatedAt], map: "idx_originate_audit_t_outcome_ts")
   @@index([callUuid], map: "idx_originate_audit_call_uuid")
   @@map("originate_audit")
+}
+
+// =============================================================================
+// C02 amendment §9 — Recording Consent State Matrix
+//
+// New enums and the consent_log table (INSERT-only, monthly partitioned).
+// Column additions on tenants / campaigns / leads are inline above.
+// =============================================================================
+
+// ConsentMode — the five recording-consent decision modes, low→high strictness.
+// Mirrors Go's consent.Mode iota.
+enum ConsentMode {
+  ALLOW
+  PROMPT_BEEP
+  PROMPT_MESSAGE
+  REQUIRE_ACTIVE
+  SKIP
+}
+
+// RecordingPurpose — classifies why a call is recorded.
+// PA §5704(15) B2B carve-out applies only to training / quality_control / monitoring.
+enum RecordingPurpose {
+  general
+  training
+  quality_control
+  monitoring
+}
+
+// OptOutAction — what happens when a customer declines REQUIRE_ACTIVE consent.
+enum OptOutAction {
+  continue_no_record
+  hangup
+}
+
+// ConsentLogStatus — the lifecycle status of a consent decision row.
+// Two rows are written per call_uuid (INSERT-only — no UPDATE):
+//   1. Decision-time row with status "pending".
+//   2. Post-call status-time row with the final status from R01.
+enum ConsentLogStatus {
+  pending
+  not_required
+  prompted_accepted
+  prompted_declined
+  prompted_assumed
+  beep_only
+  skipped
+}
+
+// consent_log — INSERT-only per-call recording-consent audit trail.
+//
+// Partitioned monthly RANGE COLUMNS(recorded_at).
+// No foreign keys (MySQL partitioned-table limitation).
+// vici2_app_rw gets INSERT + SELECT only (C03 owns grant setup).
+// Retention: 7 years (C04 partition rotator, same as recording_log/audit_log).
+model ConsentLog {
+  id            BigInt           @default(autoincrement())
+  tenantId      BigInt           @default(1) @map("tenant_id")
+  callUuid      String           @map("call_uuid") @db.VarChar(40)
+  leadId        BigInt           @map("lead_id")
+  campaignId    String           @map("campaign_id") @db.VarChar(32)
+  userId        BigInt?          @map("user_id") // nil pre-bridge
+  leadState     String?          @map("lead_state") @db.Char(2)
+  callerState   String?          @map("caller_state") @db.Char(2)
+  decision      ConsentMode
+  mechanism     String           @db.VarChar(64)
+  stateApplied  String?          @map("state_applied") @db.Char(2)
+  consentStatus ConsentLogStatus @default(pending) @map("consent_status")
+  reason        String           @db.VarChar(64)
+  citation      String?          @db.VarChar(128)
+  recordedAt    DateTime         @map("recorded_at") @db.DateTime(6)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@id([id, recordedAt])
+  @@index([tenantId, leadId, recordedAt], map: "idx_consent_log_t_lead_ts")
+  @@index([tenantId, callUuid], map: "idx_consent_log_t_call")
+  @@index([tenantId, stateApplied, recordedAt], map: "idx_consent_log_t_state_ts")
+  @@index([tenantId, decision, recordedAt], map: "idx_consent_log_t_decision_ts")
+  @@map("consent_log")
 }
