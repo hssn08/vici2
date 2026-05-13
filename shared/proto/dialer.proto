@@ -1,0 +1,82 @@
+// T04 gRPC service definition.
+// T04OriginateService.Originate — compliance-gated outbound dial.
+//
+// Callers: api (A04 manual-dial), Phase-4 N01 external REST gateway.
+// In-process callers (E02, E04) import the Go package directly.
+//
+// T04 PLAN §8.4 — this is the authoritative proto for T04OriginateService.
+
+syntax = "proto3";
+
+package vici2.dialer.v1;
+
+option go_package = "github.com/vici2/dialer/proto/dialer/v1;dialerv1";
+
+// T04OriginateService runs the 5-gate compliance pipeline and (on pass) calls
+// T01.Originate. Idempotent on attempt_uuid.
+service T04OriginateService {
+  // Originate runs the 5-gate compliance pipeline and (on all-ALLOW) calls
+  // T01.Originate with the assembled channel vars.
+  //
+  // gRPC status codes:
+  //   OK                — all gates ALLOW + transport success.
+  //   FAILED_PRECONDITION — gate BLOCK (tcpa/dnc/consent).
+  //   RESOURCE_EXHAUSTED  — gateway_cap or drop_cap block.
+  //   UNAVAILABLE         — carrier/transport fail.
+  //   ALREADY_EXISTS      — idempotent replay (response carries prior result).
+  //   INVALID_ARGUMENT    — missing attempt_uuid / malformed E.164.
+  //   INTERNAL            — audit INSERT failure or unexpected error.
+  rpc Originate(OriginateRequest) returns (OriginateResponse);
+}
+
+// OriginateRequest is the full input to T04OriginateService.Originate.
+// Must be identical (modulo naming convention) to originate.OriginateRequest.
+message OriginateRequest {
+  string attempt_uuid       = 1;  // required; UUIDv4 lowercase; caller-supplied
+  int64  tenant_id          = 2;
+  int64  lead_id            = 3;
+  string campaign_id        = 4;
+  int64  list_id            = 5;
+  int64  agent_id           = 6;  // 0 for PREDICTIVE pre-answer
+  string dest_number        = 7;  // E.164
+  OriginateMode mode        = 8;
+  string caller_id_override = 9;  // per-call tier-1 override; "" = use waterfall
+  string caller_id_name     = 10;
+  int64  carrier_id         = 11; // 0 = T02 picks
+  string fs_host            = 12; // "" = T01 round-robin; X03 wires later
+  string bypass_token       = 13; // empty = no DNC bypass
+  string request_id         = 14; // trace correlation id
+  string ip_address         = 15; // gRPC peer / forwarded-for
+  int64  actor_user_id      = 16; // for MANUAL/A04 audit
+}
+
+// OriginateResponse is the output of T04OriginateService.Originate.
+message OriginateResponse {
+  string          attempt_uuid = 1; // echo of request.attempt_uuid
+  string          call_uuid    = 2; // == attempt_uuid by policy (one-UUID rule)
+  int64           audit_row_id = 3; // originate_audit.id for cross-table joins
+  OriginateOutcome outcome     = 4;
+  string          gate_applied = 5; // "" if all ALLOW; blocking gate name otherwise
+}
+
+// OriginateMode mirrors the Go OriginateMode constants.
+enum OriginateMode {
+  PROGRESSIVE = 0;
+  PREDICTIVE  = 1;
+  MANUAL      = 2;
+  PREVIEW     = 3;
+}
+
+// OriginateOutcome mirrors the originate_audit.outcome ENUM values.
+enum OriginateOutcome {
+  SUCCESS          = 0;
+  TCPA_BLOCKED     = 1;
+  DNC_BLOCKED      = 2;
+  CONSENT_BLOCKED  = 3;
+  GATEWAY_LIMIT    = 4;
+  RATE_LIMITED     = 5;
+  GATEWAY_FAIL     = 6;
+  TIMEOUT_OUTCOME  = 7;  // renamed to avoid collision with gRPC DEADLINE_EXCEEDED
+  JOB_ORPHANED     = 8;
+  OTHER            = 9;
+}
