@@ -1,0 +1,27 @@
+# =============================================================================
+# fail2ban jail: caddy-4xx-flood.local
+# =============================================================================
+# Lightweight DoS deterrent: ban IPs generating ≥30 4xx errors in 60 seconds.
+#
+# Short ban (600s = 10 minutes) so legitimate misconfigured clients recover
+# quickly. The threshold (30/60s) is high enough to ignore the occasional
+# broken client while catching scanner tools and DDoS sources.
+#
+# This jail covers ALL 4xx responses, not just auth endpoints. It is a
+# belt-and-suspenders defense complementing caddy-auth (which has lower
+# threshold on specific auth paths).
+#
+# Logpath: /var/log/caddy/access.log (Caddy JSON format per Caddyfile).
+# =============================================================================
+
+[caddy-4xx-flood]
+enabled  = true
+filter   = caddy-4xx-flood
+logpath  = /var/log/caddy/access.log
+port     = http,https
+protocol = tcp
+maxretry = 30
+findtime = 60
+bantime  = 600
+
+# ignoreip is set in ignoreip.local — do not override here.

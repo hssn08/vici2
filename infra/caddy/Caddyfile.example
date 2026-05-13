@@ -1,0 +1,184 @@
+# =============================================================================
+# vici2 — Caddyfile.example
+# =============================================================================
+# Phase 1: Caddy runs ON THE HOST (systemd unit). The compose stack exposes
+# api/web/freeswitch on loopback-only ports; Caddy proxies via loopback.
+# Phase 2: Caddy moves into compose on the "edge" docker network (F01 amend).
+#
+# DNS-01 ACME (default): Route53
+#   Requires xcaddy build with caddy-dns/route53 plugin (see install.sh).
+#   Cloudflare alternative: swap `dns route53` for `dns cloudflare {api_token ...}`
+#
+# SINGLE-CERT LAYOUT (Phase 1):
+#   certbot owns the LE wildcard cert and writes to /etc/letsencrypt/live/.
+#   Caddy loads from disk (tls path below) so only ONE ACME account hammers LE.
+#   FreeSWITCH-side certs are written by infra/certbot/render-fs-tls.sh.
+#   Phase 2 alternative: switch to Caddy auto-renew + a file-watcher that
+#   mirrors Caddy storage into FS disk + triggers `sofia profile restart`.
+#
+# Required env vars (sourced from /etc/caddy/caddy.env or systemd EnvironmentFile):
+#   VICI2_ACME_EMAIL      — LE account email
+#   VICI2_ACME_DIRECTORY  — LE directory URL (prod or staging)
+#   CADDY_HOSTNAMES       — comma-separated, e.g. vici2.example.com,*.vici2.example.com
+#   AWS_ACCESS_KEY_ID     — Route53 credentials (dev/laptop); use IAM role in prod
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_REGION            — default us-east-1
+#   API_UPSTREAM          — e.g. http://127.0.0.1:3000  (Phase 1 loopback)
+#   WEB_UPSTREAM          — e.g. http://127.0.0.1:4000
+#   FS_WSS_UPSTREAM       — e.g. http://127.0.0.1:5066  (FS internal WSS port)
+# =============================================================================
+
+{
+    # Disable Caddy's own ACME — certbot owns the cert in Phase 1.
+    # Remove this block (and the tls directives below) when switching to
+    # Caddy-managed certs in Phase 2.
+    auto_https off
+
+    # Admin API bound to loopback only — never expose to docker network or internet.
+    admin 127.0.0.1:2019
+
+    # Enable Prometheus metrics on the admin endpoint.
+    servers {
+        metrics
+    }
+
+    # Global error log.
+    log {
+        level INFO
+        output file /var/log/caddy/caddy.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# HTTP → HTTPS redirect + ACME HTTP-01 for apex (non-wildcard) when using
+# Caddy auto-ACME in Phase 2. In Phase 1, certbot handles HTTP-01 challenges
+# via its own temporary server. Keep this block so Caddy doesn't 404 on :80.
+# ---------------------------------------------------------------------------
+http://{$CADDY_HOSTNAMES} {
+    redir https://{host}{uri} 308
+}
+
+# ---------------------------------------------------------------------------
+# Primary HTTPS site block
+# ---------------------------------------------------------------------------
+{$CADDY_HOSTNAMES} {
+    # Phase 1: load cert from certbot's directory (certbot owns renewal).
+    # Phase 2: remove tls directive to let Caddy manage ACME automatically.
+    tls /etc/letsencrypt/live/vici2.example.com/fullchain.pem \
+        /etc/letsencrypt/live/vici2.example.com/privkey.pem
+
+    # Compression
+    encode zstd gzip
+
+    # Structured access log (JSON) — fail2ban caddy-auth/4xx-flood filters parse this.
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 500mb
+            roll_keep 10
+        }
+        format json
+    }
+
+    # -------------------------------------------------------------------------
+    # Security headers (per O05 PLAN §6.3 — frozen bundle)
+    # -------------------------------------------------------------------------
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "DENY"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        # microphone=(self) is mandatory for WebRTC agent UI (A02).
+        # connect-src allows WSS to FS hostname per tenant.
+        Permissions-Policy        "camera=(), geolocation=(), microphone=(self), payment=()"
+        Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss://*.vici2.example.com; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+        Cross-Origin-Opener-Policy  "same-origin"
+        Cross-Origin-Embedder-Policy "require-corp"
+        # Remove server identity headers
+        -Server
+        -X-Powered-By
+    }
+
+    # -------------------------------------------------------------------------
+    # Route: API (authentication endpoints first for fail2ban log clarity)
+    # -------------------------------------------------------------------------
+    handle /api/auth/* {
+        reverse_proxy {$API_UPSTREAM} {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /auth/* {
+        reverse_proxy {$API_UPSTREAM} {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Route: API (all other endpoints)
+    handle /api/* {
+        reverse_proxy {$API_UPSTREAM} {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Route: WebSocket gateway (A03 — agent event bus)
+    handle /ws/* {
+        reverse_proxy {$API_UPSTREAM} {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Route: SIP.js WebSocket to FreeSWITCH WSS internal port.
+    # Phase 1: FS runs with network_mode: host, accessible at 127.0.0.1:5066.
+    # Phase 2: route to freeswitch:5066 once FS joins the "edge" docker network.
+    handle /sip-ws/* {
+        reverse_proxy {$FS_WSS_UPSTREAM} {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Route: SPA / agent UI (A01) and admin UI — catch-all.
+    handle {
+        reverse_proxy {$WEB_UPSTREAM} {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# WSS:7443 — dedicated WebRTC SIP.js port
+# Used when browser SIP.js connects directly to this port (not via /sip-ws/).
+# Phase 1: direct proxy to FS host port 5066. Phase 2: via "edge" network.
+# ---------------------------------------------------------------------------
+:{$FS_WSS_PORT:-7443} {
+    tls /etc/letsencrypt/live/vici2.example.com/fullchain.pem \
+        /etc/letsencrypt/live/vici2.example.com/privkey.pem
+
+    log {
+        output file /var/log/caddy/access-wss.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+        format json
+    }
+
+    reverse_proxy {$FS_WSS_UPSTREAM} {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

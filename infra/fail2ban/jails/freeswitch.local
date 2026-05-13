@@ -1,0 +1,25 @@
+# =============================================================================
+# fail2ban jail: freeswitch.local (mode=normal)
+# =============================================================================
+# SIP authentication failure jail — bans IPs with repeated SIP auth FAILURES.
+# mode=normal (not ddos) to avoid banning phones that generate normal challenges.
+#
+# IMPORTANT: Each sofia profile in FreeSWITCH must have:
+#   <param name="log-auth-failures" value="true"/>
+#   <param name="log-auth-failures-as-warnings" value="true"/>
+# Without these, the filter cannot detect auth failures. See O05 PLAN §2.4.
+#
+# Ports: covers SIP (5060), SIP-TLS (5061), and alternate SIP (5080).
+# =============================================================================
+
+[freeswitch]
+enabled  = true
+filter   = freeswitch[mode=normal]
+logpath  = /var/log/freeswitch/freeswitch.log
+port     = 5060,5061,5080
+protocol = udp,tcp
+maxretry = 5
+findtime = 3600
+bantime  = 3600
+
+# ignoreip is set in ignoreip.local — do not override here.
