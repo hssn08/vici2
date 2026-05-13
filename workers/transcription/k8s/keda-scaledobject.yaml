@@ -1,0 +1,21 @@
+# N07 KEDA ScaledObject — autoscale GPU workers on BullMQ queue depth
+# N07 PLAN §3.2
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: n07-python-worker-scaler
+  namespace: vici2
+spec:
+  scaleTargetRef:
+    name: n07-python-worker
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  triggers:
+    - type: redis
+      metadata:
+        address: redis:6379
+        listName: bull:transcription:wait
+        listLength: "50" # scale up at 50 pending jobs
+        activationListLength: "5" # at least 5 to trigger scale

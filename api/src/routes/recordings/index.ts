@@ -9,6 +9,7 @@ import { registerRecordingMetadataRoute } from './metadata.js';
 import { registerRecordingUrlRoute } from './url.js';
 import { registerLegalHoldRoutes } from './legal-hold.js';
 import { registerIntegrityRoute } from './integrity.js';
+import { registerTranscriptRoutes } from './transcript.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerRecordingRoutes(app: any): Promise<void> {
@@ -16,4 +17,5 @@ export async function registerRecordingRoutes(app: any): Promise<void> {
   await registerRecordingUrlRoute(app);
   await registerLegalHoldRoutes(app);
   await registerIntegrityRoute(app);
+  await registerTranscriptRoutes(app); // N07 — transcript GET + retry POST
 }
