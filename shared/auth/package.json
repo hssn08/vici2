@@ -1,0 +1,26 @@
+{
+  "name": "@vici2/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared RBAC decision functions and cache layer for vici2.",
+  "main": "rbac/can.ts",
+  "types": "rbac/can.ts",
+  "exports": {
+    "./rbac": "./rbac/can.ts",
+    "./rbac/scope": "./rbac/scope.ts",
+    "./rbac/cache": "./rbac/cache.ts",
+    "./rbac/audit": "./rbac/audit.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no shared/auth tests — tested via api/test' && true"
+  },
+  "dependencies": {
+    "@vici2/types": "workspace:*",
+    "lru-cache": "^11.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
