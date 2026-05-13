@@ -5,7 +5,7 @@
  * Run via: pnpm --filter @vici2/workers test
  */
 
-import { describe, it, mock, before, after } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { RecordingLogWriter, STREAM_STOPPED, CONSUMER_GROUP, STREAM_DLQ } from './index.js';
 
