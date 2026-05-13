@@ -152,6 +152,9 @@ export const VERBS = [
   // number pool (X04)
   'number_pool:read',
   'number_pool:edit',
+  // infra / fs-nodes (X03)
+  'infra:fs_node:read',
+  'infra:fs_node:edit',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -316,6 +319,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // X04 — number pool
     'number_pool:read':        { scope: 'tenant' },
     'number_pool:edit':        { scope: 'tenant' },
+    // X03 — FS node infra
+    'infra:fs_node:read':      { scope: 'tenant' },
+    'infra:fs_node:edit':      { scope: 'tenant' },
   },
 
   admin: {
@@ -410,6 +416,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // X04 — number pool
     'number_pool:read':        { scope: 'tenant' },
     'number_pool:edit':        { scope: 'tenant' },
+    // X03 — FS node infra (admin: read-only)
+    'infra:fs_node:read':      { scope: 'tenant' },
   },
 
   supervisor: {
