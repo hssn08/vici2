@@ -1,0 +1,157 @@
+# infra/observability/prometheus/rules/kamailio.rules.yml
+# X02 — Kamailio SIP dispatcher alert rules.
+# Covers: service availability, dispatcher pool health, call failure rate,
+# rate-limiting events, capacity thresholds, and shared memory pressure.
+#
+# Metrics are scraped from Kamailio's xhttp_prom endpoint (:9090/metrics).
+# Dispatcher metrics require: modparam("xhttp_prom", "xhttp_prom_stats", "all")
+#
+# Severity labels:
+#   critical — page on-call immediately; call routing actively impaired
+#   warning  — investigate within 30 minutes; approaching threshold
+
+groups:
+  - name: kamailio.availability
+    rules:
+
+      # Kamailio Prometheus endpoint unreachable.
+      # If Kamailio is down, all inbound and outbound SIP routing is broken.
+      - alert: KamailioDown
+        expr: up{job="kamailio"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kamailio SIP dispatcher is down"
+          description: >
+            Kamailio Prometheus endpoint has been unreachable for 1 minute.
+            All SIP traffic (inbound carriers, outbound dialer, agent WSS) is affected.
+            Action: docker compose restart kamailio; check logs for startup errors.
+            Reference: spec/modules/X02/PLAN.md
+
+  - name: kamailio.dispatcher
+    rules:
+
+      # No reachable backends in dispatcher set 1 (inbound).
+      # All inbound carrier calls will receive 503 Service Unavailable.
+      - alert: KamailioDispatcherSet1AllDown
+        expr: kamailio_dispatcher_reachable{set="1"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "All FreeSWITCH backends unreachable (inbound set 1)"
+          description: >
+            Kamailio dispatcher set 1 has 0 reachable backends.
+            All inbound carrier calls will receive 503 with Retry-After: 30.
+            Action: check FreeSWITCH health (docker compose ps freeswitch);
+            run kamcmd dispatcher.list to see backend states.
+
+      # No reachable backends in dispatcher set 2 (outbound).
+      # All dialer-originated calls will fail to reach a FreeSWITCH.
+      - alert: KamailioDispatcherSet2AllDown
+        expr: kamailio_dispatcher_reachable{set="2"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "All FreeSWITCH backends unreachable (outbound set 2)"
+          description: >
+            Kamailio dispatcher set 2 has 0 reachable backends.
+            Dialer-originated calls cannot reach FreeSWITCH.
+            Action: check FreeSWITCH health; run kamcmd dispatcher.list.
+
+      # Degraded: at least one backend down in set 1 (inbound).
+      # System still routes calls but redundancy is reduced.
+      - alert: KamailioDispatcherSet1Degraded
+        expr: kamailio_dispatcher_unreachable{set="1"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "FreeSWITCH backend(s) unreachable in inbound set 1"
+          description: >
+            {{ $value }} backend(s) unreachable in dispatcher set 1 (inbound).
+            Calls are rerouting to remaining healthy backends.
+            Action: investigate affected FreeSWITCH node;
+            run kamcmd dispatcher.list to identify which node is down.
+
+      # Degraded: at least one backend down in set 2 (outbound).
+      - alert: KamailioDispatcherSet2Degraded
+        expr: kamailio_dispatcher_unreachable{set="2"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "FreeSWITCH backend(s) unreachable in outbound set 2"
+          description: >
+            {{ $value }} backend(s) unreachable in dispatcher set 2 (outbound).
+            Dialer load is concentrated on remaining healthy backends.
+            Action: investigate affected FreeSWITCH node.
+
+  - name: kamailio.call_quality
+    rules:
+
+      # Sustained 503 reply rate > 1/min — indicates backend pool issues.
+      - alert: KamailioHigh503Rate
+        expr: >
+          rate(kamailio_core_rcv_replies_total{code="503"}[5m]) * 60 > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kamailio returning elevated 503 replies"
+          description: >
+            Kamailio 503 reply rate is {{ $value | humanize }}/min (threshold: 1/min).
+            Likely cause: FreeSWITCH backends overloaded or down.
+            Action: check dispatcher.list for inactive backends; review FS session counts.
+
+      # Active transaction count approaching capacity.
+      # 10,000 simultaneous transactions ≈ 10,000 calls in setup phase.
+      - alert: KamailioHighTransactionLoad
+        expr: kamailio_tm_active > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kamailio transaction load approaching capacity"
+          description: >
+            Kamailio has {{ $value }} active transactions (warning threshold: 10,000).
+            At this level, new SIP call setups may be delayed.
+            Action: review SIP traffic rates; consider scaling FreeSWITCH pool.
+
+  - name: kamailio.security
+    rules:
+
+      # Pike rate-limiter blocked at least one IP.
+      # Could be a scanner, an abusive carrier, or a misconfigured SIP device.
+      - alert: KamailioPikeBlocked
+        expr: rate(kamailio_pike_blocked_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kamailio pike rate limiter blocked a source IP"
+          description: >
+            Kamailio pike module has blocked requests from one or more source IPs.
+            Rate: {{ $value | humanize }}/s over 5 minutes.
+            Possible causes: SIP scanner, misconfigured device, carrier IP rotation.
+            Action: check Kamailio logs for blocked IP; verify carrier ACL is current.
+
+  - name: kamailio.resources
+    rules:
+
+      # Shared memory > 80% — Kamailio will crash if SHM is exhausted.
+      - alert: KamailioShmemHigh
+        expr: >
+          (kamailio_shmem_used / kamailio_shmem_size) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kamailio shared memory usage above 80%"
+          description: >
+            Kamailio shared memory at {{ $value | humanizePercentage }}.
+            If SHM is exhausted, Kamailio will terminate.
+            Action: increase shm_mem_size in kamailio.cfg; investigate memory leak
+            (large dispatcher table, htable growth, or high call volume).
