@@ -47,6 +47,8 @@ const ADMIN_NAV: NavItem[] = [
   { key: "scripts", label: "Scripts", href: "/admin/scripts", minRole: "admin" },
   { key: "recordings", label: "Recordings", href: "/admin/recordings", minRole: "admin" },
   { key: "reports", label: "Reports", href: "/admin/reports", minRole: "admin" },
+  // W02 — Jobs queue admin (supervisor+ can view)
+  { key: "jobs", label: "Job Queues", href: "/admin/jobs", minRole: "admin" },
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
