@@ -82,6 +82,7 @@ import { registerCallbackRoutes } from "./callbacks/index.js";
 import { registerRecordingRoutes } from "./routes/recordings/index.js";
 import { registerSupervisorRoutes } from "./routes/supervisor/index.js";
 import { registerReportingRoutes } from "./reporting/index.js";
+import { registerOpsReportRoutes } from "./ops-reports/index.js";
 import { registerInternalQueueRoutes } from "./routes/internal/queue.js";
 import { registerSupIngroupRoutes } from "./routes/sup/ingroups.js";
 import { registerScriptRoutes } from "./scripts/routes.js";
@@ -100,6 +101,7 @@ const start = async (): Promise<void> => {
     await registerRecordingRoutes(app);
     await registerSupervisorRoutes(app);
     await registerReportingRoutes(app);
+    await registerOpsReportRoutes(app);
     await registerScriptRoutes(app);
     await registerAgentScriptRoutes(app);
     await registerInternalQueueRoutes(app);
