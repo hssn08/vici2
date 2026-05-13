@@ -19,6 +19,11 @@ type zipMap = map[uint32]cacheEntry
 // npaMap is the collapse of phone_codes by NPA (first distinct IANA per NPA).
 type npaMap = map[string]cacheEntry
 
+// npaStateMap maps NPA (3-char string) to US state code (2-char string).
+// Built alongside npaOnlyCache from phone_codes.state.
+// X05 uses this for Tier-3 same-state matching.
+type npaStateMap = map[string]string
+
 // Preload reads phone_codes, phone_codes_overrides, and zip_codes from MySQL
 // into the in-process maps. It is called at boot and every 6 hours.
 // If MySQL is unavailable at boot, it returns an error (fail-fast).
@@ -41,10 +46,10 @@ func (r *Resolver) Preload(ctx context.Context) error {
 	return nil
 }
 
-// loadPhoneCodes loads phone_codes into phoneCodesCache and npaOnlyCache.
+// loadPhoneCodes loads phone_codes into phoneCodesCache, npaOnlyCache, and npaStateCache.
 func (r *Resolver) loadPhoneCodes(ctx context.Context) error {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT area_code, exchange_code, tz_iana FROM phone_codes`)
+		`SELECT area_code, exchange_code, tz_iana, state FROM phone_codes`)
 	if err != nil {
 		return err
 	}
@@ -52,10 +57,12 @@ func (r *Resolver) loadPhoneCodes(ctx context.Context) error {
 
 	fresh := make(phoneMap, 170_000)
 	npa := make(npaMap, 900)
+	npaState := make(npaStateMap, 900)
 
 	for rows.Next() {
 		var areaCode, exchangeCode, tzIANA string
-		if err := rows.Scan(&areaCode, &exchangeCode, &tzIANA); err != nil {
+		var state sql.NullString
+		if err := rows.Scan(&areaCode, &exchangeCode, &tzIANA, &state); err != nil {
 			return err
 		}
 		loc, ok := loadLocation(tzIANA)
@@ -74,6 +81,13 @@ func (r *Resolver) loadPhoneCodes(ctx context.Context) error {
 		if _, exists := npa[areaCode]; !exists {
 			npa[areaCode] = entry
 		}
+
+		// X05: NPA→state mapping (first distinct state per NPA wins)
+		if state.Valid && state.String != "" {
+			if _, exists := npaState[areaCode]; !exists {
+				npaState[areaCode] = state.String
+			}
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -81,6 +95,7 @@ func (r *Resolver) loadPhoneCodes(ctx context.Context) error {
 
 	r.phoneCodesCache.Store(&fresh)
 	r.npaOnlyCache.Store(&npa)
+	r.npaStateCache.Store(&npaState)
 	tzPhoneCodesLoaded.Set(float64(len(fresh)))
 	tzCacheSize.WithLabelValues("phone_codes").Set(float64(len(fresh)))
 	tzCacheSize.WithLabelValues("npa_only").Set(float64(len(npa)))
