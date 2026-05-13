@@ -72,10 +72,12 @@ app.get("/health", async () => ({ status: "ok", service: SERVICE }));
 app.get("/", async () => ({ service: SERVICE, message: "hello from vici2 api" }));
 
 import { registerAuthRoutes } from "./routes/auth/index.js";
+import { registerCampaignRoutes } from "./routes/campaigns/index.js";
 
 const start = async (): Promise<void> => {
   try {
     await registerAuthRoutes(app);
+    await registerCampaignRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {
