@@ -1,0 +1,166 @@
+# =============================================================================
+# O05 — OWASP ZAP baseline + full scan + govulncheck + pnpm audit
+# =============================================================================
+# Separate workflow (not in ci.yml) because:
+#   - ZAP's primary cadence is nightly cron, not every PR commit
+#   - Decoupling avoids re-running the full ZAP suite on hot branches
+#
+# Jobs:
+#   zap-baseline   — nightly + PR-to-main; fails on new HIGH/CRIT
+#   zap-full-scan  — workflow_dispatch only (manual pre-release pen-test)
+#   govulncheck    — every PR (call-graph-aware Go vuln scan)
+#   pnpm-audit     — every PR (Node dep audit, audit-level=high)
+#
+# ZAP target: https://staging.vici2.example.com (set VICI2_STAGING_URL secret)
+# ZAP auth: .zap/context.zap defines httpAuthentication with a test agent account.
+# ZAP false-positives: .zap/rules.tsv silences known FPs.
+# =============================================================================
+
+name: security-scan
+
+on:
+  schedule:
+    # Nightly at 03:00 UTC — primary ZAP signal
+    - cron: "0 3 * * *"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_full_scan:
+        description: "Run ZAP full scan (active attacks — staging only, never prod)"
+        required: false
+        default: "false"
+        type: boolean
+
+permissions:
+  contents: read
+  security-events: write  # for SARIF upload
+  issues: write           # for ZAP baseline issue maintenance
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # -----------------------------------------------------------------------
+  # ZAP baseline scan — nightly cron + PR to main
+  # Fails PR on new HIGH/CRIT; WARN/INFO logged in maintained issue.
+  # -----------------------------------------------------------------------
+  zap-baseline:
+    name: zap (baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Skip full-scan-only dispatch to avoid duplicate run
+    if: >
+      github.event_name == 'schedule' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_full_scan != 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: ${{ secrets.VICI2_STAGING_URL || 'https://staging.vici2.example.com' }}
+          rules_file_name: .zap/rules.tsv
+          # context_file: .zap/context.zap   # uncomment when staging auth is configured
+          # auth_username: ${{ secrets.ZAP_AGENT_USERNAME }}
+          # auth_password: ${{ secrets.ZAP_AGENT_PASSWORD }}
+          # Fail PR on new HIGH/CRIT only; WARN/INFO tracked in maintained issue.
+          fail_action: true
+          allow_issue_writing: true
+          artifact_name: zap-baseline-report
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ZAP report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report-${{ github.run_id }}
+          path: report_html.html
+          retention-days: 90
+
+  # -----------------------------------------------------------------------
+  # ZAP full scan — manual dispatch only (active attacks against staging)
+  # NEVER run against production.
+  # -----------------------------------------------------------------------
+  zap-full-scan:
+    name: zap (full scan — manual only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.run_full_scan == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZAP full scan (active attacks — staging only)
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: ${{ secrets.VICI2_STAGING_URL || 'https://staging.vici2.example.com' }}
+          rules_file_name: .zap/rules.tsv
+          artifact_name: zap-full-scan-report
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload full scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-full-scan-report-${{ github.run_id }}
+          path: report_html.html
+          retention-days: 90
+
+  # -----------------------------------------------------------------------
+  # govulncheck — Go call-graph-aware vulnerability scan
+  # Runs on every PR. Fails on any vuln in a *called* function.
+  # Per O05 PLAN §3.2 (O04 amendment §17.3).
+  # -----------------------------------------------------------------------
+  govulncheck:
+    name: govulncheck (go)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+          cache-dependency-path: dialer/go.sum
+
+      - name: govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          work-dir: dialer
+          go-version: "1.22"
+          # Fail on any vuln in a called function (call-graph-aware).
+          # Informational vulns (not in called path) warn only.
+
+  # -----------------------------------------------------------------------
+  # pnpm audit — Node.js source-tree dep audit
+  # Runs on every PR. Fails on HIGH+ findings in production deps.
+  # Per O05 PLAN §3.2 (O04 amendment §17.3).
+  # -----------------------------------------------------------------------
+  pnpm-audit:
+    name: pnpm audit (node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit (prod deps, HIGH+)
+        run: pnpm audit --prod --audit-level=high
+        # Fails with exit code 1 on any HIGH or CRITICAL finding in
+        # production dependencies. Dev dependencies are excluded (--prod).

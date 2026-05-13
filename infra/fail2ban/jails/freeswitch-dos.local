@@ -1,0 +1,25 @@
+# =============================================================================
+# fail2ban jail: freeswitch-dos.local (mode=ddos)
+# =============================================================================
+# SIP DDoS / scanner jail — bans IPs with rapid challenge+failure floods.
+# mode=ddos matches both challenges AND failures, so scanner tools (sipcli,
+# sipvicious, SIPVicious) are caught even if they use only challenges.
+#
+# High maxretry (50) to avoid banning legitimate phones on flappy networks.
+# Long bantime (86400s = 24h) for confirmed scanners.
+#
+# This jail complements freeswitch.local (mode=normal) — the two jails run
+# independently. A scanner will typically trip the ddos jail first.
+# =============================================================================
+
+[freeswitch-dos]
+enabled  = true
+filter   = freeswitch[mode=ddos]
+logpath  = /var/log/freeswitch/freeswitch.log
+port     = 5060,5061,5080
+protocol = udp,tcp
+maxretry = 50
+findtime = 60
+bantime  = 86400
+
+# ignoreip is set in ignoreip.local — do not override here.

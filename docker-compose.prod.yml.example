@@ -5,9 +5,27 @@
 #   - service `target: prod` instead of `dev`
 #   - metrics ports NOT published to host (Prometheus scrapes within network)
 #   - secrets via `secrets:` (Docker secrets) instead of plain env where sensitive
+#   - O05 container hardening: read_only, cap_drop: [ALL], no-new-privileges
+#   - O05 network isolation: edge/core/data networks; mysql/valkey internal only
 # Copy to docker-compose.prod.yml and fill in for your production environment.
 
 name: vici2
+
+# ---------------------------------------------------------------------------
+# O05 PLAN §6.2 — Container hardening defaults applied to every service.
+# Overrides are documented per-service below.
+# ---------------------------------------------------------------------------
+x-hardening-defaults: &hardening-defaults
+  read_only: true
+  tmpfs:
+    - /tmp:size=64M,mode=1777
+    - /var/run:size=8M
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+    - seccomp=default
+  user: "65532:65532"   # distroless nonroot UID
+  restart: unless-stopped
 
 x-common-env: &common-env
   TZ: UTC
@@ -16,11 +34,26 @@ x-common-env: &common-env
   GO_ENV: production
 
 services:
+  # ---------------------------------------------------------------------------
+  # MySQL — O05 §7.3: internal-only, no host port in prod.
+  # O05 §6.2 override: read_only: false (MySQL writes /var/lib/mysql).
+  # ---------------------------------------------------------------------------
   mysql:
     image: mysql:8.0.40
+    # Pin by digest in production (Renovate/Dependabot bumps weekly):
+    # image: mysql:8.0.40@sha256:<digest>
     restart: unless-stopped
+    read_only: false         # MySQL must write to data dir
+    cap_drop: [ALL]
+    cap_add: []              # MySQL does not need NET_BIND_SERVICE (port >1024)
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=default
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./infra/mysql/my.cnf:/etc/mysql/conf.d/vici2.cnf:ro
+    # expose: only — NO ports: in prod (O05 PLAN §7.3)
+    expose: ["3306"]
     secrets:
       - mysql_root_password
       - mysql_password
@@ -29,76 +62,213 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    networks: [vici2_internal]
+    networks: [data]
 
-  redis:
-    image: redis:7.4.1-alpine
+  # ---------------------------------------------------------------------------
+  # Valkey — O05 §7.3: internal-only, no host port in prod.
+  # O05 §6.2: read_only: true + tmpfs for Valkey AOF if persistence enabled.
+  # ---------------------------------------------------------------------------
+  valkey:
+    image: valkey/valkey:8.0-alpine
+    # image: valkey/valkey:8.0-alpine@sha256:<digest>
     restart: unless-stopped
+    <<: *hardening-defaults
+    # Valkey (non-root by default) may need to write AOF — use tmpfs:
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+      - /var/run:size=8M
+      - /data:size=512M     # AOF tmpfs (ephemeral — switch to volume if AOF persistence needed)
+    command: ["valkey-server", "/etc/valkey/valkey.conf"]
     volumes:
-      - redis_data:/data
+      - ./infra/valkey/valkey.conf:/etc/valkey/valkey.conf:ro
+    # expose: only — NO ports: in prod
+    expose: ["6379"]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 3s
-    networks: [vici2_internal]
+      timeout: 2s
+      retries: 5
+    networks: [data]
 
+  # ---------------------------------------------------------------------------
+  # FreeSWITCH — O05 §6.2 override:
+  #   read_only: false (writes to /etc/freeswitch/tls, /var/lib/freeswitch/)
+  #   cap_add: [NET_BIND_SERVICE] (binds 5060/5061 < 1024 is not required,
+  #     but SYS_NICE for RT scheduling; NET_BIND_SERVICE for ports <1024
+  #     if using 5060 binding)
+  # O05 §7.4: bridged network with explicit port maps in prod.
+  # ---------------------------------------------------------------------------
   freeswitch:
     image: vici2/freeswitch:1.10.12
+    # image: vici2/freeswitch:1.10.12@sha256:<digest>
     restart: unless-stopped
-    network_mode: host
-    cap_add: [SYS_NICE, IPC_LOCK]
+    read_only: false          # FS writes TLS certs, recordings, logs
+    cap_drop: [ALL]
+    cap_add:
+      - NET_BIND_SERVICE      # bind SIP ports; SYS_NICE dropped (phase 1)
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=default
+    # FreeSWITCH user inside the image
+    # user is managed by the signalwire base image
+    ulimits:
+      nofile: { soft: 1048576, hard: 1048576 }
+      nproc: 65535
+      stack: 245760
+      rtprio: 99
     volumes:
+      - ./freeswitch/conf:/etc/freeswitch:ro
+      - ./freeswitch/tls:/etc/freeswitch/tls    # writable: certbot writes here
       - freeswitch_recordings:/var/lib/freeswitch/recordings
+      - freeswitch_log:/var/log/freeswitch
+    ports:
+      # SIP
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      # SIP-TLS
+      - "5061:5061/tcp"
+      # Alternate SIP (external profile)
+      - "5080:5080/udp"
+      - "5080:5080/tcp"
+      # WSS internal port (Caddy proxies :7443 → this)
+      - "127.0.0.1:5066:5066/tcp"
+      # RTP media (large UDP range — required for call audio)
+      - "16384-32768:16384-32768/udp"
+    environment:
+      <<: *common-env
+      FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+      FS_DEFAULT_SIP_PASSWORD: ${FS_DEFAULT_SIP_PASSWORD}
+    networks: [core]
 
+  # ---------------------------------------------------------------------------
+  # API — O05 §6.1: distroless/nodejs20-debian12:nonroot base in Dockerfile
+  # O05 §6.2: full hardening defaults; api joins edge + core + data networks
+  # ---------------------------------------------------------------------------
   api:
     image: vici2/api:prod
-    restart: unless-stopped
+    # image: vici2/api:prod@sha256:<digest>
+    <<: *hardening-defaults
     environment:
       <<: *common-env
+      PORT: 3000
+      METRICS_PORT: 9101
+      DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}
+      VALKEY_URL: redis://valkey:6379/0
+      FS_ESL_HOST: freeswitch
+      FS_ESL_PORT: 8021
+      FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+      VICI2_JWT_PRIVATE_KEY_JWK: ${VICI2_JWT_PRIVATE_KEY_JWK}
+      VICI2_JWT_PUBLIC_KEYS_JWKS: ${VICI2_JWT_PUBLIC_KEYS_JWKS}
+      VICI2_KEK_V1: ${VICI2_KEK_V1}
+      VICI2_KEK_CURRENT_VERSION: ${VICI2_KEK_CURRENT_VERSION:-1}
+      VICI2_KEK_PROVIDER: ${VICI2_KEK_PROVIDER:-env}
+      VICI2_PASSWORD_PEPPER: ${VICI2_PASSWORD_PEPPER}
+    # Only expose metrics internally (no host port)
+    expose: ["3000", "9101"]
     depends_on:
       mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    networks: [vici2_internal, vici2_public]
+      valkey: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [core, data]
 
+  # ---------------------------------------------------------------------------
+  # Dialer — O05 §6.1: distroless/static-debian12:nonroot base in Dockerfile
+  # ---------------------------------------------------------------------------
   dialer:
     image: vici2/dialer:prod
-    restart: unless-stopped
+    # image: vici2/dialer:prod@sha256:<digest>
+    <<: *hardening-defaults
     environment:
       <<: *common-env
+      METRICS_PORT: 9102
+      DATABASE_DSN: ${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@tcp(mysql:3306)/${VICI2_DB_NAME}?parseTime=true&loc=UTC
+      VALKEY_URL: redis://valkey:6379/0
+      FS_ESL_HOST: freeswitch
+      FS_ESL_PORT: 8021
+      FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+    expose: ["9102"]
     depends_on:
       mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    networks: [vici2_internal]
+      valkey: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9102/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [core, data]
 
+  # ---------------------------------------------------------------------------
+  # Workers — O05 §6.1: distroless/nodejs20-debian12:nonroot base
+  # ---------------------------------------------------------------------------
   workers:
     image: vici2/workers:prod
-    restart: unless-stopped
+    # image: vici2/workers:prod@sha256:<digest>
+    <<: *hardening-defaults
     environment:
       <<: *common-env
+      METRICS_PORT: 9103
+      DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}
+      VALKEY_URL: redis://valkey:6379/0
+      VICI2_KEK_V1: ${VICI2_KEK_V1}
+      VICI2_KEK_CURRENT_VERSION: ${VICI2_KEK_CURRENT_VERSION:-1}
+    expose: ["9103"]
     depends_on:
       mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    networks: [vici2_internal]
+      valkey: { condition: service_healthy }
+    stop_grace_period: 300s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9103/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [data]
 
+  # ---------------------------------------------------------------------------
+  # Web — O05 §6.1: distroless/nodejs20-debian12:nonroot base
+  # ---------------------------------------------------------------------------
   web:
     image: vici2/web:prod
-    restart: unless-stopped
+    # image: vici2/web:prod@sha256:<digest>
+    <<: *hardening-defaults
     environment:
       <<: *common-env
+      PORT: 4000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    expose: ["4000"]
     depends_on:
       api: { condition: service_started }
-    networks: [vici2_public]
+    networks: [core]
 
 volumes:
   mysql_data:
-  redis_data:
   freeswitch_recordings:
+  freeswitch_log:
 
+# ---------------------------------------------------------------------------
+# O05 PLAN §7.1 — Three docker networks (FROZEN)
+#
+#   edge  — caddy, api, web (Phase 2: add caddy service here)
+#   core  — api, dialer, workers, freeswitch, web
+#   data  — api, dialer, workers, mysql, valkey
+#
+# mysql and valkey: ONLY on `data` — no host port maps in prod.
+# freeswitch: ONLY on `core` — host port maps for SIP/RTP/WSS.
+# api: on core + data (bridges the two).
+# ---------------------------------------------------------------------------
 networks:
-  vici2_internal:
+  core:
     driver: bridge
-    internal: true
-  vici2_public:
+    internal: false    # freeswitch needs outbound for carrier SIP
+  data:
     driver: bridge
+    internal: true     # strictly internal — no outbound routing
 
 secrets:
   mysql_root_password:

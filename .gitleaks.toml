@@ -1,0 +1,97 @@
+# =============================================================================
+# .gitleaks.toml — vici2 gitleaks configuration
+# =============================================================================
+# Extends the default gitleaks ruleset with vici2-specific secret patterns.
+# Used by gitleaks pre-commit hook (wired in F01) and CI secrets-scan.yml.
+#
+# Per O05 PLAN §12.4:
+#   - Custom rules for VICI2_KEK_ prefixes, vici2-kek: tokens
+#   - High-entropy base64 strings (32 bytes = AES-256 keys)
+# =============================================================================
+
+title = "vici2 gitleaks config"
+
+# ---------------------------------------------------------------------------
+# vici2-specific rules
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id          = "vici2-kek-env"
+description = "vici2 Key Encryption Key (KEK) in environment variable"
+regex       = '''VICI2_KEK_V\d+\s*=\s*[A-Za-z0-9+/=]{40,}'''
+tags        = ["secret", "encryption-key", "vici2"]
+severity    = "CRITICAL"
+
+[[rules]]
+id          = "vici2-kek-token"
+description = "vici2 KEK token format (kek_vN: prefix)"
+regex       = '''kek_v\d+:[A-Za-z0-9+/_-]{40,}'''
+tags        = ["secret", "encryption-key", "vici2"]
+severity    = "CRITICAL"
+
+[[rules]]
+id          = "vici2-jwt-private-key"
+description = "vici2 JWT private key JWK (base64-encoded JSON)"
+regex       = '''VICI2_JWT_PRIVATE_KEY_JWK\s*=\s*[A-Za-z0-9+/=]{100,}'''
+tags        = ["secret", "jwt", "vici2"]
+severity    = "CRITICAL"
+
+[[rules]]
+id          = "vici2-password-pepper"
+description = "vici2 Argon2id password pepper"
+regex       = '''VICI2_PASSWORD_PEPPER\s*=\s*[A-Za-z0-9+/=]{40,}'''
+tags        = ["secret", "encryption-key", "vici2"]
+severity    = "CRITICAL"
+
+[[rules]]
+id          = "vici2-fs-esl-password"
+description = "FreeSWITCH Event Socket password (non-default value)"
+regex       = '''FS_EVENT_SOCKET_PASSWORD\s*=\s*(?!ClueCon)[^\s]{8,}'''
+tags        = ["secret", "freeswitch", "vici2"]
+severity    = "HIGH"
+
+[[rules]]
+id          = "vici2-signalwire-token"
+description = "SignalWire Personal Access Token"
+regex       = '''SIGNALWIRE_TOKEN\s*=\s*PT[A-Za-z0-9]{32,}'''
+tags        = ["secret", "signalwire", "vici2"]
+severity    = "HIGH"
+
+[[rules]]
+id          = "vici2-high-entropy-base64-key"
+description = "High-entropy base64 string (likely AES-256 key, 32+ bytes)"
+# Matches base64 strings 44+ chars (32 bytes encoded) with high entropy
+# in contexts that look like secret assignments.
+regex       = '''(?:KEY|SECRET|TOKEN|PASSWORD|PEPPER)\s*=\s*(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4}){8,}'''
+tags        = ["secret", "high-entropy", "vici2"]
+severity    = "MEDIUM"
+
+# ---------------------------------------------------------------------------
+# Allowlist — known safe values in .env.example
+# ---------------------------------------------------------------------------
+
+[allowlist]
+description = "Known safe placeholder values in example/template files"
+paths       = [
+    ".env.example",
+    ".env.test",
+    "spec/**/*.md",
+    "docs/**/*.md",
+    "infra/**/*.example",
+    "infra/**/*.md",
+]
+regexes     = [
+    "change-me-",
+    "example\\.com",
+    "ClueCon",                    # FS ESL default — always change in prod
+    "\\$\\{[A-Z_]+\\}",          # shell variable references
+    "generate:.*openssl rand",    # comment lines
+]
+commits = []
+stopwords = [
+    "change-me",
+    "placeholder",
+    "example",
+    "CHANGE_ME",
+    "TODO",
+]

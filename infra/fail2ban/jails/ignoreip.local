@@ -1,0 +1,28 @@
+# =============================================================================
+# fail2ban ignoreip.local — ops jump-host + internal network allowlist
+# =============================================================================
+# TEMPLATE: copy and populate for each deployment host.
+# This file is in .gitignore — never commit real CIDRs to the repo.
+# Use the template only; actual values live in the deployed host at:
+#   /etc/fail2ban/jail.d/ignoreip.local
+#
+# Usage: set ignoreip in the [DEFAULT] section to apply to ALL jails.
+#
+# Typical values:
+#   - 127.0.0.0/8     — localhost (always included)
+#   - ::1             — IPv6 loopback (always included)
+#   - 10.0.0.0/8      — internal docker network / VPC
+#   - <ops_jump_ip>   — ops team jump host(s); add all egress IPs of shared NAT pools
+#   - <carrier_cidr>  — trusted SIP carrier CIDRs if they appear in FS logs
+#
+# RISK: Shared NAT pools (multiple offices, VPN exit nodes) should be added
+# carefully — banning the egress IP blocks the entire pool. Prefer individual
+# IPs over /16 or larger CIDRs when possible.
+# =============================================================================
+
+[DEFAULT]
+ignoreip = 127.0.0.0/8 ::1
+           # Add ops jump-host IPs below (one per line, CIDR notation):
+           # 203.0.113.10    # ops-jump-host-1
+           # 203.0.113.11    # ops-jump-host-2
+           # 10.0.0.0/8      # VPC internal (Phase 1 single-host: may not apply)
