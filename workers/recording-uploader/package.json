@@ -27,7 +27,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/node": "^20.16.0",
+    "@types/node": "^20.19.41",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }
