@@ -98,6 +98,8 @@ import { registerInternalVoicemailRoutes } from "./routes/internal/voicemail-hoo
 import { registerInboundCallbackRoutes } from "./routes/inbound-callbacks.js";
 // S05 — Agent feedback/scorecard inbox
 import { registerAgentFeedbackRoutes } from "./routes/agent/feedback/index.js";
+// A09 — Agent pause codes + state
+import { registerAgentPauseRoutes } from "./routes/agent/pause.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -128,6 +130,8 @@ const start = async (): Promise<void> => {
     await registerInboundCallbackRoutes(app);
     // S05 — Agent feedback/scorecard inbox
     await registerAgentFeedbackRoutes(app);
+    // A09 — Agent pause codes + state
+    await registerAgentPauseRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {
