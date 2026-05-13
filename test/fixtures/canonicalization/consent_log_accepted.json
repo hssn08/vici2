@@ -1,0 +1,17 @@
+{
+  "_comment": "consent_log accepted outcome with DTMF response",
+  "table": "consent_log",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 1,
+    "call_uuid": "call-consent-001",
+    "lead_id": 1001,
+    "phone_e164": "+15551234567",
+    "prompt_id": "tcpa_consent_v1",
+    "dtmf_response": "1",
+    "outcome": "accepted",
+    "language": "en",
+    "prompt_played_at": "2026-05-12T14:30:05.000000Z"
+  }
+}
