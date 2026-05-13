@@ -130,6 +130,9 @@ export const VERBS = [
   // email templates (N02)
   'email_templates:read',
   'email_templates:edit',
+  // voicemail (I03)
+  'voicemail:read',
+  'voicemail:manage',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -266,6 +269,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N02 — email templates
     'email_templates:read': { scope: 'tenant' },
     'email_templates:edit': { scope: 'tenant' },
+    // I03 — voicemail
+    'voicemail:read':       { scope: 'tenant' },
+    'voicemail:manage':     { scope: 'tenant' },
   },
 
   admin: {
@@ -339,6 +345,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N02 — email templates
     'email_templates:read': { scope: 'tenant' },
     'email_templates:edit': { scope: 'tenant' },
+    // I03 — voicemail
+    'voicemail:read':       { scope: 'tenant' },
+    'voicemail:manage':     { scope: 'tenant' },
   },
 
   supervisor: {
@@ -382,6 +391,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'jobs:view':            { scope: 'tenant' },
     // N02 — email templates (read-only at supervisor)
     'email_templates:read': { scope: 'tenant' },
+    // I03 — voicemail (supervisor: group scope)
+    'voicemail:read':       { scope: 'group' },
   },
 
   agent: {
@@ -406,6 +417,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'script:read':          { scope: 'group' },
     'callback:read':        { scope: 'own' },
     'callback:edit':        { scope: 'own' },
+    'voicemail:read':       { scope: 'own' },
   },
 
   viewer: {
@@ -436,6 +448,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:read':        { scope: 'tenant' },
     'alert:read':           { scope: 'tenant' },
     'list:read':            { scope: 'tenant' },
+    'voicemail:read':       { scope: 'tenant' },
   },
 
   integrator: {

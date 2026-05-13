@@ -12,7 +12,8 @@ export type NotifCategory =
   | "import_failed"
   | "recording_failed"
   | "agent_disconnected"
-  | "drop_gate_engaged";
+  | "drop_gate_engaged"
+  | "voicemail_new";
 
 export const ALL_CATEGORIES: ReadonlyArray<NotifCategory> = [
   "callback_due",
@@ -22,6 +23,7 @@ export const ALL_CATEGORIES: ReadonlyArray<NotifCategory> = [
   "recording_failed",
   "agent_disconnected",
   "drop_gate_engaged",
+  "voicemail_new",
 ];
 
 export interface CategoryConfig {
@@ -58,5 +60,9 @@ export const CATEGORY_DEFAULTS: Record<NotifCategory, CategoryConfig> = {
   drop_gate_engaged: {
     severity: "error",
     defaultChannels: ["in_app"],
+  },
+  voicemail_new: {
+    severity: "info",
+    defaultChannels: ["in_app", "email"],
   },
 };

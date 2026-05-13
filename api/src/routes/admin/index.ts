@@ -20,6 +20,8 @@ import { registerAdminCarrierRoutes } from "./carriers/index.js";
 import { registerAdminDidRoutes } from "./dids/index.js";
 // W02 — Jobs queue admin
 import { registerAdminJobRoutes } from "./jobs/index.js";
+// I03 — Voicemail box admin
+import { registerAdminVoicemailBoxRoutes } from "./voicemail-boxes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -51,4 +53,7 @@ export async function registerAdminRoutes(app: any): Promise<void> {
 
   // W02 — Jobs queue admin
   await registerAdminJobRoutes(app);
+
+  // I03 — Voicemail box admin
+  await registerAdminVoicemailBoxRoutes(app);
 }
