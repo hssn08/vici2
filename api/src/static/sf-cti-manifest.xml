@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<callCenter>
+  <section name="reqGeneralInfo" label="General Information">
+    <item name="reqInternalName" label="CTI Adapter Internal Name">
+      <value>Vici2CTIAdapter</value>
+    </item>
+    <item name="reqDisplayName" label="Display Name in Salesforce">
+      <value>Vici2 Open CTI</value>
+    </item>
+    <item name="reqAdapterUrl" label="Adapter URL">
+      <!-- REPLACE: set your vici2 API domain and tenant slug -->
+      <value>https://api.YOUR-DOMAIN.com/static/sf-cti-adapter.html?tenant=YOUR-TENANT-SLUG</value>
+    </item>
+    <item name="reqSoftphoneHeight" label="Softphone Height (px)">
+      <value>600</value>
+    </item>
+    <item name="reqSoftphoneWidth" label="Softphone Width (px)">
+      <value>300</value>
+    </item>
+    <item name="reqVersion" label="Adapter Version">
+      <value>1.0</value>
+    </item>
+  </section>
+</callCenter>

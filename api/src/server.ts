@@ -7,6 +7,8 @@ import { env } from "./lib/env.js";
 import Fastify from "fastify";
 import client from "prom-client";
 import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pino from "pino";
 
 const SERVICE = "api";
@@ -100,9 +102,29 @@ import { registerInboundCallbackRoutes } from "./routes/inbound-callbacks.js";
 import { registerAgentFeedbackRoutes } from "./routes/agent/feedback/index.js";
 // A09 — Agent pause codes + state
 import { registerAgentPauseRoutes } from "./routes/agent/pause.js";
+// N03 — Salesforce Open CTI static files
+import fastifyStatic from "@fastify/static";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const start = async (): Promise<void> => {
   try {
+    // N03 — Serve static adapter files (sf-cti-adapter.html, sf-cti.js, sf-cti-manifest.xml)
+    await app.register(fastifyStatic, {
+      root: path.join(__dirname, "static"),
+      prefix: "/static/",
+      decorateReply: false,
+      setHeaders: (res: http.ServerResponse, filePath: string) => {
+        if (filePath.endsWith("sf-cti-adapter.html") || filePath.endsWith("sf-cti.js")) {
+          res.setHeader(
+            "Content-Security-Policy",
+            "frame-ancestors 'self' https://*.salesforce.com https://*.lightning.force.com https://*.visualforce.com https://*.force.com",
+          );
+          res.setHeader("Cache-Control", "no-store, must-revalidate");
+        }
+      },
+    });
+
     await registerAuthRoutes(app);
     await registerLeadRoutes(app);
     await registerListRoutes(app);
