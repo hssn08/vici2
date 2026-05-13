@@ -3,10 +3,13 @@
  *
  * Entry point: starts stream-consumer + BullMQ worker pool + sweeper.
  * R02 PLAN §7.1.
+ *
+ * W01 IMPLEMENT: replaced ad-hoc HTTP server with WorkerHttpServer
+ * (provides /health, /ready, /metrics).  ShutdownManager replaces raw
+ * process.on handlers — fixes the missing BullMQ drain bug.
  */
 
 import 'dotenv-flow/config';
-import http from 'node:http';
 import { Redis } from 'ioredis';
 import { Worker, Queue } from 'bullmq';
 import pino from 'pino';
@@ -24,6 +27,10 @@ import { processDeleteLocalJob } from './jobs/recording-delete-local.js';
 import { RecordingService, NoopAuditWriter } from './services/recording.service.js';
 import type { TenantSettings } from './config.js';
 import type { DbClient } from './jobs/recording-upload.js';
+
+// W01 shared lib — WorkerHttpServer + ShutdownManager
+import { WorkerHttpServer } from '../../src/lib/health-server.js';
+import { ShutdownManager } from '../../src/lib/shutdown.js';
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -143,7 +150,7 @@ const stopSweeper = startSweeper(
 );
 
 // ---------------------------------------------------------------------------
-// Metrics HTTP server
+// HTTP server (W01: WorkerHttpServer with /health + /ready + /metrics)
 // ---------------------------------------------------------------------------
 
 // Queue depth gauge updater (every 15 s)
@@ -160,23 +167,44 @@ setInterval(async () => {
   } catch { /* non-fatal */ }
 }, 15_000);
 
-const metricsServer = http.createServer(async (req, res) => {
-  if (req.url === '/metrics') {
-    res.setHeader('content-type', registry.contentType);
-    res.end(await registry.metrics());
-    return;
-  }
-  if (req.url === '/health') {
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ status: 'ok', service: 'recording-uploader' }));
-    return;
-  }
-  res.statusCode = 404;
-  res.end();
+const healthServer = new WorkerHttpServer({
+  port: env.R02_METRICS_PORT,
+  metricsRegistry: registry,
+  service: 'recording-uploader',
+  readinessChecks: [
+    {
+      name: 'valkey',
+      check: async () => {
+        await redis.ping();
+        return true;
+      },
+    },
+    {
+      name: 'db',
+      check: async () => {
+        await (prisma as unknown as { $queryRaw: (sql: TemplateStringsArray) => Promise<unknown> })
+          .$queryRaw`SELECT 1`;
+        return true;
+      },
+    },
+    {
+      name: 's3',
+      check: async () => {
+        // backend.ping() verifies S3/local-fs reachability
+        if (typeof (backend as unknown as { ping?: () => Promise<boolean> }).ping === 'function') {
+          return (backend as unknown as { ping: () => Promise<boolean> }).ping();
+        }
+        return true;
+      },
+    },
+  ],
 });
 
-metricsServer.listen(env.R02_METRICS_PORT, () => {
-  logger.info({ port: env.R02_METRICS_PORT }, 'recording-uploader metrics listening');
+healthServer.listen().then(() => {
+  logger.info({ port: env.R02_METRICS_PORT }, 'recording-uploader HTTP server listening');
+}).catch((err: unknown) => {
+  logger.error({ err }, 'recording-uploader: failed to start HTTP server');
+  process.exit(1);
 });
 
 // ---------------------------------------------------------------------------
@@ -191,19 +219,61 @@ export const recordingService = new RecordingService(
 );
 
 // ---------------------------------------------------------------------------
-// Graceful shutdown
+// Graceful shutdown (W01: ShutdownManager — drains BullMQ before exit)
 // ---------------------------------------------------------------------------
 
-const shutdown = async (signal: string): Promise<void> => {
-  logger.info({ signal }, 'shutting down');
-  consumer.stop();
-  stopSweeper();
-  await uploadWorker.close();
-  await deleteLocalWorker.close();
-  await prisma.$disconnect();
-  metricsServer.close();
-  process.exit(0);
-};
+const shutdownMgr = new ShutdownManager();
 
-process.on('SIGINT', () => void shutdown('SIGINT'));
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
+// Closed last (registered first — ShutdownManager reverses order)
+shutdownMgr.register({
+  name: 'http-server',
+  close: () => healthServer.close(),
+});
+
+shutdownMgr.register({
+  name: 'redis',
+  close: async () => { redis.disconnect(); },
+});
+
+shutdownMgr.register({
+  name: 'prisma',
+  close: async () => { await (prisma as unknown as { $disconnect: () => Promise<void> }).$disconnect(); },
+});
+
+shutdownMgr.register({
+  name: 'sweeper',
+  close: async () => { stopSweeper(); },
+});
+
+shutdownMgr.register({
+  name: 'stream-consumer',
+  close: async () => { consumer.stop(); },
+});
+
+// BullMQ workers — drain in-flight with timeout
+shutdownMgr.register({
+  name: 'delete-local-worker',
+  close: async () => {
+    await deleteLocalWorker.pause(true);
+    await deleteLocalWorker.close(false);
+  },
+  timeoutMs: 30_000,
+});
+
+shutdownMgr.register({
+  name: 'upload-worker',
+  close: async () => {
+    await uploadWorker.pause(true);
+    await uploadWorker.close(false);
+  },
+  timeoutMs: Number(process.env.WORKER_SHUTDOWN_TIMEOUT_MS ?? 50_000),
+});
+
+// Flip /ready to 503 first
+shutdownMgr.register({
+  name: 'readiness-gate',
+  close: async () => { healthServer.setNotReady(); },
+});
+
+shutdownMgr.listenFor('SIGINT', logger);
+shutdownMgr.listenFor('SIGTERM', logger);

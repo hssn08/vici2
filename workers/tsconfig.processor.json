@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outFile": "./dist/jobs/lead-import/processor.cjs",
+    "rootDir": "./src",
+    "types": ["node"]
+  },
+  "include": ["src/jobs/lead-import/processor.ts"],
+  "exclude": ["node_modules", "dist"]
+}
