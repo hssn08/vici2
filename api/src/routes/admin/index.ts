@@ -30,6 +30,8 @@ import { registerAdminCoachingRoutes } from "./coaching/index.js";
 import { registerAdminPauseCodeRoutes } from "./pause-codes/index.js";
 import { registerAdminStatusRoutes } from "./statuses/index.js";
 import { registerAdminScriptRoutes } from "./scripts/index.js";
+// N06 — RND scrub
+import { registerAdminRndRoutes } from "./rnd/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -75,4 +77,7 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   await registerAdminPauseCodeRoutes(app);
   await registerAdminStatusRoutes(app);
   await registerAdminScriptRoutes(app);
+
+  // N06 — RND scrub
+  await registerAdminRndRoutes(app);
 }
