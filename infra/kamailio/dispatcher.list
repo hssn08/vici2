@@ -1,0 +1,26 @@
+# infra/kamailio/dispatcher.list — X02 fallback dispatcher list
+#
+# Used when MySQL is unreachable at Kamailio startup.
+# Primary source of truth is the MySQL dispatcher table (see kamailio.cfg).
+# This file is read by: modparam("dispatcher", "list_file", ...)
+# Updated by: dispatcher-list-renderer.py --action=sync (writes both DB + this file)
+#
+# Format per line:
+#   <setid> <flags> <weight> <attrs> <uri>
+#
+#   setid  — integer dispatcher set (1=inbound, 2=outbound)
+#   flags  — 0=active, 1=inactive (DS_INACTIVE_DST)
+#   weight — relative weight (used by algo 1 weighted round-robin)
+#   attrs  — free-form; dispatcher respects weight=N for algo 1
+#   uri    — SIP URI of the FreeSWITCH backend
+
+# Set 1: inbound DID → FS  (algorithm 0: hash by Call-ID for sticky sessions)
+1 0 1 weight=1 sip:10.0.1.10:5060
+1 0 1 weight=1 sip:10.0.1.11:5060
+
+# Set 2: outbound dialer → FS  (algorithm 4: fewest-active for load balancing)
+2 0 1 weight=1 sip:10.0.1.10:5060
+2 0 1 weight=1 sip:10.0.1.11:5060
+
+# Set 20: X03 campaign-affinity (reserved — populated by X03 campaign router)
+# 20 0 1 weight=1 sip:10.0.1.10:5060
