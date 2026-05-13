@@ -21,6 +21,11 @@ export interface UiState {
   preferredSpeakerId: string | null;
   statsIntervalMs: number;
 
+  // A05 in-call panel preferences (persisted)
+  confirmHotkeyDispo: boolean;
+  disableHangupGrace: boolean;
+  hotkeyMap: Record<string, string>;
+
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: Theme) => void;
@@ -32,6 +37,9 @@ export interface UiState {
   setPreferredMicId: (deviceId: string | null) => void;
   setPreferredSpeakerId: (deviceId: string | null) => void;
   setStatsIntervalMs: (ms: number) => void;
+  setConfirmHotkeyDispo: (v: boolean) => void;
+  setDisableHangupGrace: (v: boolean) => void;
+  setHotkeyMap: (map: Record<string, string>) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -50,6 +58,11 @@ export const useUiStore = create<UiState>()(
       preferredSpeakerId: null,
       statsIntervalMs: 5000,
 
+      // A05 defaults
+      confirmHotkeyDispo: false,
+      disableHangupGrace: false,
+      hotkeyMap: {},
+
       toggleSidebar: () =>
         set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
@@ -63,10 +76,13 @@ export const useUiStore = create<UiState>()(
       setPreferredSpeakerId: (deviceId) => set({ preferredSpeakerId: deviceId }),
       setStatsIntervalMs: (ms) =>
         set({ statsIntervalMs: Math.max(1000, Math.min(30000, ms)) }),
+      setConfirmHotkeyDispo: (v) => set({ confirmHotkeyDispo: v }),
+      setDisableHangupGrace: (v) => set({ disableHangupGrace: v }),
+      setHotkeyMap: (map) => set({ hotkeyMap: map }),
     }),
     {
       name: "vici2.ui",
-      version: 2, // bumped for A02 softphone prefs fields
+      version: 3, // bumped for A05 in-call panel prefs
       storage: createJSONStorage(() =>
         typeof window !== "undefined" ? window.localStorage : noopStorage(),
       ),
@@ -79,6 +95,12 @@ export const useUiStore = create<UiState>()(
           state.preferredMicId = null;
           state.preferredSpeakerId = null;
           state.statsIntervalMs = 5000;
+        }
+        if (version < 3) {
+          // A05 new fields — apply defaults
+          state.confirmHotkeyDispo = false;
+          state.disableHangupGrace = false;
+          state.hotkeyMap = {};
         }
         return state as UiState;
       },
