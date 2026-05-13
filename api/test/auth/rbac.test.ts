@@ -38,9 +38,19 @@ describe("rbac", () => {
     expect(hasPermission("agent", "call:listen")).toBe(false);
   });
 
-  it("supervisor has call:listen and call:eavesdrop", () => {
+  it("supervisor has call:listen and call:whisper", () => {
     expect(hasPermission("supervisor", "call:listen")).toBe(true);
-    expect(hasPermission("supervisor", "call:eavesdrop")).toBe(true);
+    expect(hasPermission("supervisor", "call:whisper")).toBe(true);
+    expect(hasPermission("supervisor", "call:barge")).toBe(true);
+    // call:eavesdrop removed in M02 (renamed — call:listen covers it)
+    expect(hasPermission("supervisor", "call:eavesdrop" as never)).toBe(false);
+  });
+
+  it("viewer role exists and has read-only grants", () => {
+    expect(hasPermission("viewer", "lead:read")).toBe(true);
+    expect(hasPermission("viewer", "audit:view")).toBe(true);
+    expect(hasPermission("viewer", "lead:edit")).toBe(false);
+    expect(hasPermission("viewer", "call:dial")).toBe(false);
   });
 
   it("admin can manage users but not bypass DNC", () => {

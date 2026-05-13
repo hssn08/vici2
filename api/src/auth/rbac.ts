@@ -2,23 +2,27 @@
 
 export {
   ROLES,
+  VERBS,
   PERMISSIONS,
   ROLE_HIERARCHY,
+  HIERARCHICAL_ROLES,
+  ROLE_VERBS,
   ROLE_PERMISSIONS,
+  SENSITIVE_VERBS,
   roleAtLeast,
   hasPermission,
   permissionsFor,
+  isRole,
   type Role,
+  type Verb,
   type Permission,
+  type Grant,
+  type Scope,
 } from "@vici2/types";
 
-import type { Permission, Role } from "@vici2/types";
-import { ROLES as ROLES_SRC, permissionsFor as permsFor } from "@vici2/types";
+import type { Verb, Role } from "@vici2/types";
+import { permissionsFor as permsFor } from "@vici2/types";
 
-export function isRole(s: string): s is Role {
-  return (ROLES_SRC as readonly string[]).includes(s);
-}
-
-export function permsAsSet(role: Role): Set<Permission> {
+export function permsAsSet(role: Role): Set<Verb> {
   return new Set(permsFor(role));
 }

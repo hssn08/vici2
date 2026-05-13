@@ -88,16 +88,17 @@ describe("middleware", () => {
     ).toBe(200);
   });
 
-  it("requirePermission accepts permission from role default set", async () => {
+  it("requirePermission accepts tenant-scoped verb from role matrix", async () => {
+    // status:read has tenant scope for agent — no resource ownership needed
     app.get(
-      "/dial",
-      { preHandler: [app.requireAuth, app.requirePermission("call:dial")] },
+      "/status",
+      { preHandler: [app.requireAuth, app.requirePermission("status:read")] },
       async () => ({ ok: true }),
     );
     const tok = await makeToken({ role: "agent" });
     const res = await app.inject({
       method: "GET",
-      url: "/dial",
+      url: "/status",
       headers: { authorization: `Bearer ${tok}` },
     });
     expect(res.statusCode).toBe(200);

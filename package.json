@@ -14,7 +14,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "test": "pnpm -r --if-present run test"
+    "test": "pnpm -r --if-present run test",
+    "rbac:gen-golden": "api/node_modules/.bin/tsx scripts/rbac/gen-golden.ts",
+    "rbac:check-coverage": "bash scripts/ci/check-rbac-coverage.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.0",
