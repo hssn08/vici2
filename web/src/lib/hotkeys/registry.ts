@@ -1,6 +1,6 @@
 "use client";
 
-export type HotkeyScope = "global" | "in-call" | "wrapup" | "modal" | "auto-dial";
+export type HotkeyScope = "global" | "in-call" | "wrapup" | "modal" | "auto-dial" | "agent-shell" | "dial";
 
 export interface HotkeyBinding {
   id: string;
@@ -21,7 +21,21 @@ export interface HotkeyBinding {
    * Default: 0.
    */
   priority?: number;
+  /** Human-readable description shown in the hotkey help overlay. */
+  description?: string;
   handler: (e: KeyboardEvent) => void;
+}
+
+/** Read-only descriptor for display purposes (no handler reference). */
+export interface HotkeyDescriptor {
+  id: string;
+  scope: HotkeyScope;
+  key: string;
+  ctrl?: boolean;
+  meta?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+  description?: string;
 }
 
 function isInputFocused(): boolean {
@@ -77,6 +91,25 @@ export class HotkeyRegistry {
 
   unregister(id: string): void {
     this.bindings.delete(id);
+  }
+
+  /**
+   * Returns display descriptors for all currently-registered bindings.
+   * Safe to call from render — no handler references included.
+   */
+  getAll(): HotkeyDescriptor[] {
+    return Array.from(this.bindings.values()).map(
+      ({ id, scope, key, ctrl, meta, shift, alt, description }) => ({
+        id,
+        scope,
+        key,
+        ctrl,
+        meta,
+        shift,
+        alt,
+        description,
+      }),
+    );
   }
 
   /**
