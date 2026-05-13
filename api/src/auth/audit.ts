@@ -1,0 +1,69 @@
+// Audit writer (PLAN §9). The Prisma grant on audit_log is INSERT+SELECT
+// only at the DB layer (per F02 PLAN §4.5); UPDATE/DELETE fail.
+
+import { Prisma, type PrismaClient } from "@prisma/client";
+
+export type AuditAction =
+  | "auth.login.success"
+  | "auth.login.failure"
+  | "auth.logout"
+  | "auth.logout.all"
+  | "auth.refresh.success"
+  | "auth.refresh.expired"
+  | "auth.refresh.reuse_detected"
+  | "auth.lockout.triggered"
+  | "auth.lockout.released"
+  | "auth.password.changed"
+  | "auth.password.reset_requested"
+  | "auth.password.reset_completed"
+  | "auth.totp.enrolled"
+  | "auth.totp.verified"
+  | "auth.totp.failed"
+  | "auth.role.changed"
+  | "auth.user.created"
+  | "auth.user.deleted"
+  | "auth.user.activated"
+  | "auth.user.deactivated"
+  | "auth.sip.rotated"
+  | "auth.sip.viewed"
+  | "auth.kek.rotation_started"
+  | "auth.kek.rotation_completed"
+  | "auth.jwt.keys.rotated";
+
+export type ActorKind = "user" | "system" | "worker" | "external_api";
+
+export interface AuditInput {
+  tx: PrismaClient | Prisma.TransactionClient;
+  actorUserId: bigint | number | null;
+  actorKind: ActorKind;
+  action: AuditAction;
+  tenantId: bigint | number;
+  entityType: string;
+  entityId: string | null;
+  beforeJson?: unknown;
+  afterJson?: unknown;
+  ip?: string;
+  userAgent?: string;
+  requestId?: string;
+}
+
+export async function audit(opts: AuditInput): Promise<void> {
+  await opts.tx.auditLog.create({
+    data: {
+      tenantId: BigInt(opts.tenantId),
+      actorUserId: opts.actorUserId === null ? null : BigInt(opts.actorUserId),
+      actorKind: opts.actorKind,
+      action: opts.action,
+      entityType: opts.entityType,
+      entityId: opts.entityId,
+      beforeJson: (opts.beforeJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      afterJson: (opts.afterJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      requestId: opts.requestId ?? null,
+      ipAddress: opts.ip ?? null,
+      userAgent: opts.userAgent ?? null,
+      ts: new Date(),
+    },
+  });
+}
+
+export { Prisma };
