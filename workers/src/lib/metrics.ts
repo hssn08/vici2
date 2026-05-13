@@ -177,3 +177,87 @@ export function startMetricsPoller(
 export function createRegistry(): Registry {
   return new client.Registry();
 }
+
+// ---------------------------------------------------------------------------
+// W02 — WS queue event publisher
+// ---------------------------------------------------------------------------
+
+/** Minimal Redis interface for event publishing. */
+export interface QueueEventPublisher {
+  xadd(key: string, id: string, ...args: string[]): Promise<unknown>;
+}
+
+/**
+ * Publish a BullMQ lifecycle event to the shared jobs event stream.
+ * Consumed by the API's WS broadcaster; triggers TanStack Query invalidation
+ * on connected admin clients.
+ *
+ * Stream: events:vici2.bullmq.jobs (MAXLEN ~ 1000)
+ */
+export async function publishQueueEvent(
+  redis: QueueEventPublisher,
+  params: {
+    queueName: string;
+    event: 'completed' | 'failed' | 'active' | 'waiting';
+    jobId: string;
+    tenantId: string | number;
+  },
+): Promise<void> {
+  try {
+    await redis.xadd(
+      'events:vici2.bullmq.jobs',
+      'MAXLEN', '~', '1000', '*',
+      'queue', params.queueName,
+      'event', params.event,
+      'jobId', params.jobId,
+      'tenantId', String(params.tenantId),
+      'ts', String(Date.now()),
+    );
+  } catch {
+    // non-fatal — WS events are best-effort; 5s polling is the fallback
+  }
+}
+
+/**
+ * Attach completed/failed event listeners to a BullMQ Worker to publish
+ * WS queue events in addition to Prometheus metrics.
+ *
+ * Call after instrumentWorker() or in place of it.
+ */
+export function instrumentWorkerWithEvents(
+  worker: Worker,
+  queueName: string,
+  redis: QueueEventPublisher,
+): void {
+  // Instrument Prometheus metrics
+  instrumentWorker(worker, queueName);
+
+  // Publish WS events
+  worker.on('completed', async (job) => {
+    await publishQueueEvent(redis, {
+      queueName,
+      event: 'completed',
+      jobId: job.id ?? '',
+      tenantId: (job.data as Record<string, unknown>)?.tenantId as string ?? '0',
+    });
+  });
+
+  worker.on('failed', async (job, _err) => {
+    if (!job) return;
+    await publishQueueEvent(redis, {
+      queueName,
+      event: 'failed',
+      jobId: job.id ?? '',
+      tenantId: (job.data as Record<string, unknown>)?.tenantId as string ?? '0',
+    });
+  });
+
+  worker.on('active', async (job) => {
+    await publishQueueEvent(redis, {
+      queueName,
+      event: 'active',
+      jobId: job.id ?? '',
+      tenantId: (job.data as Record<string, unknown>)?.tenantId as string ?? '0',
+    });
+  });
+}
