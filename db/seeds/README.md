@@ -10,6 +10,15 @@ yields a deterministic dev DB.
 |---|---|---|---|---|
 | `phone_codes_starter.csv` | NANP NPA + NXX → IANA timezone | F02 (D03 owns refresh) | 20 | ~165k after D03 IMPLEMENT pipeline |
 | `zip_codes_starter.csv`   | US ZIP → IANA timezone (D03 tier 2 cascade) | F02 (D03 owns refresh) | 20 | ~33k US ZIPs after D03 IMPLEMENT pipeline |
+| `split_state_counties.csv` | County FIPS → IANA crosswalk for 8 split states (D03 ship-blocking) | D03 (hand-curated from DOT 49 CFR Part 71 + IANA zone1970.tab) | static | static; updated only when Congress/DOT changes TZ boundaries |
+
+## Data attribution
+
+- **NANPA Central Office Code Utilized Report** — public domain; [nationalnanpa.com](https://nationalnanpa.com/)
+- **Local Calling Guide** (`localcallingguide.com`) — community-maintained; polite use at ≤1 req/s with User-Agent `vici2-tz-builder/1.0`
+- **Census ZCTA5 Gazetteer** — public domain; [census.gov](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html)
+- **timezone-boundary-builder 2026a** — ODbL license (attribution required); [evansiroky/timezone-boundary-builder](https://github.com/evansiroky/timezone-boundary-builder). Polygons are build-time only — not redistributed with binaries.
+- **IANA Time Zone Database** — public domain; [iana.org/time-zones](https://www.iana.org/time-zones)
 
 Each starter CSV is a representative sample covering the eight US split
 states (IN, KY, TN, FL, ID, OR, ND, SD, NE) called out in

@@ -1,0 +1,292 @@
+[
+  {
+    "name": "tier1_known_wins_over_npa",
+    "req": {
+      "PhoneE164": "+12125550099",
+      "KnownTimezone": "America/Phoenix",
+      "State": "NY"
+    },
+    "wantIANA": "America/Phoenix",
+    "wantConf": "KNOWN"
+  },
+  {
+    "name": "tier1_bad_iana_falls_through_to_zip",
+    "req": {
+      "PhoneE164": "",
+      "KnownTimezone": "Mars/Olympus_Mons",
+      "Zip": "10001",
+      "State": "NY"
+    },
+    "wantIANA": "America/New_York",
+    "wantConf": "ZIP",
+    "seedPhone": [],
+    "seedZip": [{"zip": "10001", "iana": "America/New_York"}]
+  },
+  {
+    "name": "tier2_zip_wins_over_nxx",
+    "req": {
+      "PhoneE164": "+12125550099",
+      "Zip": "90210",
+      "State": "NY"
+    },
+    "wantIANA": "America/Los_Angeles",
+    "wantConf": "ZIP",
+    "seedPhone": [{"npa": "212", "nxx": "555", "iana": "America/New_York"}],
+    "seedZip": [{"zip": "90210", "iana": "America/Los_Angeles"}]
+  },
+  {
+    "name": "tier3_nxx_hit",
+    "req": {
+      "PhoneE164": "+13175551212"
+    },
+    "wantIANA": "America/Indiana/Indianapolis",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "317", "nxx": "555", "iana": "America/Indiana/Indianapolis"}],
+    "seedZip": []
+  },
+  {
+    "name": "tier3_override_beats_phone_codes",
+    "req": {
+      "PhoneE164": "+13175551212"
+    },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "317", "nxx": "555", "iana": "America/Indiana/Indianapolis"}],
+    "seedOverride": [{"npa": "317", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "tier5_single_tz_state",
+    "req": {
+      "PhoneE164": "",
+      "State": "CA"
+    },
+    "wantIANA": "America/Los_Angeles",
+    "wantConf": "STATE_DEFAULT",
+    "seedPhone": [],
+    "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_IN",
+    "req": {
+      "PhoneE164": "",
+      "State": "IN"
+    },
+    "wantIANA": "",
+    "wantConf": "NONE",
+    "seedPhone": [],
+    "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_KY",
+    "req": {
+      "PhoneE164": "",
+      "State": "KY"
+    },
+    "wantIANA": "",
+    "wantConf": "NONE",
+    "seedPhone": [],
+    "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_TN",
+    "req": { "PhoneE164": "", "State": "TN" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_FL",
+    "req": { "PhoneE164": "", "State": "FL" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_ID",
+    "req": { "PhoneE164": "", "State": "ID" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_OR",
+    "req": { "PhoneE164": "", "State": "OR" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_ND",
+    "req": { "PhoneE164": "", "State": "ND" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_SD",
+    "req": { "PhoneE164": "", "State": "SD" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier5_skipped_for_split_state_NE",
+    "req": { "PhoneE164": "", "State": "NE" },
+    "wantIANA": "", "wantConf": "NONE", "seedPhone": [], "seedZip": []
+  },
+  {
+    "name": "tier6_campaign_default",
+    "req": {
+      "PhoneE164": "",
+      "CampaignID": "camp-abc"
+    },
+    "wantIANA": "America/Denver",
+    "wantConf": "CAMPAIGN_DEFAULT",
+    "seedPhone": [],
+    "seedZip": [],
+    "campaignDefault": {"campId": "camp-abc", "iana": "America/Denver"}
+  },
+  {
+    "name": "none_all_tiers_miss",
+    "req": {
+      "PhoneE164": ""
+    },
+    "wantIANA": "",
+    "wantConf": "NONE",
+    "seedPhone": [],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_IN_hammond_lake_county",
+    "req": { "PhoneE164": "+12199335555", "State": "IN" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "219", "nxx": "933", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_IN_indianapolis_marion",
+    "req": { "PhoneE164": "+13175551212", "State": "IN" },
+    "wantIANA": "America/Indiana/Indianapolis",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "317", "nxx": "555", "iana": "America/Indiana/Indianapolis"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_IN_tell_city_perry",
+    "req": { "PhoneE164": "+18125551212", "State": "IN" },
+    "wantIANA": "America/Indiana/Tell_City",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "812", "nxx": "555", "iana": "America/Indiana/Tell_City"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_KY_paducah_chicago",
+    "req": { "PhoneE164": "+12705551212", "State": "KY" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "270", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_KY_lexington_eastern",
+    "req": { "PhoneE164": "+18595551212", "State": "KY" },
+    "wantIANA": "America/New_York",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "859", "nxx": "555", "iana": "America/New_York"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_TN_memphis_chicago",
+    "req": { "PhoneE164": "+19015551212", "State": "TN" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "901", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_TN_knoxville_eastern",
+    "req": { "PhoneE164": "+18655551212", "State": "TN" },
+    "wantIANA": "America/New_York",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "865", "nxx": "555", "iana": "America/New_York"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_FL_pensacola_chicago",
+    "req": { "PhoneE164": "+18505551212", "State": "FL" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "850", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_FL_tallahassee_eastern",
+    "req": { "PhoneE164": "+18502001212", "State": "FL" },
+    "wantIANA": "America/New_York",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "850", "nxx": "200", "iana": "America/New_York"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_ID_boise_mountain",
+    "req": { "PhoneE164": "+12085551212", "State": "ID" },
+    "wantIANA": "America/Boise",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "208", "nxx": "555", "iana": "America/Boise"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_OR_ontario_boise",
+    "req": { "PhoneE164": "+15412001212", "State": "OR" },
+    "wantIANA": "America/Boise",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "541", "nxx": "200", "iana": "America/Boise"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_OR_bend_pacific",
+    "req": { "PhoneE164": "+15415551212", "State": "OR" },
+    "wantIANA": "America/Los_Angeles",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "541", "nxx": "555", "iana": "America/Los_Angeles"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_ND_fargo_central",
+    "req": { "PhoneE164": "+17015551212", "State": "ND" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "701", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_ND_dickinson_mountain",
+    "req": { "PhoneE164": "+17012001212", "State": "ND" },
+    "wantIANA": "America/Denver",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "701", "nxx": "200", "iana": "America/Denver"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_SD_sioux_falls_central",
+    "req": { "PhoneE164": "+16055551212", "State": "SD" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "605", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_SD_rapid_city_mountain",
+    "req": { "PhoneE164": "+16052001212", "State": "SD" },
+    "wantIANA": "America/Denver",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "605", "nxx": "200", "iana": "America/Denver"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_NE_scottsbluff_mountain",
+    "req": { "PhoneE164": "+13085551212", "State": "NE" },
+    "wantIANA": "America/Denver",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "308", "nxx": "555", "iana": "America/Denver"}],
+    "seedZip": []
+  },
+  {
+    "name": "split_state_NE_omaha_central",
+    "req": { "PhoneE164": "+14025551212", "State": "NE" },
+    "wantIANA": "America/Chicago",
+    "wantConf": "NXX",
+    "seedPhone": [{"npa": "402", "nxx": "555", "iana": "America/Chicago"}],
+    "seedZip": []
+  }
+]
