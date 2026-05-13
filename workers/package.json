@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx 'src/**/*.test.ts' || true",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@types/node": "^20.16.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
   }
 }
