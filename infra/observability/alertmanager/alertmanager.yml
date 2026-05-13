@@ -1,0 +1,91 @@
+# vici2 — Alertmanager 0.27+ routing config.
+# Source: spec/modules/O01/PLAN.md §9.
+#
+# Phase 1: webhook receiver only (per parent task requirements).
+# Slack/PagerDuty receivers are scaffolded but disabled (commented) until
+# the secrets land in env. Operators flip them on by uncommenting + setting
+# SLACK_WEBHOOK_URL / PAGERDUTY_SERVICE_KEY.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: webhook-default
+  group_by: [alertname, tenant_id, campaign_id]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    - matchers:
+        - severity="page"
+      receiver: webhook-page
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 4h
+      continue: false
+    - matchers:
+        - severity="warn"
+      receiver: webhook-warn
+      continue: false
+    - matchers:
+        - severity="info"
+      receiver: webhook-info
+      group_interval: 6h
+      repeat_interval: 24h
+
+receivers:
+  # Phase 1: simple webhook receivers. URL points at api-side handler that
+  # logs alerts to the audit log; Phase 2 swaps these for PagerDuty + Slack.
+  - name: webhook-default
+    webhook_configs:
+      - url: http://api:3000/internal/alerts/webhook
+        send_resolved: true
+
+  - name: webhook-page
+    webhook_configs:
+      - url: http://api:3000/internal/alerts/webhook?severity=page
+        send_resolved: true
+
+  - name: webhook-warn
+    webhook_configs:
+      - url: http://api:3000/internal/alerts/webhook?severity=warn
+        send_resolved: true
+
+  - name: webhook-info
+    webhook_configs:
+      - url: http://api:3000/internal/alerts/webhook?severity=info
+        send_resolved: false
+
+  # --- Phase 2 receivers (commented out; require secret rollout) ---
+  # - name: pagerduty-and-slack
+  #   pagerduty_configs:
+  #     - service_key: ${PAGERDUTY_SERVICE_KEY}
+  #       description: "{{ .CommonLabels.alertname }} - {{ .CommonAnnotations.summary }}"
+  #       details:
+  #         runbook:   "{{ .CommonAnnotations.runbook }}"
+  #         dashboard: "{{ .CommonAnnotations.dashboard }}"
+  #         campaign:  "{{ .CommonLabels.campaign_id }}"
+  #   slack_configs:
+  #     - api_url: ${SLACK_WEBHOOK_URL}
+  #       channel: "#oncall"
+  #       send_resolved: true
+
+inhibit_rules:
+  # FreeSwitchDown swallows derivative alerts.
+  - source_matchers:
+      - alertname="Vici2FreeSwitchDown"
+    target_matchers:
+      - alertname=~"Vici2(ESL.*|HopperStarved|HopperFloor|DropRate.*|FSConferenceLeak|DialerOriginateLatencyHigh)"
+    equal: [fs_host]
+
+  # RedisDown swallows hopper alerts (hopper lives in Redis).
+  - source_matchers:
+      - alertname="Vici2RedisDown"
+    target_matchers:
+      - alertname=~"Vici2Hopper.*"
+
+  # MySQLDown swallows drop-rate alerts (audit numerators live in MySQL).
+  - source_matchers:
+      - alertname="Vici2MySQLDown"
+    target_matchers:
+      - alertname=~"Vici2DropRate.*"

@@ -1,0 +1,87 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Originates / sec (per campaign)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [{"expr": "vici2:dialer_originates_rate:5m", "refId": "A", "legendFormat": "{{campaign_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Bridged / sec (per campaign)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "targets": [{"expr": "vici2:dialer_bridged_rate:5m", "refId": "A", "legendFormat": "{{campaign_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Originate Latency p50 / p95 / p99",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(vici2_dialer_originate_latency_seconds_bucket[5m])))", "refId": "A", "legendFormat": "p50"},
+        {"expr": "vici2:dialer_originate_latency_p95:5m", "refId": "B", "legendFormat": "p95 / {{campaign_id}}"},
+        {"expr": "vici2:dialer_originate_latency_p99:5m", "refId": "C", "legendFormat": "p99 / {{campaign_id}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Drop Rate by Campaign",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "targets": [{"expr": "vici2_dialer_drop_ratio", "refId": "A", "legendFormat": "{{campaign_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Hopper Depth (per campaign)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "targets": [{"expr": "vici2_dialer_hopper_depth", "refId": "A", "legendFormat": "{{campaign_id}}"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Pacing Dial Level",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6,
+      "targets": [{"expr": "vici2_dialer_pacing_dial_level", "refId": "A", "legendFormat": "{{campaign_id}}"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Dialer Errors by Code (/s, 5m)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+      "id": 7,
+      "targets": [{"expr": "sum by (code) (rate(vici2_dialer_errors_total[5m]))", "refId": "A", "legendFormat": "{{code}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["vici2", "dialer"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "vici2 / Dialer",
+  "uid": "dialer",
+  "version": 1,
+  "weekStart": ""
+}

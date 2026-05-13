@@ -1,0 +1,61 @@
+# vici2 — MySQL alerts.
+# Source: spec/modules/O01/PLAN.md §3.5. Metric names from mysqld_exporter.
+
+groups:
+  - name: vici2_mysql
+    interval: 30s
+    rules:
+
+      - alert: Vici2MySQLDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: page
+          team: oncall
+        annotations:
+          summary: "MySQL down"
+          description: "Persistence plane offline. ALL writes failing."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2MySQLDown"
+          dashboard: "/d/mysql"
+
+      - alert: Vici2MySQLReplicationLag
+        expr: mysql_slave_lag_seconds > 30
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "MySQL replica lag > 30s"
+          description: "Replica falling behind. Read consistency degraded."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2MySQLReplicationLag"
+          dashboard: "/d/mysql"
+
+      - alert: Vici2MySQLConnUsageHigh
+        expr: |
+          mysql_global_status_threads_connected
+          / mysql_global_variables_max_connections
+          > 0.85
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "MySQL connections > 85% of max"
+          description: "Pool saturation approaching. Risk of refused connections."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2MySQLConnUsageHigh"
+          dashboard: "/d/mysql"
+
+      - alert: Vici2MySQLBufferPoolLow
+        expr: |
+          rate(mysql_global_status_innodb_buffer_pool_reads[5m])
+          / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])
+          > 0.05
+        for: 10m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "InnoDB buffer pool miss ratio > 5%"
+          description: "Working set spilling to disk; consider increasing buffer pool size."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2MySQLBufferPoolLow"
+          dashboard: "/d/mysql"
