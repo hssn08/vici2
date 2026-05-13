@@ -157,6 +157,7 @@ model Tenant {
   imports           Import[]
   notifications     Notification[]
   notificationPrefs NotificationPref[]
+  wallboardLayouts  WallboardLayout[]
 
   @@map("tenants")
 }
@@ -2114,4 +2115,26 @@ model NotificationPref {
 
   @@unique([tenantId, userId, category], map: "uk_notif_prefs_t_user_cat")
   @@map("notification_prefs")
+}
+
+// =============================================================================
+// S04 — Supervisor Wallboard Layout config
+// =============================================================================
+
+model WallboardLayout {
+  id            BigInt   @id @default(autoincrement())
+  tenantId      BigInt   @default(1)  @map("tenant_id")
+  name          String   @db.VarChar(128)
+  /// JSON array of board IDs in rotation order: ["agents","campaigns","queue","performers"]
+  boards        Json
+  rotateSeconds Int      @default(30) @map("rotate_seconds")
+  active        Boolean  @default(true)
+
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime @updatedAt      @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_wallboard_tenant")
+
+  @@index([tenantId, active], map: "idx_wallboard_tenant_active")
+  @@map("wallboard_layouts")
 }
