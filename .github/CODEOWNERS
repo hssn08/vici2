@@ -1,0 +1,44 @@
+# vici2 CODEOWNERS
+#
+# Until real teams exist on GitHub, the placeholder @vici2-maintainers is the
+# repo owner. Branch protection is configured NOT to require codeowner review
+# (per PLAN §12.1 — team too small for that to be useful yet), so this file is
+# advisory: it auto-requests review from the listed owner for PRs touching
+# their area.
+#
+# When @vici2/sre and @vici2/dba teams are created (per PLAN §9, §18 item 4),
+# replace @vici2-maintainers below with the appropriate team handle and add a
+# tag/branch ruleset enforcing codeowner approval on production-bound merges.
+
+* @vici2-maintainers
+
+# ----------------------------------------------------------------- ownership
+# CI / CD / observability
+/.github/                         @vici2-maintainers
+/Makefile                         @vici2-maintainers
+/scripts/ci/                      @vici2-maintainers
+/spec/modules/O04/                @vici2-maintainers
+/spec/modules/O01/                @vici2-maintainers
+/spec/modules/O05/                @vici2-maintainers
+
+# Database schema + migrations
+/api/prisma/                      @vici2-maintainers
+/spec/modules/F02/                @vici2-maintainers
+
+# Dialer / pacing / compliance — high-blast-radius code
+/dialer/internal/pacing/          @vici2-maintainers
+/dialer/internal/compliance/      @vici2-maintainers
+/dialer/internal/hopper/          @vici2-maintainers
+
+# FreeSWITCH config
+/freeswitch/                      @vici2-maintainers
+
+# Security baseline
+/.gitleaks.toml                   @vici2-maintainers
+/.github/workflows/security.yml   @vici2-maintainers
+/.github/workflows/secrets-scan.yml @vici2-maintainers
+
+# Specification + design docs
+/SPEC.md                          @vici2-maintainers
+/DESIGN.md                        @vici2-maintainers
+/spec/rfc/                        @vici2-maintainers
