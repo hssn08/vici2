@@ -20,6 +20,7 @@ export default defineConfig({
         "src/dnc/**/*.ts",
         "src/import/**/*.ts",
         "src/statuses/**/*.ts",
+        "src/reporting/**/*.ts",
       ],
       exclude: ["src/auth/lua/**", "src/auth/index.ts", "src/dnc/lua/**"],
       thresholds: {
