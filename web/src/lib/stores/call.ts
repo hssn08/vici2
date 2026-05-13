@@ -9,7 +9,8 @@ export type CallPhase =
   | "active"
   | "hold"
   | "wrapup"
-  | "transferring";
+  | "transferring"
+  | "reconnecting"; // A02: SIP.js transport recovery in progress
 export type CallDirection = "outbound" | "inbound" | null;
 export type RecordingState = "on" | "off" | "paused";
 
