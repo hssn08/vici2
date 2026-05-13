@@ -1,0 +1,24 @@
+# =============================================================================
+# fail2ban jail: caddy-auth.local
+# =============================================================================
+# Ban IPs that flood login/refresh/TOTP endpoints with 401/403 responses.
+# Catches password spray, credential stuffing, and brute-force attempts.
+#
+# Threshold: 10 failures in 5 minutes → 30-minute ban.
+# The 30-minute ban is short enough that a legitimate user who mistyped can
+# call support; long enough to defeat automated spray tools.
+#
+# Logpath: /var/log/caddy/access.log (Caddy JSON format per Caddyfile).
+# =============================================================================
+
+[caddy-auth]
+enabled  = true
+filter   = caddy-auth
+logpath  = /var/log/caddy/access.log
+port     = http,https
+protocol = tcp
+maxretry = 10
+findtime = 300
+bantime  = 1800
+
+# ignoreip is set in ignoreip.local — do not override here.

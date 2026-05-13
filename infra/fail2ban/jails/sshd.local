@@ -1,0 +1,20 @@
+# =============================================================================
+# fail2ban jail: sshd.local
+# =============================================================================
+# Aggressive SSH brute-force protection on the host.
+# mode=aggressive catches probe attempts (not just successful auth failures).
+#
+# This overrides Debian 12's default sshd jail config with tighter thresholds.
+# =============================================================================
+
+[sshd]
+enabled  = true
+mode     = aggressive
+port     = ssh
+filter   = sshd
+logpath  = /var/log/auth.log
+maxretry = 3
+findtime = 600
+bantime  = 86400
+
+# ignoreip is set in ignoreip.local — do not override here.
