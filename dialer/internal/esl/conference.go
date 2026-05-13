@@ -88,6 +88,51 @@ func (c *Client) ConferenceHold(ctx context.Context, fsHost, conferenceName, mem
 	return err
 }
 
+// ConferenceSummary represents one conference in the all-conferences list.
+// E06 PLAN §8.2.
+type ConferenceSummary struct {
+	Name        string
+	MemberCount int
+}
+
+// ListAllConferences returns all active conferences on an FS host.
+// Uses `api conference json_list` (no conference name = list all).
+// E06 PLAN §8.2.
+func (c *Client) ListAllConferences(ctx context.Context, fsHost string) ([]ConferenceSummary, error) {
+	if c.isShuttingDown() {
+		return nil, ErrShuttingDown
+	}
+	reply, err := c.command(ctx, fsHost, "conference json_list")
+	if err != nil {
+		return nil, fmt.Errorf("esl ListAllConferences: %w", err)
+	}
+	return parseAllConferences(reply)
+}
+
+// parseAllConferences parses the JSON array returned by `conference json_list`.
+// FS returns a JSON array of conference objects when invoked without a name.
+func parseAllConferences(reply string) ([]ConferenceSummary, error) {
+	reply = strings.TrimSpace(reply)
+	if reply == "" || reply == "+OK" || !strings.HasPrefix(reply, "[") {
+		return nil, nil
+	}
+	var raw []struct {
+		Name    string        `json:"conference_name"`
+		Members []interface{} `json:"members"`
+	}
+	if err := json.Unmarshal([]byte(reply), &raw); err != nil {
+		return nil, fmt.Errorf("parseAllConferences: %w", err)
+	}
+	out := make([]ConferenceSummary, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, ConferenceSummary{
+			Name:        r.Name,
+			MemberCount: len(r.Members),
+		})
+	}
+	return out, nil
+}
+
 // parseConferenceList parses the JSON output of `conference <name> json_list`.
 // FreeSWITCH returns JSON with member fields. Handles both array and object forms.
 func parseConferenceList(reply string) ([]ConferenceMember, error) {

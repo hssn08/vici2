@@ -1,0 +1,38 @@
+groups:
+  - name: janitor
+    rules:
+      - alert: JanitorHighStuckChannelRate
+        expr: rate(vici2_janitor_stuck_channels_killed_total[5m]) > 3
+        for: 2m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Janitor killing >3 stuck channels/min — possible upstream bug in T04/ESL"
+          runbook: "https://wiki.vici2.io/runbooks/janitor-stuck-channels"
+
+      - alert: JanitorHighStaleConfRate
+        expr: rate(vici2_janitor_stale_confs_killed_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Janitor killing >1 stale conference/min — conference lifecycle bug"
+          runbook: "https://wiki.vici2.io/runbooks/janitor-stale-confs"
+
+      - alert: JanitorHighOrphanLockRate
+        expr: rate(vici2_janitor_orphan_locks_cleared_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Janitor clearing >5 orphan locks/min — picker pod crash pattern?"
+          runbook: "https://wiki.vici2.io/runbooks/janitor-orphan-locks"
+
+      - alert: JanitorTickSlow
+        expr: histogram_quantile(0.95, rate(vici2_janitor_tick_duration_seconds_bucket[10m])) > 5
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Janitor sweep p95 > 5s — ESL or DB latency spike"
+          runbook: "https://wiki.vici2.io/runbooks/janitor-tick-slow"
