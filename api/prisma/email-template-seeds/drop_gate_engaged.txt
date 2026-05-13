@@ -1,0 +1,19 @@
+DROP GATE ENGAGED
+=================
+
+Hi {{user.name}},
+
+The drop gate has been engaged for campaign {{dropGate.campaignName}}.
+
+Current drop rate: {{dropGate.dropRate}}% (threshold: {{dropGate.threshold}}%)
+
+Campaign:   {{dropGate.campaignName}}
+Engaged At: {{formatDate dropGate.engagedAt "MMMM d, yyyy 'at' h:mm a"}}
+Drop Rate:  {{dropGate.dropRate}}%
+Threshold:  {{dropGate.threshold}}%
+
+Dialing has been paused automatically. Please review campaign settings.
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}

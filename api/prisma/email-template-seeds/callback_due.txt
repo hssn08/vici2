@@ -1,0 +1,17 @@
+CALLBACK DUE NOW
+================
+
+Hi {{user.name}},
+
+Your scheduled callback with {{callback.leadName}}
+({{phoneFormat callback.leadPhone}}) is due.
+
+Scheduled: {{formatDate callback.scheduledAtLocal "MMMM d, yyyy 'at' h:mm a"}}
+
+{{#if callback.notes}}Notes: {{callback.notes}}
+
+{{/if}}View Callback: {{callback.link}}
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}

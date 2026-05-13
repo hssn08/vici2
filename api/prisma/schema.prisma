@@ -163,6 +163,9 @@ model Tenant {
   notifications     Notification[]
   notificationPrefs NotificationPref[]
   wallboardLayouts  WallboardLayout[]
+  // N02 email templates
+  emailTemplates        EmailTemplate[]
+  emailTemplateVersions EmailTemplateVersion[]
 
   @@map("tenants")
 }
@@ -194,6 +197,8 @@ model User {
   active        Boolean   @default(true)
   hotkeysActive Boolean   @default(true) @map("hotkeys_active")
   totpRequired  Boolean   @default(false) @map("totp_required")
+  // N02 amendment: BCP 47 language tag for email template lookup
+  preferredLang String    @default("en") @map("preferred_lang") @db.VarChar(10)
   lastLoginAt   DateTime? @map("last_login_at") @db.DateTime(6)
   createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
@@ -2265,4 +2270,52 @@ model WallboardLayout {
 
   @@index([tenantId, active], map: "idx_wallboard_tenant_active")
   @@map("wallboard_layouts")
+}
+
+// =============================================================================
+// N02 — Email Template System
+// Phase 1: system notification templates (7 categories, English).
+// Phase 3: marketing/blast templates.
+// =============================================================================
+
+model EmailTemplate {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @default(1) @map("tenant_id")
+  category  String   @db.VarChar(64)
+  lang      String   @default("en") @db.VarChar(10)
+  subject   String   @db.VarChar(255)
+  htmlBody  String   @map("html_body") @db.MediumText
+  textBody  String   @map("text_body") @db.MediumText
+  active    Boolean  @default(true)
+  version   Int      @default(1) @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_email_tpl_tenant")
+  versions EmailTemplateVersion[]
+
+  @@unique([tenantId, category, lang], map: "uk_email_tpl_t_cat_lang")
+  @@index([tenantId, active, category], map: "idx_email_tpl_t_active_cat")
+  @@map("email_templates")
+}
+
+// N02 — Version history for email templates.
+// Keeps last 10 versions per (tenantId, category, lang); oldest pruned on version bump.
+
+model EmailTemplateVersion {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   BigInt   @map("tenant_id")
+  templateId BigInt   @map("template_id")
+  version    Int      @db.SmallInt
+  subject    String   @db.VarChar(255)
+  htmlBody   String   @map("html_body") @db.MediumText
+  textBody   String   @map("text_body") @db.MediumText
+  savedAt    DateTime @default(now()) @map("saved_at") @db.DateTime(6)
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_email_tpl_ver_tenant")
+  template EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_email_tpl_ver_tpl")
+
+  @@unique([templateId, version], map: "uk_email_tpl_ver_id_v")
+  @@index([tenantId, templateId], map: "idx_email_tpl_ver_t_tpl")
+  @@map("email_template_versions")
 }

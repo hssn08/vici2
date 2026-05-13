@@ -41,6 +41,8 @@
     "date-fns": "^4.1.0",
     "dotenv-flow": "^4.1.0",
     "fastify": "^5.1.0",
+    "handlebars": "^4.7.9",
+    "html-to-text": "^10.0.0",
     "iconv-lite": "^0.7.2",
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",
@@ -53,6 +55,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/html-to-text": "^9.0.4",
     "@types/node": "^20.16.0",
     "@types/sanitize-html": "^2.16.1",
     "@vitest/coverage-v8": "^2.1.8",
