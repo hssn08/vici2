@@ -1,0 +1,11 @@
+[Unit]
+Description=vici2 FreeSWITCH config daily backup timer
+Documentation=file:spec/runbooks/restore.md
+
+[Timer]
+OnCalendar=*-*-* 02:20:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=vici2 weekly automated restore test
+Documentation=file:spec/runbooks/restore.md
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+User=vici2-backup
+EnvironmentFile=/etc/vici2/backup.env
+ExecStart=/opt/vici2/scripts/restore/restore-test.sh --env prod
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=7200

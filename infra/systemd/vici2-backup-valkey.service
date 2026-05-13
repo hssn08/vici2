@@ -1,0 +1,13 @@
+[Unit]
+Description=vici2 Valkey daily backup
+Documentation=file:spec/runbooks/restore.md
+After=network.target
+
+[Service]
+Type=oneshot
+User=vici2-backup
+EnvironmentFile=/etc/vici2/backup.env
+ExecStart=/opt/vici2/scripts/backup/valkey.sh --env prod --archive-class daily
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=3600

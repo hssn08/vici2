@@ -1,0 +1,11 @@
+[Unit]
+Description=vici2 MySQL monthly backup timer
+Documentation=file:spec/runbooks/restore.md
+
+[Timer]
+OnCalendar=*-*-01 02:30:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,282 @@
+name: ci-backup-scripts
+
+on:
+  push:
+    paths:
+      - "scripts/backup/**"
+      - "scripts/restore/**"
+      - ".github/workflows/ci-backup-scripts.yml"
+  pull_request:
+    paths:
+      - "scripts/backup/**"
+      - "scripts/restore/**"
+      - ".github/workflows/ci-backup-scripts.yml"
+
+jobs:
+  shellcheck-and-syntax:
+    name: Shell lint + syntax
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: shellcheck
+        run: |
+          shellcheck \
+            scripts/backup/mysql.sh \
+            scripts/backup/valkey.sh \
+            scripts/backup/freeswitch-config.sh \
+            scripts/backup/tip-verify.sh \
+            scripts/backup/preflight-host.sh \
+            scripts/restore/from-s3.sh \
+            scripts/restore/restore-test.sh
+
+      - name: bash -n syntax check
+        run: |
+          bash -n scripts/backup/mysql.sh
+          bash -n scripts/backup/valkey.sh
+          bash -n scripts/backup/freeswitch-config.sh
+          bash -n scripts/backup/tip-verify.sh
+          bash -n scripts/backup/preflight-host.sh
+          bash -n scripts/restore/from-s3.sh
+          bash -n scripts/restore/restore-test.sh
+
+      - name: verify redis.sh symlink
+        run: |
+          test -L scripts/backup/redis.sh
+          test "$(readlink scripts/backup/redis.sh)" = "valkey.sh"
+
+  backup-dry-run:
+    name: MySQL backup dry-run (LocalStack)
+    runs-on: ubuntu-24.04
+    needs: shellcheck-and-syntax
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-pw
+          MYSQL_DATABASE: vici2
+          MYSQL_USER: vici2_backup
+          MYSQL_PASSWORD: ci-backup-pw
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -u root -pci-root-pw --silent"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+      localstack:
+        image: localstack/localstack:3
+        env:
+          SERVICES: s3,kms
+          DEFAULT_REGION: us-east-1
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd="curl -s http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get install -y zstd awscli
+          # awscli v2 from pip for LocalStack compatibility
+          pip install awscli-local 2>/dev/null || true
+
+      - name: Create LocalStack S3 bucket
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          aws --endpoint-url http://localhost:4566 s3 mb s3://vici2-backups-ci
+
+      - name: Create MySQL cnf for backup user
+        run: |
+          mkdir -p /tmp/vici2
+          cat > /tmp/vici2/mysql-backup.cnf <<EOF
+          [client]
+          user=root
+          password=ci-root-pw
+          EOF
+          chmod 0600 /tmp/vici2/mysql-backup.cnf
+
+      - name: MySQL dry-run backup
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          VICI2_ENV: dev
+          VICI2_BACKUP_BUCKET: vici2-backups-ci
+          VICI2_BACKUP_KEK_ALIAS: alias/test-kek
+          MYSQL_CNF: /tmp/vici2/mysql-backup.cnf
+        run: |
+          scripts/backup/mysql.sh \
+            --env dev \
+            --archive-class daily \
+            --db-host 127.0.0.1 \
+            --db-port 3306 \
+            --db-name vici2 \
+            --bucket vici2-backups-ci \
+            --kek-alias alias/test-kek \
+            --endpoint-url http://localhost:4566 \
+            --dry-run
+
+      - name: MySQL full backup (LocalStack)
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          VICI2_ENV: dev
+          VICI2_BACKUP_BUCKET: vici2-backups-ci
+          MYSQL_CNF: /tmp/vici2/mysql-backup.cnf
+        run: |
+          scripts/backup/mysql.sh \
+            --env dev \
+            --archive-class daily \
+            --db-host 127.0.0.1 \
+            --db-port 3306 \
+            --db-name vici2 \
+            --bucket vici2-backups-ci \
+            --kek-alias alias/test-kek \
+            --endpoint-url http://localhost:4566
+
+      - name: Verify artifact in LocalStack S3
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          TODAY=$(date -u +%Y/%m/%d)
+          OBJECTS=$(aws --endpoint-url http://localhost:4566 s3 ls \
+            "s3://vici2-backups-ci/dev/mysql/${TODAY}/" 2>/dev/null || echo "")
+          echo "Objects found:"
+          echo "$OBJECTS"
+          if ! echo "$OBJECTS" | grep -q '\.sql\.zst$'; then
+            echo "ERROR: .sql.zst artifact not found in LocalStack" >&2
+            exit 1
+          fi
+          if ! echo "$OBJECTS" | grep -q '\.sha256$'; then
+            echo "ERROR: .sha256 sidecar not found in LocalStack" >&2
+            exit 1
+          fi
+          echo "Artifact and SHA256 sidecar verified in LocalStack."
+
+  restore-dry-run:
+    name: MySQL restore from LocalStack
+    runs-on: ubuntu-24.04
+    needs: backup-dry-run
+
+    services:
+      mysql-src:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-pw
+          MYSQL_DATABASE: vici2
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -u root -pci-root-pw --silent"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+      mysql-dest:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-restore-pw
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -u root -pci-restore-pw --silent"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+      localstack:
+        image: localstack/localstack:3
+        env:
+          SERVICES: s3,kms
+          DEFAULT_REGION: us-east-1
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd="curl -s http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get install -y zstd awscli
+
+      - name: Seed source MySQL + backup to LocalStack
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          MYSQL_PWD: ci-root-pw
+        run: |
+          aws --endpoint-url http://localhost:4566 s3 mb s3://vici2-backups-ci
+
+          # Create a minimal vici2 schema to test restore
+          mysql -h 127.0.0.1 -u root -pci-root-pw -e "
+            CREATE TABLE IF NOT EXISTS vici2.test_table (id INT PRIMARY KEY, val VARCHAR(64));
+            INSERT INTO vici2.test_table VALUES (1, 'hello-o02');
+          "
+
+          cat > /tmp/mysql-backup.cnf <<EOF
+          [client]
+          user=root
+          password=ci-root-pw
+          EOF
+          chmod 0600 /tmp/mysql-backup.cnf
+
+          scripts/backup/mysql.sh \
+            --env dev \
+            --archive-class daily \
+            --db-host 127.0.0.1 \
+            --db-port 3306 \
+            --db-name vici2 \
+            --bucket vici2-backups-ci \
+            --kek-alias alias/test-kek \
+            --endpoint-url http://localhost:4566
+
+      - name: Restore to dest MySQL + verify
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          VICI2_STAGING_DB_HOST: 127.0.0.1
+          VICI2_STAGING_DB_PORT: "3307"
+          MYSQL_PWD: ci-restore-pw
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          scripts/restore/from-s3.sh \
+            --service mysql \
+            --date "${TODAY}" \
+            --target staging \
+            --env dev \
+            --bucket vici2-backups-ci \
+            --endpoint-url http://localhost:4566
+
+          # Verify data is present
+          COUNT=$(mysql -h 127.0.0.1 -P 3307 -u root -pci-restore-pw \
+            -e "SELECT COUNT(*) FROM vici2.test_table WHERE val='hello-o02'" \
+            --skip-column-names 2>/dev/null || echo 0)
+          echo "Row count after restore: ${COUNT}"
+          if [[ "$COUNT" -lt 1 ]]; then
+            echo "ERROR: restored data not found" >&2
+            exit 1
+          fi
+          echo "Restore verified: ${COUNT} matching rows."
