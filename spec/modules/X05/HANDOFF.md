@@ -1,21 +1,46 @@
 # X05 — Local-Presence Caller-ID — HANDOFF
 
 **Module:** X05 — Local-Presence Caller-ID
-**Status:** STUB — to be completed after IMPLEMENT phase
+**Status:** IMPLEMENTED
 **Date:** 2026-05-13
+**Commit:** `4f6cda2 feat(X05): implement local-presence caller-ID NPA matching`
 
 ---
 
 ## 1. What Was Built
 
-_Populated by IMPLEMENT agent._
+### Schema (migration `20260513360000_x05_local_presence`)
+- `number_pools.local_presence_enabled TINYINT(1) NOT NULL DEFAULT 0` — per-pool feature flag
+- `originate_audit.cid_match_tier TINYINT UNSIGNED NULL` — analytics (1=exact_npa, 2=neighbor_npa, 3=same_state, 4=pool_fallback, NULL=disabled)
+- Prisma: `NumberPool.localPresenceEnabled`, `OriginateAudit.cidMatchTier`
+
+### Go dialer — new files
+- `dialer/internal/originate/reserved_npa.go` — `isReservedNPA()`, `extractNPA()`
+- `dialer/internal/originate/npa_neighbors.go` — embedded 62-entry neighbor NPA map (symmetric)
+- `dialer/internal/originate/npa_index.go` — `NPAIndexBuilder` with startup rebuild, event-driven updates, pub/sub consumer
+- `dialer/internal/originate/local_presence.go` — `LocalPresencePicker.PickCallerIDWithLocalPresence()` (4-tier algorithm)
+- `*_test.go` — unit tests covering AC-1 through AC-8 + symmetry check
+
+### Go dialer — modified files
+- `dialer/internal/valkey/keys.go` — added `PoolNPAIndex`, `PoolStateIndex`, `PoolNPAIndexBuilt`, `DIDQuarantined` key builders
+- `dialer/internal/pool/types.go` — added `PoolConfig.LocalPresenceEnabled`
+- `dialer/internal/pool/cache.go` — reads `local_presence_enabled` from DB
+- `dialer/internal/pool/picker.go` — added `Service.GetMembers()` (used by X05 to resolve DID E.164 from cache)
+- `dialer/internal/tz/resolver.go` — added `npaStateCache` + `StateForNPA()` method
+- `dialer/internal/tz/preload.go` — `loadPhoneCodes` reads `state` column; populates `npaStateCache`
+
+### TypeScript API
+- `api/src/routes/admin/number-pools/npa-coverage.ts` — `getNpaCoverageReport()` (Valkey SCAN)
+- `schema.ts` — `localPresenceEnabled` in `PoolCreateSchema`/`PoolResponse`; `NpaCoverageResponse` type
+- `service.ts` — createPool/updatePool propagate `localPresenceEnabled`
+- `index.ts` — registered `GET /:id/npa-coverage` route
 
 ## 2. Matching Algorithm Summary
 
 The four-tier selection algorithm (exact NPA → neighbor NPA → same state →
 X04 pool fallback) is implemented in:
-- Go: `dialer/internal/originate/pick_caller.go` — `PickCallerID()`
-- TypeScript: `api/src/services/number-pool/local-presence.ts` — `pickCallerIdWithLocalPresence()`
+- Go: `dialer/internal/originate/local_presence.go` — `LocalPresencePicker.PickCallerIDWithLocalPresence()`
+- TypeScript: NPA coverage report only (admin preview); hot path is Go
 
 Enable local presence per pool by setting `local_presence_enabled = true` via
 `PATCH /api/admin/number-pools/:id`.
