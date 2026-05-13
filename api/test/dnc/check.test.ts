@@ -1,6 +1,6 @@
 // D05 — DNC check unit tests
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { dncCheck } from "../../src/dnc/check.js";
 import type { CheckRequest } from "../../src/dnc/types.js";
 
