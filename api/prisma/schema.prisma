@@ -362,7 +362,8 @@ model Campaign {
   dialMethod             DialMethod         @default(MANUAL) @map("dial_method")
   autoDialLevel          Decimal            @default(0.00) @map("auto_dial_level") @db.Decimal(4, 2)
   adaptiveMaxLevel       Decimal            @default(3.00) @map("adaptive_max_level") @db.Decimal(4, 2)
-  adaptiveDropPct        Decimal            @default(1.50) @map("adaptive_drop_pct") @db.Decimal(4, 2)
+  // E05 amendment: renamed adaptive_drop_pct → drop_target_max; FCC hard ceiling 3.00% enforced by CHECK constraint.
+  dropTargetMax          Decimal            @default(1.50) @map("drop_target_max") @db.Decimal(4, 2)
   dialTimeoutSec         Int                @default(22) @map("dial_timeout_sec") @db.SmallInt
   wrapupSeconds          Int                @default(10) @map("wrapup_seconds") @db.SmallInt
   nextAgentCall          NextAgentCall      @default(longest_wait) @map("next_agent_call")
@@ -429,6 +430,15 @@ model Campaign {
   // E04 amendment §3.3 — agent-selection strategy for PROGRESSIVE dial.
   // Phase 3 ships random/fewest_calls/rank; today only longest_wait is implemented.
   callStrategy           CallStrategy       @default(longest_wait) @map("call_strategy")
+  // E05 amendment §9.1 — drop-gate threshold pair + dwell + counting policy.
+  // drop_target_soft: WARN alert at this rate; no gate; operator advisory.
+  dropTargetSoft         Decimal            @default(1.00) @map("drop_target_soft") @db.Decimal(4, 2)
+  // drop_target_max_override: downward-only cap for regulated industries (≤ drop_target_max).
+  dropTargetMaxOverride  Decimal?           @map("drop_target_max_override") @db.Decimal(4, 2)
+  // recover_seconds: minimum dwell before hard gate auto-releases (min 60).
+  recoverSeconds         Int                @default(300) @map("recover_seconds")
+  // count_early_customer_hangup_as_drop: FCC-conservative default (true = PDROP on early BYE).
+  countEarlyCustomerHangupAsDrop Boolean   @default(true) @map("count_early_customer_hangup_as_drop")
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -1254,28 +1264,61 @@ model RecordingLog {
 // 4.27  drop_log  (partitioned)
 // =============================================================================
 
+// E05 amendment §9.3: extended with customer_hangup_early, audio_missing, software_error.
 enum DropReason {
   no_agent
   timeout
   queue_full
+  customer_hangup_early
+  audio_missing
+  software_error
 }
 
 model DropLog {
-  id               BigInt     @default(autoincrement())
-  tenantId         BigInt     @default(1) @map("tenant_id")
-  callLogId        BigInt?    @map("call_log_id")
-  campaignId       String     @map("campaign_id") @db.VarChar(32)
-  phoneE164        String     @map("phone_e164") @db.VarChar(16)
-  droppedAt        DateTime   @map("dropped_at") @db.DateTime(6)
-  dropReason       DropReason @map("drop_reason")
-  safeHarborPlayed Boolean    @default(false) @map("safe_harbor_played")
-  createdAt        DateTime   @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt        DateTime   @default(now()) @map("updated_at") @db.DateTime(6)
+  id                      BigInt     @default(autoincrement())
+  tenantId                BigInt     @default(1) @map("tenant_id")
+  callLogId               BigInt?    @map("call_log_id")
+  campaignId              String     @map("campaign_id") @db.VarChar(32)
+  phoneE164               String     @map("phone_e164") @db.VarChar(16)
+  droppedAt               DateTime   @map("dropped_at") @db.DateTime(6)
+  dropReason              DropReason @map("drop_reason")
+  safeHarborPlayed        Boolean    @default(false) @map("safe_harbor_played")
+  // E05 amendment §9.2: forward-link to originate_audit.attempt_uuid (T04 one-UUID rule).
+  originatorAttemptUuid   String?    @map("originator_attempt_uuid") @db.VarChar(40)
+  createdAt               DateTime   @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt               DateTime   @default(now()) @map("updated_at") @db.DateTime(6)
 
   @@id([id, droppedAt])
   @@index([tenantId, campaignId, droppedAt], map: "idx_drop_log_t_camp_dropped")
   @@index([tenantId, callLogId], map: "idx_drop_log_t_call")
   @@map("drop_log")
+}
+
+// =============================================================================
+// E05 §9.4 — drop_gate_transition_log  (partitioned)
+//
+// Durable audit trail for every drop-gate engage/release event.
+// TCPA § 64.1200 requires 7-year evidence retention (C04 manages partition drops).
+// Mirrors the t:{tid}:campaign:{cid}:drop_gate_transitions Valkey STREAM.
+// =============================================================================
+
+model DropGateTransitionLog {
+  id         BigInt   @default(autoincrement())
+  tenantId   BigInt   @map("tenant_id")
+  campaignId String   @map("campaign_id") @db.VarChar(32)
+  // "engage" | "release"
+  action     String   @map("action") @db.VarChar(16)
+  dropPct    Decimal  @map("drop_pct") @db.Decimal(5, 2)
+  // "auto" | "operator"
+  source     String   @map("source") @db.VarChar(16)
+  operatorId BigInt?  @map("operator_id")
+  reason     String?  @db.VarChar(255)
+  occurredAt DateTime @map("occurred_at") @db.DateTime(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@id([id, occurredAt])
+  @@index([tenantId, campaignId, occurredAt], map: "idx_dgtl_t_camp_ts")
+  @@map("drop_gate_transition_log")
 }
 
 // =============================================================================

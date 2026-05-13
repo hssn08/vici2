@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  45_safe_harbor.xml — FCC § 64.1200(a)(7) safe-harbor dialplan extension.
+
+  This extension is entered via sched_transfer:
+    execute_on_answer=sched_transfer:+2 safe_harbor XML default
+
+  injected at originate time by T04 (E05 PLAN §8.2). The +2 schedules the
+  transfer 2 000 ms after CHANNEL_ANSWER. If E04 bridges the customer before
+  T+2 s, mod_dptools suppresses the transfer on a bridged channel.
+
+  Audio precondition (E05 PLAN §8.3):
+    campaigns.safe_harbor_audio validated by M03 admin UI + E02 startup stat-check.
+    Missing file → PDROP status + operator PAGE (E05 ESL handler).
+
+  Channel vars set by T04 at originate time:
+    safe_harbor_audio_path  = /var/lib/freeswitch/sounds/custom/safe_harbor/<campaign_id>.wav
+    vici2_safe_harbor_cancel (set by E04 on agent bridge, belt-and-suspenders)
+
+  TCPA evidence: E05 ESL handler reads CHANNEL_HANGUP_COMPLETE; if
+  vici2_safe_harbor_played=true → DROP + drop_log INSERT (safe_harbor_played=true).
+  If absent → PDROP + PAGE (per-call § 64.1200(a)(7) violation).
+-->
+<include>
+  <context name="default">
+
+    <extension name="safe_harbor">
+      <condition field="destination_number" expression="^safe_harbor$">
+
+        <!-- Belt-and-suspenders: if E04 cancelled the transfer, exit cleanly. -->
+        <condition field="${vici2_safe_harbor_cancelled}" expression="^true$" break="on-true">
+          <action application="log"      data="INFO safe_harbor: transfer cancelled by agent bridge; no action"/>
+          <action application="hangup"   data="NORMAL_CLEARING"/>
+        </condition>
+
+        <!-- Guard: only execute if channel was answered by a live human. -->
+        <condition field="${answered}" expression="^true$" break="on-false">
+          <action application="log" data="WARNING safe_harbor: channel not answered; skipping audio"/>
+          <action application="hangup" data="NORMAL_CLEARING"/>
+        </condition>
+
+        <!-- Core safe-harbor: play required recorded message, then hang up. -->
+        <action application="set"      data="hangup_after_bridge=true"/>
+        <action application="set"      data="vici2_safe_harbor_played=true"/>
+        <action application="log"      data="INFO safe_harbor: playing ${safe_harbor_audio_path}"/>
+        <action application="playback" data="${safe_harbor_audio_path}"/>
+        <!-- Fallback: if primary audio path is empty, play system fallback. -->
+        <action application="playback" data="/var/lib/freeswitch/sounds/custom/safe_harbor/fallback_safe_harbor.wav"/>
+        <action application="set"      data="hangup_cause=NORMAL_CLEARING"/>
+        <action application="hangup"/>
+
+      </condition>
+    </extension>
+
+  </context>
+</include>
