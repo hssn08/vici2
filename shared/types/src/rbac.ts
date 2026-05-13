@@ -152,6 +152,9 @@ export const VERBS = [
   // number pool (X04)
   'number_pool:read',
   'number_pool:edit',
+  // branded calling (N05)
+  'branded_calling:configure',   // manage provider credentials + brand profile
+  'branded_calling:register_did', // register/deregister individual DIDs + submit disputes
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -209,6 +212,9 @@ export const SENSITIVE_VERBS = new Set<Verb>([
   // N06 — RND configure writes credentials; override removes DNC entries
   'rnd:configure',
   'rnd:override',
+  // N05 — branded calling: configure exposes encrypted creds; register_did affects call reputation
+  'branded_calling:configure',
+  'branded_calling:register_did',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -316,6 +322,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // X04 — number pool
     'number_pool:read':        { scope: 'tenant' },
     'number_pool:edit':        { scope: 'tenant' },
+    // N05 — branded calling
+    'branded_calling:configure':    { scope: 'tenant', sensitive: true },
+    'branded_calling:register_did': { scope: 'tenant', sensitive: true },
   },
 
   admin: {
@@ -410,6 +419,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // X04 — number pool
     'number_pool:read':        { scope: 'tenant' },
     'number_pool:edit':        { scope: 'tenant' },
+    // N05 — branded calling
+    'branded_calling:configure':    { scope: 'tenant', sensitive: true },
+    'branded_calling:register_did': { scope: 'tenant', sensitive: true },
   },
 
   supervisor: {

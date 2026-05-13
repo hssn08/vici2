@@ -240,6 +240,24 @@ export const rndScrubDuration = new client.Histogram({
 });
 
 // ---------------------------------------------------------------------------
+// N05 — Branded Calling metrics
+// ---------------------------------------------------------------------------
+
+export const brandRepScoreGauge = new client.Gauge({
+  name: 'vici2_branded_did_reputation_score',
+  help: 'Normalized brand reputation score (0–100) for active branded DIDs',
+  labelNames: ['provider', 'tenant_id'] as const,
+  registers: [registry],
+});
+
+export const brandedDidCountGauge = new client.Gauge({
+  name: 'vici2_branded_did_count',
+  help: 'Count of active branded DID registrations per provider',
+  labelNames: ['provider', 'tenant_id', 'status'] as const,
+  registers: [registry],
+});
+
+// ---------------------------------------------------------------------------
 // W02 — WS queue event publisher
 // ---------------------------------------------------------------------------
 
