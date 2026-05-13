@@ -6,6 +6,8 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useUiStore } from "@/lib/stores/ui";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Button } from "@/components/ui/button";
+import { AgentStateWidget } from "@/components/agent/AgentStateWidget";
+import { ConnectionIndicator } from "@/components/agent/ConnectionIndicator";
 
 export function TopNav(): React.ReactElement {
   const user = useAuthStore((s) => s.user);
@@ -18,6 +20,7 @@ export function TopNav(): React.ReactElement {
       role="banner"
       className="flex h-14 items-center justify-between border-b bg-[var(--color-surface-elevated)] px-4"
     >
+      {/* Left: sidebar toggle + brand */}
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
@@ -34,7 +37,25 @@ export function TopNav(): React.ReactElement {
           vici2
         </Link>
       </div>
-      <div className="flex items-center gap-2">
+
+      {/* Center: agent state widget */}
+      <div className="flex items-center gap-3">
+        <AgentStateWidget />
+      </div>
+
+      {/* Right: connection indicator + tenant/user info + theme + logout */}
+      <div className="flex items-center gap-3">
+        <ConnectionIndicator />
+
+        {user ? (
+          <span
+            className="hidden text-sm text-[var(--color-fg-muted)] sm:inline"
+            title={`Tenant: ${user.tenantId}`}
+          >
+            {user.displayName} · {user.role}
+          </span>
+        ) : null}
+
         <Button
           variant="ghost"
           size="sm"
@@ -43,11 +64,7 @@ export function TopNav(): React.ReactElement {
         >
           {theme === "dark" ? "Light" : "Dark"}
         </Button>
-        {user ? (
-          <span className="text-sm text-[var(--color-fg-muted)]">
-            {user.displayName} · {user.role}
-          </span>
-        ) : null}
+
         <LogoutButton />
       </div>
     </header>
