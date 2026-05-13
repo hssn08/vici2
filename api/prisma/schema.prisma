@@ -525,6 +525,8 @@ model Campaign {
   useReassignedDnc      Boolean                    @default(true) @map("use_reassigned_dnc")
   // X04: number pool assignment (overrides CID waterfall tier 3)
   numberPoolId          BigInt?                    @map("number_pool_id")
+  // X03: FS node affinity (NULL = auto-assign pending)
+  fsNodeId              Int?                       @db.UnsignedInt @map("fs_node_id")
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -536,6 +538,8 @@ model Campaign {
   vmdropAsset     VoicemailDropAsset?      @relation(fields: [vmdropAssetId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_camp_vmdrop_asset")
   /// X04: number pool assignment
   numberPool      NumberPool?              @relation(fields: [numberPoolId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_number_pool")
+  /// X03: FS node affinity
+  fsNode          FsNode?                  @relation(fields: [fsNodeId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_campaigns_fs_node")
   campaignLists   CampaignList[]
   pauseCodes      PauseCode[]
   scripts         Script[]                 @relation("ScriptCampaign")
@@ -3128,4 +3132,35 @@ model LeadExternalRef {
   @@unique([tenantId, source, externalId], map: "uk_ler_tenant_source_ext")
   @@index([tenantId, leadId], map: "idx_ler_tenant_lead")
   @@map("lead_external_refs")
+=======
+// X03 — Multi-FS Campaign Affinity
+// =============================================================================
+
+enum FsNodeStatus {
+  ACTIVE
+  DRAINING
+  UNHEALTHY
+  OFFLINE
+}
+
+model FsNode {
+  id            Int          @id @default(autoincrement()) @db.UnsignedInt
+  tenantId      Int          @db.UnsignedInt @map("tenant_id")
+  name          String       @db.VarChar(64)
+  host          String       @db.VarChar(128)
+  eslHost       String       @db.VarChar(128) @map("esl_host")
+  eslPort       Int          @default(8021) @db.UnsignedSmallInt @map("esl_port")
+  eslPassword   String       @db.VarChar(255) @map("esl_password")
+  weight        Int          @default(100) @db.UnsignedSmallInt
+  status        FsNodeStatus @default(ACTIVE)
+  lastHeartbeat DateTime?    @db.DateTime(3) @map("last_heartbeat")
+  metadata      Json         @default("{}")
+  createdAt     DateTime     @default(now()) @db.DateTime(3) @map("created_at")
+  updatedAt     DateTime     @updatedAt @db.DateTime(3) @map("updated_at")
+
+  campaigns Campaign[]
+
+  @@index([tenantId, status], map: "idx_tenant_status")
+  @@index([status, lastHeartbeat], map: "idx_status_heartbeat")
+  @@map("fs_nodes")
 }

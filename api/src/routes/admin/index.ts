@@ -40,6 +40,8 @@ import { registerSfIntegrationRoutes } from "../adapters/sf-integration/index.js
 import { registerAdminBrandedCallingRoutes } from "./branded-calling/index.js";
 // N04 — HubSpot integration
 import { registerHubspotIntegrationRoutes } from "./integrations/hubspot/index.js";
+// X03 — Multi-FS campaign affinity
+import { registerAdminFsNodeRoutes } from "./infrastructure/fs-nodes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -96,4 +98,6 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   await registerAdminBrandedCallingRoutes(app);
   // N04 — HubSpot integration
   await registerHubspotIntegrationRoutes(app);
+  // X03 — Multi-FS campaign affinity
+  await registerAdminFsNodeRoutes(app);
 }

@@ -133,20 +133,69 @@ def get_vici2_fs_instances(vici2_conn: pymysql.Connection) -> list:
         """)
         return cur.fetchall()
 
+
+def get_vici2_fs_nodes(vici2_conn: pymysql.Connection) -> list:
+    """Read FS nodes from the vici2 fs_nodes table (X03).
+
+    Returns rows with host, weight, name, status for set 20 population.
+    Only ACTIVE and DRAINING nodes are returned; OFFLINE/UNHEALTHY are excluded.
+    """
+    with vici2_conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, host, weight, name, status
+            FROM fs_nodes
+            WHERE status IN ('ACTIVE', 'DRAINING')
+            ORDER BY id
+        """)
+        return cur.fetchall()
+
+
+def sync_set_20(kam_conn: pymysql.Connection, fs_nodes: list) -> None:
+    """Sync active FS nodes to Kamailio dispatcher set 20 (X03 campaign affinity).
+
+    Set 20 uses algorithm 8 (hash by PV / AVP) for affinity routing.
+    DRAINING nodes are inserted with DS_FLAG_INACTIVE so new calls skip them
+    while OPTIONS probing is still active (Kamailio marks them manually anyway).
+    """
+    with kam_conn.cursor() as cur:
+        cur.execute("DELETE FROM dispatcher WHERE setid = 20")
+        count = 0
+        for node in fs_nodes:
+            host   = node['host']
+            weight = node.get('weight') or 100
+            name   = node.get('name') or f"fs-{node['id']}"
+            status = node.get('status', 'ACTIVE')
+            dst    = f"sip:{host}:{FS_SIP_PORT_DEFAULT}"
+            flags  = DS_FLAG_INACTIVE if status == 'DRAINING' else DS_FLAG_ACTIVE
+            cur.execute(
+                "INSERT INTO dispatcher "
+                "(setid, destination, flags, priority, attrs, description) "
+                "VALUES (20, %s, %s, %s, %s, %s)",
+                (dst, flags, weight, f"weight={weight}", name)
+            )
+            count += 1
+    kam_conn.commit()
+    print(f"Set 20 synced: {count} FS node(s) from fs_nodes table.")
+
 # ---------------------------------------------------------------------------
 # Actions
 # ---------------------------------------------------------------------------
 
 def action_sync(args: argparse.Namespace) -> int:
-    """Full sync: replace dispatcher sets 1 and 2 from vici2 fs_instances."""
+    """Full sync: replace dispatcher sets 1, 2, and 20 from vici2 tables.
+
+    Sets 1 + 2 are sourced from fs_instances (legacy/static registry).
+    Set 20 is sourced from fs_nodes (X03 dynamic affinity nodes).
+    """
     vici2_conn = pymysql.connect(**VICI2_DB)
     instances  = get_vici2_fs_instances(vici2_conn)
+    fs_nodes   = get_vici2_fs_nodes(vici2_conn)
     vici2_conn.close()
 
     if not instances:
-        print("WARNING: no active FS instances in vici2 DB — leaving dispatcher unchanged",
+        print("WARNING: no active FS instances in vici2 DB — leaving sets 1/2 unchanged",
               file=sys.stderr)
-        return 1
+        # Don't return 1 — we still want to sync set 20.
 
     kam_conn = pymysql.connect(**KAMAILIO_DB)
     try:
@@ -171,7 +220,17 @@ def action_sync(args: argparse.Namespace) -> int:
                     count += 1
 
         kam_conn.commit()
-        print(f"Synced {len(instances)} FS instances ({count} rows) to dispatcher table.")
+        print(f"Synced {len(instances)} FS instances ({count} rows) to sets 1+2.")
+
+        # X03: sync set 20 from fs_nodes table.
+        if fs_nodes:
+            sync_set_20(kam_conn, fs_nodes)
+        else:
+            print("INFO: no fs_nodes rows — set 20 cleared (empty).")
+            with kam_conn.cursor() as cur:
+                cur.execute("DELETE FROM dispatcher WHERE setid = 20")
+            kam_conn.commit()
+
         write_fallback_file(kam_conn)
     finally:
         kam_conn.close()
