@@ -12,6 +12,8 @@ export type { HotkeyScope };
 export interface HotkeyDef
   extends Omit<HotkeyBinding, "id" | "handler"> {
   handler: (e: KeyboardEvent) => void;
+  /** Optional human-readable description for the hotkey help overlay. */
+  description?: string;
 }
 
 let idCounter = 0;

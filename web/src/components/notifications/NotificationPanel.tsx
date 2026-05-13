@@ -4,6 +4,7 @@
 // Lists in-app notifications with read/dismiss actions and a "Mark all read" header.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { NotificationItem } from "@/lib/hooks/useNotifications";
@@ -153,6 +154,17 @@ export function NotificationPanel({
             Load more
           </button>
         )}
+      </div>
+
+      {/* Footer: view all link */}
+      <div className="border-t border-[var(--color-surface-border)] px-4 py-2.5">
+        <Link
+          href="/agent/notifications"
+          onClick={onClose}
+          className="block w-full text-center text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] transition-colors"
+        >
+          View all notifications
+        </Link>
       </div>
     </div>
   );
