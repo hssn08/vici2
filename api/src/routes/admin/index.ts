@@ -14,6 +14,7 @@ import { AuditReader } from "../../services/audit/reader.js";
 import { AuditVerifier } from "../../services/audit/verifier.js";
 import { AuditWriter } from "../../services/audit/writer.js";
 import { getPrisma } from "../../lib/prisma.js";
+import { registerAdminIvrRoutes } from "./ivr.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -35,4 +36,7 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   const auditReader = new AuditReader({ db, writer: auditWriter, verifier: auditVerifier });
   const auditViewerService = new AuditLogViewerService(auditReader, auditVerifier);
   await registerAuditLogRoutes(app, auditViewerService);
+
+  // I02 — IVR engine admin
+  await registerAdminIvrRoutes(app);
 }
