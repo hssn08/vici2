@@ -1,0 +1,11 @@
+[Unit]
+Description=vici2 Valkey daily backup timer
+Documentation=file:spec/runbooks/restore.md
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

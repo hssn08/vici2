@@ -1,0 +1,47 @@
+{
+  "_comment": "IAM policy for vici2-backup-rotate role. Used by O05's KEK rotation procedure for S3 Batch Operations re-encryption. Grant to a tightly scoped rotation service account only.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3BackupReEncrypt",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:PutObjectTagging",
+        "s3:GetObjectTagging",
+        "s3:HeadObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::vici2-backups-prod",
+        "arn:aws:s3:::vici2-backups-prod/*"
+      ]
+    },
+    {
+      "Sid": "KMSReEncrypt",
+      "Effect": "Allow",
+      "Action": [
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey",
+        "kms:Decrypt",
+        "kms:DescribeKey"
+      ],
+      "Resource": [
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-prod",
+        "arn:aws:kms:us-west-2:ACCOUNT_ID:alias/vici2-backup-kek-prod-dr"
+      ]
+    },
+    {
+      "Sid": "S3BatchOperations",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateJob",
+        "s3:DescribeJob",
+        "s3:ListJobs",
+        "s3:UpdateJobStatus"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

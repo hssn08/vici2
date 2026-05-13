@@ -1,0 +1,11 @@
+[Unit]
+Description=vici2 weekly automated restore test timer
+Documentation=file:spec/runbooks/restore.md
+
+[Timer]
+OnCalendar=Mon *-*-* 04:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

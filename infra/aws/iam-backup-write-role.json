@@ -1,0 +1,40 @@
+{
+  "_comment": "IAM policy for vici2-backup-write role. Attach to the role assumed by systemd vici2-backup-* services.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3BackupWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectTagging",
+        "s3:GetObject",
+        "s3:HeadObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::vici2-backups-prod",
+        "arn:aws:s3:::vici2-backups-prod/*",
+        "arn:aws:s3:::vici2-backups-staging",
+        "arn:aws:s3:::vici2-backups-staging/*",
+        "arn:aws:s3:::vici2-backups-dev",
+        "arn:aws:s3:::vici2-backups-dev/*"
+      ]
+    },
+    {
+      "Sid": "KMSEncrypt",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:GenerateDataKey",
+        "kms:DescribeKey"
+      ],
+      "Resource": [
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-prod",
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-staging",
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-dev"
+      ]
+    }
+  ]
+}
