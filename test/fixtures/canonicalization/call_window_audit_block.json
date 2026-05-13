@@ -1,0 +1,27 @@
+{
+  "_comment": "call_window_audit BLOCK_INVALID with null TZ fields",
+  "table": "call_window_audit",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 2,
+    "created_at": "2026-05-12T02:00:00.000000Z",
+    "lead_id": 99999,
+    "phone_e164": "+18005551234",
+    "campaign_id": "CAMP002",
+    "decision": "BLOCK_INVALID",
+    "reason": "invalid_number",
+    "tz_iana": null,
+    "tz_confidence": null,
+    "state_code": null,
+    "zip": null,
+    "party_local": null,
+    "party_dow": null,
+    "effective_open_min": null,
+    "effective_close_min": null,
+    "rule_applied": null,
+    "enforcement_point": "hopper_filler",
+    "next_open_at": null,
+    "call_uuid": null
+  }
+}

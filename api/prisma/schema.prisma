@@ -30,6 +30,14 @@
 //   A5: phone_codes_overrides (D03 manual override resolver)
 //   A6: bootstrap super_admin shape (no row seeded — F05 owns)
 //
+// C03 — audit immutability chain columns + audit_attestation table:
+//   C03.1  audit_log.prev_hash / row_hash / hash_at (BEFORE INSERT trigger computes)
+//   C03.2  call_window_audit chain columns
+//   C03.3  originate_audit chain columns
+//   C03.4  consent_log table (C02-owned schema; C03 adds chain + immutability)
+//   C03.5  dnc_sync_log chain columns
+//   C03.6  audit_attestation table (signed daily Merkle attestation records)
+//
 // Wave-5 amendments (feat/F02-amendments — additive only, no DROP):
 //   C01.1  call_window_audit table (partitioned, INSERT-only) — TCPA decisions log
 //   C01.2  state_holidays table (admin-display lookup; non-partitioned)
@@ -261,11 +269,16 @@ model AuditLog {
   ts          DateTime       @db.DateTime(6)
   createdAt   DateTime       @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt   DateTime       @default(now()) @map("updated_at") @db.DateTime(6)
+  // C03 chain columns — populated by audit_log_hash_chain BEFORE INSERT trigger
+  prevHash    String         @default("") @map("prev_hash") @db.Char(64)
+  rowHash     String         @default("") @map("row_hash") @db.Char(64)
+  hashAt      DateTime       @default(now()) @map("hash_at") @db.DateTime(6)
 
   @@id([id, ts])
   @@index([tenantId, actorUserId, ts], map: "idx_audit_t_actor_ts")
   @@index([tenantId, entityType, entityId, ts], map: "idx_audit_t_entity_ts")
   @@index([tenantId, action, ts], map: "idx_audit_t_action_ts")
+  @@index([tenantId, hashAt], map: "idx_audit_t_hash_at")
   @@map("audit_log")
 }
 
@@ -1305,6 +1318,10 @@ model CallWindowAudit {
   nextOpenAt        DateTime?           @map("next_open_at") @db.DateTime(6)
   callUuid          String?             @map("call_uuid") @db.VarChar(64)
   createdAt         DateTime            @default(now()) @map("created_at") @db.DateTime(6)
+  // C03 chain columns
+  prevHash          String              @default("") @map("prev_hash") @db.Char(64)
+  rowHash           String              @default("") @map("row_hash") @db.Char(64)
+  hashAt            DateTime            @default(now()) @map("hash_at") @db.DateTime(6)
 
   @@id([id, createdAt])
   @@index([tenantId, leadId, createdAt], map: "idx_cwa_t_lead_ts")
@@ -1312,6 +1329,7 @@ model CallWindowAudit {
   @@index([tenantId, campaignId, createdAt], map: "idx_cwa_t_campaign_ts")
   @@index([tenantId, stateCode, createdAt], map: "idx_cwa_t_state_ts")
   @@index([tenantId, callUuid], map: "idx_cwa_t_call_uuid")
+  @@index([tenantId, hashAt], map: "idx_cwa_t_hash_at")
   @@map("call_window_audit")
 }
 
@@ -1400,10 +1418,15 @@ model DncSyncLog {
   durationMs  Int?           @map("duration_ms")
   notes       String?        @db.Text
   createdAt   DateTime       @default(now()) @map("created_at") @db.DateTime(6)
+  // C03 chain columns
+  prevHash    String         @default("") @map("prev_hash") @db.Char(64)
+  rowHash     String         @default("") @map("row_hash") @db.Char(64)
+  hashAt      DateTime       @default(now()) @map("hash_at") @db.DateTime(6)
 
   @@id([id, startedAt])
   @@index([source, startedAt], map: "idx_dnc_sync_log_source_started")
   @@index([outcome, startedAt], map: "idx_dnc_sync_log_outcome_started")
+  @@index([hashAt], map: "idx_dnc_sync_t_hash_at")
   @@map("dnc_sync_log")
 }
 
@@ -1500,6 +1523,10 @@ model OriginateAudit {
   ipAddress       String?                   @map("ip_address") @db.VarChar(45)
   createdAt       DateTime                  @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt       DateTime                  @default(now()) @map("updated_at") @db.DateTime(6)
+  // C03 chain columns
+  prevHash        String                    @default("") @map("prev_hash") @db.Char(64)
+  rowHash         String                    @default("") @map("row_hash") @db.Char(64)
+  hashAt          DateTime                  @default(now()) @map("hash_at") @db.DateTime(6)
 
   @@id([id, originatedAt])
   // Partition column must appear in every UNIQUE key (MySQL hard rule).
@@ -1509,14 +1536,18 @@ model OriginateAudit {
   @@index([tenantId, campaignId, originatedAt], map: "idx_originate_audit_t_camp_ts")
   @@index([tenantId, outcome, originatedAt], map: "idx_originate_audit_t_outcome_ts")
   @@index([callUuid], map: "idx_originate_audit_call_uuid")
+  @@index([tenantId, hashAt], map: "idx_originate_audit_t_hash_at")
   @@map("originate_audit")
 }
 
 // =============================================================================
-// C02 amendment §9 — Recording Consent State Matrix
+// C02 + C03 amendments — Recording Consent State Matrix + chain columns
 //
-// New enums and the consent_log table (INSERT-only, monthly partitioned).
-// Column additions on tenants / campaigns / leads are inline above.
+// C02 owns the state-matrix decision; C03 adds tamper-evident chain columns
+// (prev_hash, row_hash, hash_at) populated by BEFORE INSERT trigger.
+// INSERT-only, monthly partitioned. Column additions on tenants/campaigns/
+// leads are inline above. vici2_app_rw gets INSERT + SELECT only.
+// Retention: 7 years (C04 partition rotator).
 // =============================================================================
 
 // ConsentMode — the five recording-consent decision modes, low→high strictness.
@@ -1560,10 +1591,9 @@ enum ConsentLogStatus {
 
 // consent_log — INSERT-only per-call recording-consent audit trail.
 //
-// Partitioned monthly RANGE COLUMNS(recorded_at).
-// No foreign keys (MySQL partitioned-table limitation).
-// vici2_app_rw gets INSERT + SELECT only (C03 owns grant setup).
-// Retention: 7 years (C04 partition rotator, same as recording_log/audit_log).
+// Partitioned monthly RANGE COLUMNS(recorded_at). No foreign keys (MySQL
+// partitioned-table limitation). C03 adds prev_hash/row_hash/hash_at chain
+// columns via BEFORE INSERT trigger; INSERT-only enforced via grants + triggers.
 model ConsentLog {
   id            BigInt           @default(autoincrement())
   tenantId      BigInt           @default(1) @map("tenant_id")
@@ -1580,6 +1610,10 @@ model ConsentLog {
   reason        String           @db.VarChar(64)
   citation      String?          @db.VarChar(128)
   recordedAt    DateTime         @map("recorded_at") @db.DateTime(6)
+  // C03 chain columns (populated by BEFORE INSERT trigger; clients do not write)
+  prevHash      String           @default("") @map("prev_hash") @db.Char(64)
+  rowHash       String           @default("") @map("row_hash") @db.Char(64)
+  hashAt        DateTime         @default(now()) @map("hash_at") @db.DateTime(6)
   createdAt     DateTime         @default(now()) @map("created_at") @db.DateTime(6)
 
   @@id([id, recordedAt])
@@ -1587,5 +1621,52 @@ model ConsentLog {
   @@index([tenantId, callUuid], map: "idx_consent_log_t_call")
   @@index([tenantId, stateApplied, recordedAt], map: "idx_consent_log_t_state_ts")
   @@index([tenantId, decision, recordedAt], map: "idx_consent_log_t_decision_ts")
+  @@index([tenantId, hashAt], map: "idx_consent_log_t_hash_at")
   @@map("consent_log")
+}
+
+// =============================================================================
+// C03 — audit_attestation
+//
+// One row per published S3 Merkle attestation (tenant × table × day).
+// INSERT-only: audit_attestation_no_update / no_delete + hash_chain triggers.
+// Partitioned by computed_at (monthly) — C04 owns rotation.
+// =============================================================================
+
+enum AuditAttestationTable {
+  audit_log
+  call_window_audit
+  originate_audit
+  consent_log
+  dnc_sync_log
+}
+
+model AuditAttestation {
+  id                   BigInt                 @default(autoincrement())
+  tenantId             BigInt                 @default(1) @map("tenant_id")
+  tableName            AuditAttestationTable  @map("table_name")
+  windowDate           DateTime               @map("window_date") @db.Date
+  rowCount             BigInt                 @default(0) @map("row_count")
+  firstId              BigInt?                @map("first_id")
+  lastId               BigInt?                @map("last_id")
+  firstRowPrevHash     String                 @map("first_row_prev_hash") @db.Char(64)
+  lastRowRowHash       String                 @map("last_row_row_hash") @db.Char(64)
+  merkleRoot           String                 @map("merkle_root") @db.Char(64)
+  keyId                String                 @map("key_id") @db.VarChar(64)
+  signatureB64         String                 @map("signature_b64") @db.VarChar(96)
+  s3Key                String                 @map("s3_key") @db.VarChar(255)
+  s3Etag               String?                @map("s3_etag") @db.VarChar(64)
+  s3UploadedAt         DateTime?              @map("s3_uploaded_at") @db.DateTime(6)
+  // chain columns (chained per tenant_id + table_name)
+  prevAttestationHash  String                 @default("") @map("prev_attestation_hash") @db.Char(64)
+  attestationHash      String                 @default("") @map("attestation_hash") @db.Char(64)
+  hashAt               DateTime               @default(now()) @map("hash_at") @db.DateTime(6)
+  computedAt           DateTime               @map("computed_at") @db.DateTime(6)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@id([id, computedAt])
+  @@unique([tenantId, tableName, windowDate], map: "uk_t_table_date")
+  @@index([tenantId, tableName, computedAt], map: "idx_t_table_computed")
+  @@index([tenantId, hashAt], map: "idx_t_hash_at")
+  @@map("audit_attestation")
 }

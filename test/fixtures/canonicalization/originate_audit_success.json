@@ -1,0 +1,19 @@
+{
+  "_comment": "originate_audit SUCCESS with all compliance decisions",
+  "table": "originate_audit",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 1,
+    "originated_at": "2026-05-12T14:00:00.000000Z",
+    "lead_id": 42,
+    "phone_e164": "+15559876543",
+    "campaign_id": "CAMP001",
+    "outcome": "SUCCESS",
+    "tcpa_reason": "within_window",
+    "dnc_decision": "ALLOW",
+    "dnc_sources": ["federal", "state:NY"],
+    "tcpa_decision": "ALLOW",
+    "call_uuid": "call-xyz789"
+  }
+}

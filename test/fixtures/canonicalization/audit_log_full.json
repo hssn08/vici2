@@ -1,0 +1,21 @@
+{
+  "_comment": "Full audit_log row with all fields — edge cases: emoji in user_agent, nested JSON",
+  "table": "audit_log",
+  "row": {
+    "prev_hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    "tenant_id": 42,
+    "id": 999,
+    "ts": "2026-05-12T14:00:00.123000Z",
+    "actor_user_id": 7,
+    "actor_kind": "user",
+    "action": "auth.password.changed",
+    "entity_type": "user",
+    "entity_id": "7",
+    "before_json": { "role": "agent", "active": true },
+    "after_json": { "role": "admin", "active": true, "reason": "promotion" },
+    "request_id": "req-abc123",
+    "ip_address": "192.168.1.1",
+    "user_agent": "Mozilla/5.0 (vici2-test) 😀"
+  },
+  "_note": "expected_canonical_hex computed by reference implementation; golden value updated by CI"
+}

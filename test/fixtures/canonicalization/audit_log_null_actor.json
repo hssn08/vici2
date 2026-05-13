@@ -1,0 +1,20 @@
+{
+  "_comment": "audit_log with null actor_user_id — verifies \\N serialization vs empty string",
+  "table": "audit_log",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 2,
+    "ts": "2026-05-12T00:00:00.000000Z",
+    "actor_user_id": null,
+    "actor_kind": "worker",
+    "action": "audit.attestation.published",
+    "entity_type": "audit_log",
+    "entity_id": null,
+    "before_json": null,
+    "after_json": { "date": "2026-05-11", "row_count": 12847 },
+    "request_id": null,
+    "ip_address": null,
+    "user_agent": null
+  }
+}

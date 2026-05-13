@@ -1,0 +1,17 @@
+{
+  "_comment": "consent_log timeout outcome — null dtmf_response serializes as \\N",
+  "table": "consent_log",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 2,
+    "call_uuid": "call-consent-002",
+    "lead_id": 1002,
+    "phone_e164": "+15557654321",
+    "prompt_id": "tcpa_consent_v1",
+    "dtmf_response": null,
+    "outcome": "timeout",
+    "language": "es",
+    "prompt_played_at": "2026-05-12T14:31:00.000000Z"
+  }
+}

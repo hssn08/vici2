@@ -1,0 +1,19 @@
+{
+  "_comment": "originate_audit with explicit UUID — referenced from PLAN §11.2",
+  "table": "originate_audit",
+  "row": {
+    "prev_hash": "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+    "tenant_id": 5,
+    "id": 100,
+    "originated_at": "2026-05-12T09:15:30.123456Z",
+    "lead_id": 8888,
+    "phone_e164": "+14155559876",
+    "campaign_id": "WEST_COAST",
+    "outcome": "TCPA_BLOCKED",
+    "tcpa_reason": "outside_window",
+    "dnc_decision": "ALLOW",
+    "dnc_sources": { "federal": "clean", "state:CA": "clean" },
+    "tcpa_decision": "BLOCK",
+    "call_uuid": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
