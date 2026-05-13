@@ -183,6 +183,8 @@ model Tenant {
   rndUsageLogs       RndUsageLog[]
   // X04: number pools
   numberPools        NumberPool[]
+  // N03: Salesforce Open CTI integration
+  sfIntegration      SfIntegration?
 
   @@map("tenants")
 }
@@ -795,6 +797,9 @@ model Lead {
   tzBlocked         Boolean   @default(false) @map("tz_blocked")
   // C02 amendment §9.4 — PA §5704(15) B2B carve-out gate; populated by D01 CSV import.
   isBusiness        Boolean   @default(false) @map("is_business")
+  // N03 amendment — Salesforce record linkage fields
+  sfRecordId        String?   @map("sf_record_id") @db.VarChar(32)
+  sfObjectType      String?   @map("sf_object_type") @db.VarChar(32)
   // D01 amendment §13.1 — optimistic-lock token for /api/leads PATCH (If-Match).
   version           Int       @default(1) @db.SmallInt
   deletedAt         DateTime? @map("deleted_at") @db.DateTime(6)
@@ -819,6 +824,7 @@ model Lead {
   @@index([tenantId, postalCode], map: "idx_leads_t_postal")
   @@index([tenantId, vendorLeadCode], map: "idx_leads_t_vendor")
   @@index([tenantId, deletedAt], map: "idx_leads_t_deleted")
+  @@index([sfRecordId], map: "idx_leads_sf_record")
   @@map("leads")
 }
 
@@ -2871,4 +2877,29 @@ model RndUsageLog {
 
   @@unique([tenantId, periodYear, periodMonth], map: "uk_rnd_usage_tenant_period")
   @@map("rnd_usage_log")
+}
+
+// =============================================================================
+// N03  sf_integrations — Salesforce Open CTI Adapter (one row per tenant)
+// =============================================================================
+
+model SfIntegration {
+  id              BigInt    @id @default(autoincrement())
+  tenantId        BigInt    @unique @map("tenant_id")
+  enabled         Boolean   @default(false)
+  instanceUrl     String?   @map("instance_url") @db.VarChar(255)
+  clientId        String?   @map("client_id") @db.VarChar(512)
+  clientSecret    Bytes?    @map("client_secret")
+  accessToken     Bytes?    @map("access_token")
+  refreshToken    Bytes?    @map("refresh_token")
+  tokenExpiry     DateTime? @map("token_expiry") @db.DateTime(6)
+  fieldMappings   Json      @default("{}") @map("field_mappings")
+  lastWritebackAt DateTime? @map("last_writeback_at") @db.DateTime(6)
+  lastError       String?   @map("last_error") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("sf_integrations")
 }

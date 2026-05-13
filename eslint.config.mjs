@@ -43,5 +43,15 @@ export default [
       "@typescript-eslint/no-explicit-any": "warn",
     },
   },
+  // N03 — Browser globals for vanilla-JS adapter files served as static assets
+  {
+    files: ["api/src/static/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        sforce: "readonly",
+      },
+    },
+  },
   prettier,
 ];

@@ -99,7 +99,13 @@ export type AuditAction =
   | "number_pool.did.added"
   | "number_pool.did.removed"
   | "number_pool.did.quarantined"
-  | "number_pool.did.unquarantined";
+  | "number_pool.did.unquarantined"
+  // N03 — Salesforce Open CTI integration
+  | "sf_integration.connect_initiated"
+  | "sf_integration.oauth_complete"
+  | "sf_integration.patched"
+  | "sf_integration.disconnected"
+  | "sf_integration.lead_imported";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
