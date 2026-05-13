@@ -176,6 +176,11 @@ model Tenant {
   callScorecards     CallScorecard[]
   callAnnotations    CallAnnotation[]
   agentFeedback      AgentFeedback[]
+  // N06: RND scrub
+  rndConfig          TenantRndConfig?
+  rndScrubJobs       RndScrubJob[]
+  rndLookupLogs      RndLookupLog[]
+  rndUsageLogs       RndUsageLog[]
 
   @@map("tenants")
 }
@@ -502,6 +507,12 @@ model Campaign {
   callbackNoAnswerPolicy        CallbackNoAnswerPolicy @default(leave_callbk) @map("callback_no_answer_policy")
   callbackGraceWindowSeconds    Int                    @default(30) @map("callback_grace_window_seconds")
   callbackStaleThresholdSeconds Int                    @default(14400) @map("callback_stale_threshold_seconds")
+  // N06 amendment — per-campaign RND scrub tracking
+  rndAutoScrub          Boolean                    @default(true) @map("rnd_auto_scrub")
+  rndLastScrubAt        DateTime?                  @map("rnd_last_scrub_at") @db.DateTime(6)
+  rndLastScrubId        String?                    @map("rnd_last_scrub_id") @db.Char(26)
+  rndScrubStatus        RndCampaignScrubStatus     @default(never) @map("rnd_scrub_status")
+  useReassignedDnc      Boolean                    @default(true) @map("use_reassigned_dnc")
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -2612,4 +2623,158 @@ model AgentFeedback {
   @@index([tenantId, supervisorId, createdAt], map: "idx_af_t_supervisor")
   @@index([tenantId, agentId, acknowledgedAt], map: "idx_af_t_unack")
   @@map("agent_feedback")
+}
+
+// =============================================================================
+// N06  RND Scrub — tenant_rnd_config, rnd_scrub_job, rnd_lookup_log, rnd_usage_log
+// =============================================================================
+
+enum RndTier {
+  xs
+  small
+  medium
+  large
+  xl
+  jumbo
+}
+
+enum RndTriggerReason {
+  manual
+  auto_launch
+  scheduled_rescrub
+}
+
+enum RndScrubStatus {
+  queued
+  running
+  completed
+  failed
+  paused_budget
+}
+
+enum RndQueryMode {
+  api
+  sftp
+}
+
+enum RndResult {
+  yes
+  no
+  no_data
+  error
+}
+
+enum RndConsentDateSrc {
+  pewc
+  ebr
+  inferred
+  fallback
+}
+
+enum RndNoDataPolicy {
+  safe
+  block
+}
+
+enum RndCampaignScrubStatus {
+  never
+  pending
+  running
+  completed
+  failed
+  paused_budget
+}
+
+model TenantRndConfig {
+  tenantId            BigInt          @id @map("tenant_id")
+  clientId            String          @map("client_id") @db.VarChar(255)
+  clientSecretEnc     Bytes           @map("client_secret_enc") @db.VarBinary(512)
+  clientSecretIv      Bytes           @map("client_secret_iv") @db.VarBinary(16)
+  tier                RndTier         @default(xs)
+  monthlyBudgetCents  Int?            @map("monthly_budget_cents")
+  autoScrubOnLaunch   Boolean         @default(true) @map("auto_scrub_on_launch")
+  rescrubIntervalDays Int             @default(55) @map("rescrub_interval_days") @db.TinyInt
+  noDataPolicy        RndNoDataPolicy @default(safe) @map("no_data_policy")
+  useReassignedDnc    Boolean         @default(true) @map("use_reassigned_dnc")
+  isActive            Boolean         @default(false) @map("is_active")
+  createdAt           DateTime        @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_tenant_rnd_config_tenant")
+  scrubJobs RndScrubJob[]
+  usageLogs RndUsageLog[]
+
+  @@map("tenant_rnd_config")
+}
+
+model RndScrubJob {
+  id                 String           @id @db.Char(26)
+  tenantId           BigInt           @map("tenant_id")
+  campaignId         String           @map("campaign_id") @db.VarChar(32)
+  triggeredBy        BigInt?          @map("triggered_by")
+  triggerReason      RndTriggerReason @map("trigger_reason")
+  status             RndScrubStatus   @default(queued)
+  totalPhones        Int              @default(0) @map("total_phones")
+  phonesQueried      Int              @default(0) @map("phones_queried")
+  phonesYes          Int              @default(0) @map("phones_yes")
+  phonesNo           Int              @default(0) @map("phones_no")
+  phonesNoData       Int              @default(0) @map("phones_no_data")
+  phonesError        Int              @default(0) @map("phones_error")
+  estimatedCostCents Int              @default(0) @map("estimated_cost_cents")
+  actualCostCents    Int              @default(0) @map("actual_cost_cents")
+  uploadId           String?          @map("upload_id") @db.VarChar(255)
+  queryMode          RndQueryMode     @default(api) @map("query_mode")
+  startedAt          DateTime?        @map("started_at") @db.DateTime(6)
+  completedAt        DateTime?        @map("completed_at") @db.DateTime(6)
+  errorMessage       String?          @map("error_message") @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_rnd_scrub_job_tenant")
+  rndConfig   TenantRndConfig @relation(fields: [tenantId], references: [tenantId], onDelete: Restrict, onUpdate: NoAction, map: "fk_rnd_scrub_job_config")
+  lookups     RndLookupLog[]
+
+  @@index([tenantId, campaignId], map: "idx_rnd_scrub_job_tenant_campaign")
+  @@index([status, createdAt], map: "idx_rnd_scrub_job_status")
+  @@map("rnd_scrub_job")
+}
+
+model RndLookupLog {
+  id             BigInt            @id @default(autoincrement())
+  tenantId       BigInt            @map("tenant_id")
+  scrubJobId     String            @map("scrub_job_id") @db.Char(26)
+  phoneE164      String            @map("phone_e164") @db.VarChar(16)
+  consentDate    DateTime          @map("consent_date") @db.Date
+  consentDateSrc RndConsentDateSrc @default(inferred) @map("consent_date_src")
+  result         RndResult
+  disconnectDate DateTime?         @map("disconnect_date") @db.Date
+  queriedAt      DateTime          @map("queried_at") @db.DateTime(6)
+  lookupDate     DateTime          @default(now()) @map("lookup_date") @db.DateTime(6)
+  dncInserted    Boolean           @default(false) @map("dnc_inserted")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.DateTime(6)
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_rnd_log_tenant")
+  scrubJob RndScrubJob @relation(fields: [scrubJobId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_rnd_log_job")
+
+  @@index([tenantId, phoneE164, lookupDate], map: "idx_rnd_log_tenant_phone")
+  @@index([scrubJobId], map: "idx_rnd_log_job")
+  @@index([result, lookupDate], map: "idx_rnd_log_result")
+  @@map("rnd_lookup_log")
+}
+
+model RndUsageLog {
+  id                 Int      @id @default(autoincrement())
+  tenantId           BigInt   @map("tenant_id")
+  periodYear         Int      @map("period_year") @db.SmallInt
+  periodMonth        Int      @map("period_month") @db.TinyInt
+  queriesCount       Int      @default(0) @map("queries_count")
+  estimatedCostCents Int      @default(0) @map("estimated_cost_cents")
+  scrubJobCount      Int      @default(0) @map("scrub_job_count")
+  lastUpdatedAt      DateTime @default(now()) @updatedAt @map("last_updated_at") @db.DateTime(6)
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_rnd_usage_tenant")
+  rndConfig TenantRndConfig @relation(fields: [tenantId], references: [tenantId], onDelete: Restrict, onUpdate: NoAction, map: "fk_rnd_usage_config")
+
+  @@unique([tenantId, periodYear, periodMonth], map: "uk_rnd_usage_tenant_period")
+  @@map("rnd_usage_log")
 }
