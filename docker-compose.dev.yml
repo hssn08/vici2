@@ -247,11 +247,150 @@ services:
           path: ./web/package.json
     networks: [vici2_default]
 
+  # ---------------------------------------------------------------------------
+  # O01 observability stack: Prometheus 3.x + Alertmanager 0.27+ + Grafana 11.x
+  # plus mysqld/redis/node exporters. See spec/modules/O01/PLAN.md.
+  # All services join vici2_default so they resolve api/dialer/workers/mysql/redis
+  # by service name. Cardinality discipline enforced by promtool in CI.
+  # ---------------------------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: vici2_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+      - --web.enable-remote-write-receiver
+      - --enable-feature=native-histograms
+    volumes:
+      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      alertmanager: { condition: service_healthy }
+    networks: [vici2_default]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: vici2_alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./infra/observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [vici2_default]
+
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    container_name: vici2_grafana
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - ./infra/observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infra/observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      # 3000 is taken by api; Grafana lives on 3001 host-side.
+      - "${GRAFANA_PORT:-3001}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      prometheus: { condition: service_healthy }
+    networks: [vici2_default]
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.16.0
+    container_name: vici2_mysqld_exporter
+    restart: unless-stopped
+    command:
+      - --collect.global_status
+      - --collect.global_variables
+      - --collect.info_schema.innodb_metrics
+      - --collect.info_schema.innodb_cmp
+      - --collect.info_schema.innodb_cmpmem
+      - --collect.perf_schema.eventsstatementssum
+      - --collect.engine_innodb_status
+      - --no-collect.info_schema.processlist
+      - --no-collect.perf_schema.eventswaits
+      - --web.listen-address=:9105
+    environment:
+      DATA_SOURCE_NAME: "${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@(mysql:3306)/"
+    ports:
+      - "${MYSQLD_EXPORTER_PORT:-9105}:9105"
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks: [vici2_default]
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: vici2_redis_exporter
+    restart: unless-stopped
+    command:
+      - --redis.addr=redis://redis:6379
+      - --web.listen-address=:9106
+    ports:
+      - "${REDIS_EXPORTER_PORT:-9106}:9106"
+    depends_on:
+      redis: { condition: service_healthy }
+    networks: [vici2_default]
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: vici2_node_exporter
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --no-collector.wifi
+      - --no-collector.ipvs
+      - --no-collector.textfile
+      - --web.listen-address=:9107
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "${NODE_EXPORTER_PORT:-9107}:9107"
+    networks: [vici2_default]
+
 volumes:
   mysql_data:
   redis_data:
   freeswitch_recordings:
   freeswitch_log:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
 
 networks:
   vici2_default:

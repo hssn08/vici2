@@ -1,0 +1,83 @@
+# vici2 — SLO recording rules.
+# Source: spec/modules/O01/PLAN.md §2.3, §13 #1.
+# Pre-aggregates expensive PromQL so Grafana renders pre-computed series.
+# Downstream modules (E05 audit worker) read vici2_dialer_drop_ratio
+# directly as the gauge of record alongside MySQL audit numerator.
+
+groups:
+
+  - name: vici2_slo_dialer
+    interval: 30s
+    rules:
+
+      # 30-day drop ratio per campaign. FCC compliance signal.
+      # E05 worker mirrors numerator + denominator to MySQL as audit-of-record;
+      # this rule is the Prometheus-side view used by dashboards and alerts.
+      - record: vici2_dialer_drop_ratio
+        expr: |
+          (
+            sum by (campaign_id) (increase(vici2_dialer_drop_window_total[30d]))
+            /
+            sum by (campaign_id) (increase(vici2_dialer_originates_total[30d]))
+          )
+
+      - record: vici2:dialer_originate_latency_p99:5m
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, campaign_id) (rate(vici2_dialer_originate_latency_seconds_bucket[5m]))
+          )
+
+      - record: vici2:dialer_originate_latency_p95:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, campaign_id) (rate(vici2_dialer_originate_latency_seconds_bucket[5m]))
+          )
+
+      - record: vici2:dialer_originates_rate:5m
+        expr: sum by (campaign_id) (rate(vici2_dialer_originates_total[5m]))
+
+      - record: vici2:dialer_bridged_rate:5m
+        expr: sum by (campaign_id) (rate(vici2_dialer_bridged_total[5m]))
+
+  - name: vici2_slo_agents
+    interval: 30s
+    rules:
+
+      - record: vici2:agent_state_count:by_state
+        expr: sum by (state) (vici2_agent_state_count)
+
+      - record: vici2:agent_calls_handled_rate:5m
+        expr: sum by (disposition) (rate(vici2_agent_calls_handled_total[5m]))
+
+  - name: vici2_slo_freeswitch
+    interval: 30s
+    rules:
+
+      - record: vici2:freeswitch_calls_active:sum
+        expr: sum(vici2_freeswitch_calls_active)
+
+      - record: vici2:esl_event_latency_p99:5m
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, fs_host, event_type) (rate(vici2_freeswitch_esl_event_latency_seconds_bucket[5m]))
+          )
+
+  - name: vici2_slo_api
+    interval: 30s
+    rules:
+
+      - record: vici2:api_request_duration_p95:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (rate(vici2_api_request_duration_seconds_bucket[5m]))
+          )
+
+      - record: vici2:api_error_rate_5xx:5m
+        expr: |
+          sum(rate(vici2_api_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(vici2_api_requests_total[5m]))
