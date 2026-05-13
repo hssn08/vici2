@@ -234,6 +234,54 @@ async function handleDelete(
   void reply.code(204).send();
 }
 
+// ─── I05: GET /api/voicemails/box/:id/messages ────────────────────────────────
+// Convenience alias for GET /api/voicemails?mailboxId=:id with box-ownership
+// auth (user must be assigned to the box or be admin).
+
+async function handleListByBox(
+  req: FastifyRequest<{ Params: { id: string }; Querystring: Record<string, string> }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const { tenantId, uid: userId, role } = getAuth(req);
+  const boxId = BigInt(req.params.id);
+
+  const accessibleIds = await getAccessibleBoxIds(
+    BigInt(tenantId),
+    BigInt(userId),
+    role,
+  );
+  if (!accessibleIds.some((id) => id === boxId)) {
+    void reply.code(403).send({ error: "forbidden", message: "Not assigned to this mailbox" });
+    return;
+  }
+
+  const parsed = ListQuerySchema.safeParse({ ...req.query, mailboxId: req.params.id });
+  if (!parsed.success) {
+    void reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+    return;
+  }
+  const { status, limit, cursor } = parsed.data;
+
+  const vms = await prisma.voicemail.findMany({
+    where: {
+      tenantId: BigInt(tenantId),
+      mailboxId: boxId,
+      ...(status && { status }),
+      ...(cursor && { id: { lt: cursor } }),
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit + 1,
+    include: { mailbox: { select: { name: true } } },
+  });
+
+  const hasMore = vms.length > limit;
+  const items = hasMore ? vms.slice(0, limit) : vms;
+  const lastItem = items[items.length - 1];
+  const nextCursor = hasMore && lastItem ? String(lastItem.id) : null;
+
+  void reply.send({ items: items.map(toDto), nextCursor });
+}
+
 // ─── Plugin registration ──────────────────────────────────────────────────────
 
 export async function registerVoicemailRoutes(app: FastifyInstance): Promise<void> {
@@ -243,6 +291,12 @@ export async function registerVoicemailRoutes(app: FastifyInstance): Promise<voi
     "/api/voicemails",
     { preHandler },
     handleList,
+  );
+  // I05: box-scoped messages alias
+  app.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    "/api/voicemails/box/:id/messages",
+    { preHandler },
+    handleListByBox,
   );
   app.get<{ Params: { id: string } }>(
     "/api/voicemails/:id/play",

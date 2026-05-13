@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  I05 — VM Drop test extension.
+
+  This extension is for ADMIN TESTING ONLY. It allows an admin to verify
+  that a VM drop audio file plays correctly by dialing vmdrop_test_{id}
+  where {id} is the VoicemailDropAsset.id.
+
+  Usage (from FS CLI):
+    originate sofia/internal/test@{ip} &transfer(vmdrop_test_42 XML default)
+
+  In production, the AMDHandler calls uuid_broadcast directly on the live
+  predictive call channel — no dialplan transfer is needed.
+
+  See I05 PLAN §3.2 for rationale.
+-->
+<include>
+  <extension name="vmdrop_test" continue="false">
+    <condition field="destination_number" expression="^vmdrop_test_(\d+)$">
+      <!-- $1 = VoicemailDropAsset id -->
+      <action application="set" data="vici2_role=vmdrop_test"/>
+      <action application="set" data="vmdrop_asset_id=$1"/>
+      <action application="answer"/>
+      <!-- Audio path pattern: /var/lib/vici2/vmdrop/{tenant_id}/{asset_id}.wav -->
+      <!-- In a test call, tenant_id is taken from channel var or defaults to 1 -->
+      <action application="playback" data="/var/lib/vici2/vmdrop/${vici2_tenant_id:-1}/$1.wav"/>
+      <action application="hangup" data="NORMAL_CLEARING"/>
+    </condition>
+  </extension>
+</include>

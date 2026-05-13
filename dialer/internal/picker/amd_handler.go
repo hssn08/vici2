@@ -2,6 +2,7 @@ package picker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -15,8 +16,12 @@ import (
 // amdEventStream is the Valkey stream written by T01 + AMD detector.
 const amdEventStream = "events:vici2.call.amd_detected"
 
+// vmdropAuditStream is the Valkey stream for VM drop audit events.
+// Consumed by the API's vmdrop-audit-consumer.ts worker.
+const vmdropAuditStream = "events:vici2.audit.vmdrop"
+
 // AMDHandler consumes events:vici2.call.amd_detected and applies the
-// per-list amd_action (drop / transfer / message / park).
+// per-list amd_action (drop / transfer / message / park / vmdrop).
 //
 // AMD action is per-list (not per-campaign) per F02 schema. The list
 // configuration is read from a process-level cache invalidated via pubsub.
@@ -30,6 +35,9 @@ type AMDHandler struct {
 	logger     *slog.Logger
 	podID      string
 	groupName  string
+
+	// I05: VM drop asset local path resolved from CampaignConfig.VMDropPath
+	vmDropPath string
 
 	// listAMDActionFn resolves the per-list amd_action string.
 	// Default: "drop". This is a function so tests can inject list configs.
@@ -60,6 +68,12 @@ func NewAMDHandler(
 		groupName:       "picker-amd-" + podID,
 		listAMDActionFn: listAMDActionFn,
 	}
+}
+
+// SetVMDropPath sets the resolved local path for the VM drop asset.
+// Called by the campaign runner when the config snapshot includes vmdrop_local_path.
+func (h *AMDHandler) SetVMDropPath(path string) {
+	h.vmDropPath = path
 }
 
 // Run blocks, consuming events:vici2.call.amd_detected via XREADGROUP.
@@ -134,6 +148,52 @@ func (h *AMDHandler) handle(ctx context.Context, ev AMDEvent) {
 			h.logger.Error("picker: amd_handler UUIDBroadcast error",
 				"call_uuid", ev.CallUUID, "err", err)
 		}
+	case "vmdrop":
+		// I05: Play pre-uploaded VM drop audio asset and hang up.
+		// Falls back to plain drop if no asset is configured.
+		vmPath := h.vmDropPath
+		if vmPath == "" {
+			h.logger.Warn("picker: vmdrop — no asset configured, falling back to drop",
+				"campaign_id", h.campaignID, "call_uuid", ev.CallUUID)
+			if h.metrics != nil && h.metrics.VMDropFallback != nil {
+				h.metrics.VMDropFallback.WithLabelValues(
+					fmt.Sprintf("%d", h.tenantID),
+					fmt.Sprintf("%d", h.campaignID),
+					"no_asset",
+				).Inc()
+			}
+			h.emitVMDropAuditEvent(ctx, ev, "vmdrop_blocked_no_asset", vmPath)
+			if err := h.t01.UUIDKill(ctx, ev.FSHost, ev.CallUUID, "NORMAL_CLEARING"); err != nil {
+				h.logger.Error("picker: vmdrop fallback UUIDKill error",
+					"call_uuid", ev.CallUUID, "err", err)
+			}
+			return
+		}
+		audioArg := "play_and_hangup," + vmPath
+		if err := h.t01.UUIDBroadcast(ctx, ev.FSHost, ev.CallUUID, audioArg, "aleg"); err != nil {
+			h.logger.Error("picker: vmdrop UUIDBroadcast error",
+				"call_uuid", ev.CallUUID, "err", err)
+			// Best-effort hangup on broadcast failure
+			_ = h.t01.UUIDKill(ctx, ev.FSHost, ev.CallUUID, "NORMAL_CLEARING")
+			if h.metrics != nil && h.metrics.VMDropFallback != nil {
+				h.metrics.VMDropFallback.WithLabelValues(
+					fmt.Sprintf("%d", h.tenantID),
+					fmt.Sprintf("%d", h.campaignID),
+					"broadcast_error",
+				).Inc()
+			}
+			h.emitVMDropAuditEvent(ctx, ev, "vmdrop_blocked_no_asset", vmPath)
+			return
+		}
+		if h.metrics != nil && h.metrics.VMDropPlayed != nil {
+			h.metrics.VMDropPlayed.WithLabelValues(
+				fmt.Sprintf("%d", h.tenantID),
+				fmt.Sprintf("%d", h.campaignID),
+			).Inc()
+		}
+		h.emitVMDropAuditEvent(ctx, ev, "vmdrop_played", vmPath)
+		h.logger.Info("picker: vmdrop played",
+			"campaign_id", h.campaignID, "call_uuid", ev.CallUUID, "path", vmPath)
 	case "park":
 		// Phase 3 voicemail-drop — no-op in Phase 2.
 		h.logger.Info("picker: amd_handler park — voicemail-drop Phase 3 stub",
@@ -141,6 +201,35 @@ func (h *AMDHandler) handle(ctx context.Context, ev AMDEvent) {
 	default:
 		h.logger.Warn("picker: amd_handler unknown action",
 			"action", action, "campaign_id", h.campaignID)
+	}
+}
+
+// emitVMDropAuditEvent writes a VM drop audit event to the Valkey stream.
+// Consumed by api/src/workers/vmdrop-audit-consumer.ts.
+func (h *AMDHandler) emitVMDropAuditEvent(ctx context.Context, ev AMDEvent, auditAction string, vmPath string) {
+	if h.vc == nil {
+		return
+	}
+	payload := map[string]string{
+		"action":       auditAction,
+		"entity_type":  "campaign",
+		"entity_id":    fmt.Sprintf("%d", ev.CampaignID),
+		"tenant_id":    fmt.Sprintf("%d", ev.TenantID),
+		"call_uuid":    ev.CallUUID,
+		"lead_id":      fmt.Sprintf("%d", ev.LeadID),
+		"vm_drop_path": vmPath,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		h.logger.Error("picker: failed to marshal vmdrop audit payload", "err", err)
+		return
+	}
+	if err := h.vc.State.XAdd(ctx, &redis.XAddArgs{
+		Stream: vmdropAuditStream,
+		Values: map[string]interface{}{"data": string(data)},
+	}).Err(); err != nil {
+		h.logger.Error("picker: failed to emit vmdrop audit event",
+			"action", auditAction, "call_uuid", ev.CallUUID, "err", err)
 	}
 }
 
