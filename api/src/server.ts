@@ -82,6 +82,8 @@ import { registerCallbackRoutes } from "./callbacks/index.js";
 import { registerRecordingRoutes } from "./routes/recordings/index.js";
 import { registerSupervisorRoutes } from "./routes/supervisor/index.js";
 import { registerReportingRoutes } from "./reporting/index.js";
+import { registerInternalQueueRoutes } from "./routes/internal/queue.js";
+import { registerSupIngroupRoutes } from "./routes/sup/ingroups.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -96,6 +98,8 @@ const start = async (): Promise<void> => {
     await registerRecordingRoutes(app);
     await registerSupervisorRoutes(app);
     await registerReportingRoutes(app);
+    await registerInternalQueueRoutes(app);
+    await registerSupIngroupRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {
