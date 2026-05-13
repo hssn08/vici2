@@ -1,0 +1,41 @@
+{
+  "_comment": "IAM policy for vici2-backup-read role. Attach to the role assumed by restore scripts and restore-test cron.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3BackupRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectTagging",
+        "s3:HeadObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::vici2-backups-prod",
+        "arn:aws:s3:::vici2-backups-prod/*",
+        "arn:aws:s3:::vici2-backups-prod-dr",
+        "arn:aws:s3:::vici2-backups-prod-dr/*",
+        "arn:aws:s3:::vici2-backups-staging",
+        "arn:aws:s3:::vici2-backups-staging/*",
+        "arn:aws:s3:::vici2-backups-dev",
+        "arn:aws:s3:::vici2-backups-dev/*"
+      ]
+    },
+    {
+      "Sid": "KMSDecrypt",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:DescribeKey"
+      ],
+      "Resource": [
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-prod",
+        "arn:aws:kms:us-west-2:ACCOUNT_ID:alias/vici2-backup-kek-prod-dr",
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-staging",
+        "arn:aws:kms:us-east-1:ACCOUNT_ID:alias/vici2-backup-kek-dev"
+      ]
+    }
+  ]
+}

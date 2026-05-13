@@ -221,6 +221,33 @@ audit-verify-7d: ## Verify last 7 days of audit chain for all tables (CI/smoke).
 	 done
 	@echo "[audit-verify] All tables OK"
 
+# ----- backup / restore (O02) ------------------------------------------------
+
+backup-mysql: ## Run a MySQL daily backup (--dry-run by default; set DRY_RUN=false to upload).
+	@ARGS="--env dev --archive-class daily"; \
+	 [ "$$(echo $${DRY_RUN:-true})" = "false" ] || ARGS="$$ARGS --dry-run"; \
+	 scripts/backup/mysql.sh $$ARGS
+
+backup-valkey: ## Run a Valkey daily backup (dry-run by default).
+	@ARGS="--env dev --archive-class daily"; \
+	 [ "$$(echo $${DRY_RUN:-true})" = "false" ] || ARGS="$$ARGS --dry-run"; \
+	 scripts/backup/valkey.sh $$ARGS --docker-cp
+
+backup-preflight: ## Run the host preflight check for backup operations.
+	@scripts/backup/preflight-host.sh
+
+# Restore from a backup artifact. BACKUP= sets the S3 key date portion (YYYY-MM-DD).
+# Example: make restore-from-backup BACKUP=2026-05-12
+restore-from-backup: ## Restore MySQL from S3 backup to staging. Requires BACKUP=YYYY-MM-DD.
+	@if [ -z "$${BACKUP:-}" ]; then \
+	  echo "ERROR: BACKUP=YYYY-MM-DD is required (e.g. make restore-from-backup BACKUP=2026-05-12)"; \
+	  exit 1; \
+	fi; \
+	scripts/restore/from-s3.sh \
+	  --service mysql \
+	  --date "$${BACKUP}" \
+	  --target staging
+
 # ----- housekeeping ----------------------------------------------------------
 
 clean: ## Stop stack + remove volumes + remove generated artifacts.
@@ -239,4 +266,6 @@ hooks: ## Install lefthook git hooks.
 	db-generate db-migrate db-migrate-dev db-deploy db-reset db-seed \
 	db-studio db-bootstrap-superadmin \
 	fs-up fs-down fs-reload fs-cli valkey-cli redis-cli mysql-cli \
-	valkey-sync-lua audit-ddl audit-verify-7d clean reset hooks
+	valkey-sync-lua audit-ddl audit-verify-7d \
+	backup-mysql backup-valkey backup-preflight restore-from-backup \
+	clean reset hooks

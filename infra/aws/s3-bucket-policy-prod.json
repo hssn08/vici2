@@ -1,0 +1,80 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyNonKMSPuts",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::vici2-backups-prod/*",
+      "Condition": {
+        "StringNotEquals": {
+          "s3:x-amz-server-side-encryption": "aws:kms"
+        }
+      }
+    },
+    {
+      "Sid": "DenyNonKMSPutsWithoutKeyId",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::vici2-backups-prod/*",
+      "Condition": {
+        "Null": {
+          "s3:x-amz-server-side-encryption-aws-kms-key-id": true
+        }
+      }
+    },
+    {
+      "Sid": "DenyPublicAccess",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::vici2-backups-prod",
+        "arn:aws:s3:::vici2-backups-prod/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    },
+    {
+      "Sid": "AllowBackupWriteRole",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/vici2-backup-write"
+      },
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectTagging",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::vici2-backups-prod",
+        "arn:aws:s3:::vici2-backups-prod/*"
+      ]
+    },
+    {
+      "Sid": "AllowBackupReadRole",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/vici2-backup-read"
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectTagging",
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:HeadObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::vici2-backups-prod",
+        "arn:aws:s3:::vici2-backups-prod/*"
+      ]
+    }
+  ]
+}
