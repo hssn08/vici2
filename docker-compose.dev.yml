@@ -44,17 +44,21 @@ services:
       start_period: 60s
     networks: [vici2_default]
 
-  redis:
-    image: redis:7.4.1-alpine
-    container_name: vici2_redis
+  # F04 PLAN §1, §8: Valkey replaces Redis (license: BSD-3-Clause vs
+  # Redis 7.4 RSAL/SSPL+AGPL). Wire-compatible — clients unmodified.
+  # `redis://valkey:6379/...` URLs work because the protocol is identical.
+  valkey:
+    image: valkey/valkey:8.0-alpine
+    container_name: vici2_valkey
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    command: ["valkey-server", "/etc/valkey/valkey.conf"]
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
+      - ./infra/valkey/valkey.conf:/etc/valkey/valkey.conf:ro
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 3s
       timeout: 2s
       retries: 5
@@ -104,7 +108,10 @@ services:
       PORT: ${API_HTTP_PORT:-3000}
       METRICS_PORT: ${API_METRICS_PORT:-9101}
       DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}
-      REDIS_URL: redis://redis:6379/0
+      # F04 PLAN §7.1: VALKEY_URL is the preferred env; REDIS_URL kept
+      # for back-compat with code still on the old name.
+      VALKEY_URL: redis://valkey:6379/0
+      REDIS_URL: redis://valkey:6379/0
       FS_ESL_HOST: host.docker.internal
       FS_ESL_PORT: 8021
       FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
@@ -117,7 +124,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      valkey: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 10s
@@ -152,7 +159,10 @@ services:
       METRICS_PORT: ${DIALER_METRICS_PORT:-9102}
       GRPC_PORT: ${DIALER_GRPC_PORT:-7000}
       DATABASE_DSN: ${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@tcp(mysql:3306)/${VICI2_DB_NAME}?parseTime=true
-      REDIS_URL: redis://redis:6379/0
+      # F04 PLAN §7.1: VALKEY_URL is the preferred env; REDIS_URL kept
+      # for back-compat with code still on the old name.
+      VALKEY_URL: redis://valkey:6379/0
+      REDIS_URL: redis://valkey:6379/0
       FS_ESL_HOST: host.docker.internal
       FS_ESL_PORT: 8021
       FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
@@ -163,7 +173,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      valkey: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:9102/health"]
       interval: 10s
@@ -194,12 +204,15 @@ services:
       <<: *common-env
       METRICS_PORT: ${WORKERS_METRICS_PORT:-9103}
       DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}
-      REDIS_URL: redis://redis:6379/0
+      # F04 PLAN §7.1: VALKEY_URL is the preferred env; REDIS_URL kept
+      # for back-compat with code still on the old name.
+      VALKEY_URL: redis://valkey:6379/0
+      REDIS_URL: redis://valkey:6379/0
     ports:
       - "${WORKERS_METRICS_PORT:-9103}:9103"
     depends_on:
       mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      valkey: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:9103/health"]
       interval: 10s
@@ -249,7 +262,7 @@ services:
 
 volumes:
   mysql_data:
-  redis_data:
+  valkey_data:
   freeswitch_recordings:
   freeswitch_log:
 
