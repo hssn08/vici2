@@ -1,6 +1,6 @@
 # M07 Handoff — Admin: Pause Codes + Statuses + Scripts
 
-> Status: STUB — to be completed by implementation agent after code merge.
+> Status: IMPLEMENTED — commit 023c6c3 on branch worktree-agent-a516b28f7ee837805 (2026-05-13)
 
 ## Public Interfaces
 
