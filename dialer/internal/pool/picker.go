@@ -92,6 +92,13 @@ func (s *Service) Release(ctx context.Context, didID int64) {
 	s.rdb.Decr(ctx, s.keys.DIDConcurrent(didID))
 }
 
+// GetMembers returns the raw member list and pool config from the in-process
+// cache (or loads from DB on miss). Used by X05 to build the DID→E.164 lookup
+// map without an extra database round-trip on the hot originate path.
+func (s *Service) GetMembers(ctx context.Context, tenantID, poolID int64) ([]PoolMember, PoolConfig, error) {
+	return s.cache.Get(ctx, tenantID, poolID)
+}
+
 // filterMembers removes ineligible members from the candidate list.
 func (s *Service) filterMembers(
 	ctx context.Context,
