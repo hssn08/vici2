@@ -1,0 +1,370 @@
+[
+  {
+    "id": 1,
+    "desc": "Federal floor — inside window (Wed 10am ET)",
+    "req": {
+      "phoneE164": "+12125550001",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-13T14:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 2,
+    "desc": "Federal floor — before open (Wed 7:30am ET)",
+    "req": {
+      "phoneE164": "+12125550002",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-13T11:30:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "before_window" }
+  },
+  {
+    "id": 3,
+    "desc": "Federal floor — after close (Wed 9:01pm ET)",
+    "req": {
+      "phoneE164": "+12125550003",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-14T01:01:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "after_window" }
+  },
+  {
+    "id": 4,
+    "desc": "FL 8pm cutoff — 8:01pm local SKIP",
+    "req": {
+      "phoneE164": "+14075550004",
+      "knownTimezone": "America/New_York",
+      "state": "FL",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-14T00:01:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "after_window" }
+  },
+  {
+    "id": 5,
+    "desc": "FL 8pm cutoff — 7:59pm local ALLOW",
+    "req": {
+      "phoneE164": "+14075550005",
+      "knownTimezone": "America/New_York",
+      "state": "FL",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-13T23:59:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 6,
+    "desc": "KY 10am start — 9:59am local SKIP",
+    "req": {
+      "phoneE164": "+15025550006",
+      "knownTimezone": "America/New_York",
+      "state": "KY",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-13T13:59:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "before_window" }
+  },
+  {
+    "id": 7,
+    "desc": "KY 10am start — 10:00am local ALLOW",
+    "req": {
+      "phoneE164": "+15025550007",
+      "knownTimezone": "America/New_York",
+      "state": "KY",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-13T14:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 8,
+    "desc": "RI Monday 9am-6pm — 6:00pm SKIP",
+    "req": {
+      "phoneE164": "+14015550008",
+      "knownTimezone": "America/New_York",
+      "state": "RI",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-11T22:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "after_window" }
+  },
+  {
+    "id": 9,
+    "desc": "RI Saturday 10am-5pm — 5:00pm SKIP",
+    "req": {
+      "phoneE164": "+14015550009",
+      "knownTimezone": "America/New_York",
+      "state": "RI",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-16T21:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "after_window" }
+  },
+  {
+    "id": 10,
+    "desc": "RI Saturday 10am-5pm — 10:30am ALLOW",
+    "req": {
+      "phoneE164": "+14015550010",
+      "knownTimezone": "America/New_York",
+      "state": "RI",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-16T14:30:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 11,
+    "desc": "RI Sunday blackout",
+    "req": {
+      "phoneE164": "+14015550011",
+      "knownTimezone": "America/New_York",
+      "state": "RI",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-17T15:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "state_sunday_blackout" }
+  },
+  {
+    "id": 12,
+    "desc": "AL Sunday blackout",
+    "req": {
+      "phoneE164": "+12055550012",
+      "knownTimezone": "America/Chicago",
+      "state": "AL",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-17T15:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "state_sunday_blackout" }
+  },
+  {
+    "id": 13,
+    "desc": "LA Sunday blackout",
+    "req": {
+      "phoneE164": "+15045550013",
+      "knownTimezone": "America/Chicago",
+      "state": "LA",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-17T15:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "state_sunday_blackout" }
+  },
+  {
+    "id": 14,
+    "desc": "TX Sunday noon start — 11:59am SKIP",
+    "req": {
+      "phoneE164": "+12145550014",
+      "knownTimezone": "America/Chicago",
+      "state": "TX",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-17T16:59:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "before_window" }
+  },
+  {
+    "id": 15,
+    "desc": "TX Sunday noon start — 12:01pm ALLOW",
+    "req": {
+      "phoneE164": "+12145550015",
+      "knownTimezone": "America/Chicago",
+      "state": "TX",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-17T17:01:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 16,
+    "desc": "ME autodialer Saturday blackout",
+    "req": {
+      "phoneE164": "+12075550016",
+      "knownTimezone": "America/New_York",
+      "state": "ME",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": true,
+      "when": "2026-05-16T15:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "state_autodialer_window" }
+  },
+  {
+    "id": 17,
+    "desc": "ME live call Saturday ALLOW",
+    "req": {
+      "phoneE164": "+12075550017",
+      "knownTimezone": "America/New_York",
+      "state": "ME",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-16T15:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 18,
+    "desc": "ME autodialer Monday 9am-5pm — 8am SKIP",
+    "req": {
+      "phoneE164": "+12075550018",
+      "knownTimezone": "America/New_York",
+      "state": "ME",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": true,
+      "when": "2026-05-11T12:00:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "before_window" }
+  },
+  {
+    "id": 19,
+    "desc": "ME autodialer Monday 10am ALLOW",
+    "req": {
+      "phoneE164": "+12075550019",
+      "knownTimezone": "America/New_York",
+      "state": "ME",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": true,
+      "when": "2026-05-11T14:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 20,
+    "desc": "Unknown TZ — policy deny → BLOCK_INVALID",
+    "req": {
+      "phoneE164": "+19995550020",
+      "knownTimezone": "",
+      "state": "",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "unknownTzPolicy": "deny",
+      "when": "2026-05-13T14:00:00Z"
+    },
+    "want": { "outcome": "BLOCK_INVALID", "reason": "no_timezone" }
+  },
+  {
+    "id": 21,
+    "desc": "Unknown TZ — policy warn_pass → ALLOW_WARN",
+    "req": {
+      "phoneE164": "+19995550021",
+      "knownTimezone": "",
+      "state": "",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "unknownTzPolicy": "warn_pass",
+      "when": "2026-05-13T14:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "unknown_tz_warn_pass" }
+  },
+  {
+    "id": 22,
+    "desc": "Campaign window narrow — 9am-8pm campaign, FL 8pm — 7:50pm ALLOW",
+    "req": {
+      "phoneE164": "+14075550022",
+      "knownTimezone": "America/New_York",
+      "state": "FL",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "campaignWindow": { "openLocal": 32400, "closeLocal": 72000 },
+      "when": "2026-05-13T23:50:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 23,
+    "desc": "Campaign window wide — 6am-11pm ignored; federal 8am applies",
+    "req": {
+      "phoneE164": "+12125550023",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "campaignWindow": { "openLocal": 21600, "closeLocal": 82800 },
+      "when": "2026-05-13T11:30:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "before_window" }
+  },
+  {
+    "id": 24,
+    "desc": "Boundary check 30s before close — originate point SKIP",
+    "req": {
+      "phoneE164": "+12125550024",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "originate_path",
+      "isAutoDialer": false,
+      "when": "2026-05-14T00:59:35Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "boundary_30s_to_close" }
+  },
+  {
+    "id": 25,
+    "desc": "Boundary check 31s before close — originate point ALLOW",
+    "req": {
+      "phoneE164": "+12125550025",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "originate_path",
+      "isAutoDialer": false,
+      "when": "2026-05-14T00:59:29Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 26,
+    "desc": "HI inside window (Wed 2pm)",
+    "req": {
+      "phoneE164": "+18085550026",
+      "knownTimezone": "Pacific/Honolulu",
+      "state": "HI",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-14T00:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 27,
+    "desc": "AK inside window (Wed 2pm Alaska)",
+    "req": {
+      "phoneE164": "+19075550027",
+      "knownTimezone": "America/Anchorage",
+      "state": "AK",
+      "enforcementPoint": "hopper_filler",
+      "isAutoDialer": false,
+      "when": "2026-05-13T22:00:00Z"
+    },
+    "want": { "outcome": "ALLOW", "reason": "ok" }
+  },
+  {
+    "id": 28,
+    "desc": "Manual dial — same as originate, no override path",
+    "req": {
+      "phoneE164": "+12125550028",
+      "knownTimezone": "America/New_York",
+      "state": "",
+      "enforcementPoint": "manual_dial",
+      "isAutoDialer": false,
+      "when": "2026-05-14T01:01:00Z"
+    },
+    "want": { "outcome": "SKIP_UNTIL", "reason": "after_window" }
+  }
+]
