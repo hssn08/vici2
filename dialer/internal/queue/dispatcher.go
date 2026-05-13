@@ -33,6 +33,8 @@ type DispatcherConfig struct {
 	AHT        *AHTUpdater
 	Metrics    *Metrics
 	Log        *slog.Logger
+	// I04 — tenant default outbound CLI (fallback when ingroup.outbound_cli is empty)
+	TenantDefaultCLI string
 }
 
 // DispatcherLoop is the per-in-group dispatch goroutine.
@@ -139,6 +141,18 @@ func (d *DispatcherLoop) runDispatchCycle(ctx context.Context) error {
 		return fmt.Errorf("dispatch: ZRANGEBYSCORE queue: %w", err)
 	}
 	if len(results) == 0 {
+		// I04: no live calls — check for pending INBOUND callbacks to fire
+		// We need a READY agent for this; pick one speculatively
+		agent, err := d.pickAgent(ctx, &QueuedCall{IngroupID: ig.ID, TenantID: d.cfg.TenantID})
+		if err != nil {
+			d.log.Error("dispatch: pickAgent for i04 callback check", "err", err)
+			return nil
+		}
+		if agent != nil {
+			if err := d.tryFireInboundCallback(ctx, agent); err != nil {
+				d.log.Error("dispatch: tryFireInboundCallback", "err", err)
+			}
+		}
 		return nil // no calls in queue
 	}
 

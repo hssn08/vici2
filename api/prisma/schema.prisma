@@ -894,6 +894,28 @@ enum CallbackStatus {
   DEAD
 }
 
+// I04 — source discriminator for inbound vs D06 agent/global callbacks
+enum CallbackSource {
+  AGENT
+  GLOBAL
+  INBOUND
+}
+
+// I04 — callback number collection mode for queue-offer
+enum CallbackNumberMode {
+  ani
+  dtmf_optional
+  dtmf_required
+}
+
+// I04 — no-answer policy for inbound callbacks
+enum CallbackNoAnswerPolicyInbound {
+  leave_callbk
+  reschedule_30m
+  reschedule_24h
+  terminate_NA
+}
+
 model Callback {
   id         BigInt         @id @default(autoincrement())
   tenantId   BigInt         @default(1) @map("tenant_id")
@@ -903,19 +925,27 @@ model Callback {
   callbackAt DateTime       @map("callback_at") @db.DateTime(6)
   comments   String?        @db.Text
   status     CallbackStatus @default(PENDING)
+  // I04 additive columns (migration 20260513270000_i04_inbound_callback)
+  source              CallbackSource  @default(AGENT)
+  originalIngroupId   String?         @map("original_ingroup_id") @db.VarChar(32)
+  originalWaitSeconds Int?            @map("original_wait_seconds") @db.UnsignedInt
+  callbackNumber      String?         @map("callback_number") @db.VarChar(20)
+  firedAt             DateTime?       @map("fired_at") @db.DateTime(6)
   createdBy  BigInt?        @map("created_by")
   createdAt  DateTime       @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt  DateTime       @updatedAt @map("updated_at") @db.DateTime(6)
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_callbacks_tenant")
-  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_callbacks_lead")
-  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Restrict, onUpdate: NoAction, map: "fk_callbacks_campaign")
-  user     User?    @relation("CallbacksOwner", fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_user")
-  creator  User?    @relation("CallbacksCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_creator")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_callbacks_tenant")
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_callbacks_lead")
+  campaign        Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Restrict, onUpdate: NoAction, map: "fk_callbacks_campaign")
+  user            User?    @relation("CallbacksOwner", fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_user")
+  creator         User?    @relation("CallbacksCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_creator")
+  originalIngroup Ingroup? @relation("InboundCallbacks", fields: [tenantId, originalIngroupId], references: [tenantId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_callbacks_ingroup")
 
   @@index([tenantId, status, callbackAt], map: "idx_callbacks_t_status_due")
   @@index([tenantId, userId, callbackAt], map: "idx_callbacks_t_user_due")
   @@index([tenantId, leadId], map: "idx_callbacks_t_lead")
+  @@index([tenantId, originalIngroupId, source, status, callbackAt], map: "idx_callbacks_t_ingroup_source_status")
   @@map("callbacks")
 }
 
@@ -1168,11 +1198,20 @@ model Ingroup {
   recordingMode IngroupRecordingMode  @default(ALL) @map("recording_mode")
   noAgentAction IngroupOverflowAction @default(voicemail) @map("no_agent_action")
   noAgentTarget String?               @map("no_agent_target") @db.VarChar(64)
+  // I04 additive columns (migration 20260513270000_i04_inbound_callback)
+  callbackOfferEnabled          Boolean                         @default(false)  @map("callback_offer_enabled")
+  callbackOfferAfterSeconds     Int                             @default(90)     @map("callback_offer_after_seconds") @db.UnsignedInt
+  callbackNumberMode            CallbackNumberMode              @default(ani)    @map("callback_number_mode")
+  outboundCli                   String?                                          @map("outbound_cli") @db.VarChar(20)
+  callbackNoAnswerPolicyInbound CallbackNoAnswerPolicyInbound   @default(reschedule_30m) @map("callback_no_answer_policy_inbound")
+  callbackExpiresHours          Int                             @default(96)     @map("callback_expires_hours") @db.UnsignedSmallInt
+  callbackPositionExpiryMinutes Int                             @default(60)     @map("callback_position_expiry_minutes") @db.UnsignedInt
   createdAt     DateTime              @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt     DateTime              @updatedAt @map("updated_at") @db.DateTime(6)
 
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ingroups_tenant")
-  agents IngroupAgent[]
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_ingroups_tenant")
+  agents          IngroupAgent[]
+  inboundCallbacks Callback[]   @relation("InboundCallbacks")
 
   @@id([tenantId, id])
   @@map("ingroups")

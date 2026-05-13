@@ -61,7 +61,13 @@ export type AuditAction =
   | "email_template.updated"
   | "email_template.deleted"
   | "email_template.test_sent"
-  | "notification_prefs.email_unsubscribed";
+  | "notification_prefs.email_unsubscribed"
+  // I04 — inbound callback queue
+  | "callback.inbound_accepted"
+  | "callback.inbound_fired"
+  | "callback.inbound_deferred"
+  | "callback.inbound_dead"
+  | "callback.inbound_no_answer";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
