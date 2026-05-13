@@ -301,3 +301,30 @@ func (k Keys) DIDDailyCalls(didID int64) string {
 func (k Keys) DIDConcurrent(didID int64) string {
 	return fmt.Sprintf("t:%d:did:{%d}:concurrent", k.tid, didID)
 }
+
+// --- X05 local-presence NPA index keys --------------------------------------
+
+// PoolNPAIndex is the SET of DID IDs for a given pool + NPA combination.
+// X05 picker reads; X05 index builder writes.
+func (k Keys) PoolNPAIndex(poolID int64, npa string) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:npa:%s", k.tid, poolID, npa)
+}
+
+// PoolStateIndex is the SET of DID IDs for a given pool + US state code.
+// X05 picker reads; X05 index builder writes.
+func (k Keys) PoolStateIndex(poolID int64, state string) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:state:%s", k.tid, poolID, state)
+}
+
+// PoolNPAIndexBuilt is the sentinel STRING key (value "1", TTL 24h) that
+// indicates the NPA/state index has been fully built for the given pool.
+func (k Keys) PoolNPAIndexBuilt(poolID int64) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:npa_index_built", k.tid, poolID)
+}
+
+// DIDQuarantined is the per-DID quarantine flag key used by X05 health checks.
+// Key exists = DID is quarantined; key absent = DID is healthy.
+// Convention mirrors X04 which sets this on quarantine events.
+func (k Keys) DIDQuarantined(poolID, didID int64) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:did:{%d}:quarantined", k.tid, poolID, didID)
+}

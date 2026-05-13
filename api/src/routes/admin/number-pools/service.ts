@@ -30,6 +30,7 @@ function toPoolResponse(row: any, activeDids: number, quarantinedDids: number): 
     minActiveSize: row.minActiveSize,
     maxConcurrent: row.maxConcurrent,
     active: row.active,
+    localPresenceEnabled: row.localPresenceEnabled ?? false,
     activeDids,
     quarantinedDids,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
@@ -133,6 +134,7 @@ export async function createPool(
       dailyCap: input.dailyCap,
       minActiveSize: input.minActiveSize,
       maxConcurrent: input.maxConcurrent,
+      localPresenceEnabled: input.localPresenceEnabled ?? false,
     },
   });
 
@@ -180,6 +182,8 @@ export async function updatePool(
       ...(input.dailyCap !== undefined && { dailyCap: input.dailyCap }),
       ...(input.minActiveSize !== undefined && { minActiveSize: input.minActiveSize }),
       ...(input.maxConcurrent !== undefined && { maxConcurrent: input.maxConcurrent }),
+      // X05: local-presence feature flag
+      ...(input.localPresenceEnabled !== undefined && { localPresenceEnabled: input.localPresenceEnabled }),
     },
   });
 

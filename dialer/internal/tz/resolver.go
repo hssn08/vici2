@@ -31,6 +31,7 @@ type Resolver struct {
 	phoneCodesCache atomic.Value // *phoneMap
 	overrideCache   atomic.Value // *phoneMap
 	npaOnlyCache    atomic.Value // *npaMap
+	npaStateCache   atomic.Value // *npaStateMap  X05: NPA→state
 	zipCodesCache   atomic.Value // *zipMap
 
 	campaignLRU  *campaignCache
@@ -49,10 +50,12 @@ func New(db *sql.DB, vk *redis.Client) *Resolver {
 	empty := make(phoneMap)
 	emptyZ := make(zipMap)
 	emptyN := make(npaMap)
+	emptyNS := make(npaStateMap)
 	r.phoneCodesCache.Store(&empty)
 	r.overrideCache.Store(&empty)
 	r.zipCodesCache.Store(&emptyZ)
 	r.npaOnlyCache.Store(&emptyN)
+	r.npaStateCache.Store(&emptyNS)
 
 	warmLocations()
 	return r
@@ -270,6 +273,17 @@ func (r *Resolver) ResolveBatch(ctx context.Context, reqs []ResolveRequest) ([]R
 // handlers when campaign config is updated. TTL: 5 minutes.
 func (r *Resolver) SetCampaignDefault(campaignID, iana string) {
 	r.campaignLRU.set(campaignID, iana)
+}
+
+// StateForNPA returns the 2-character US state code for the given 3-digit NPA
+// (area code), or "" if the NPA is not in the phone_codes table or has no
+// state assignment. Used by X05 local-presence Tier-3 same-state matching.
+//
+// The NPA→state map is loaded at startup (alongside npaOnlyCache) and refreshed
+// every 6 hours. Lookups are O(1) with no I/O.
+func (r *Resolver) StateForNPA(npa string) string {
+	m := r.npaStateCache.Load().(*npaStateMap)
+	return (*m)[npa]
 }
 
 // campaignCache is a simple TTL-aware LRU for campaign default timezones.

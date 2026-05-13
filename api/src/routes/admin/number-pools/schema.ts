@@ -40,6 +40,8 @@ export const PoolCreateSchema = z.object({
   dailyCap: z.number().int().min(1).max(65535).default(200),
   minActiveSize: z.number().int().min(1).max(255).default(3),
   maxConcurrent: z.number().int().min(1).max(255).default(5),
+  // X05: local-presence NPA matching
+  localPresenceEnabled: z.boolean().default(false),
 });
 export type PoolCreateInput = z.infer<typeof PoolCreateSchema>;
 
@@ -68,10 +70,25 @@ export interface PoolResponse {
   minActiveSize: number;
   maxConcurrent: number;
   active: boolean;
+  // X05: local-presence NPA matching
+  localPresenceEnabled: boolean;
   activeDids: number;
   quarantinedDids: number;
   createdAt: string;
   updatedAt: string;
+}
+
+// X05: NPA coverage report response
+export interface NpaCoverageEntry {
+  npa: string;
+  state: string | null;
+  didCount: number;
+}
+
+export interface NpaCoverageResponse {
+  poolId: string;
+  localPresenceEnabled: boolean;
+  coverage: NpaCoverageEntry[];
 }
 
 export interface PoolListResponse {

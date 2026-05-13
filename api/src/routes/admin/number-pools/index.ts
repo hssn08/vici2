@@ -39,6 +39,7 @@ import {
   unquarantineDid,
 } from "./did-service.js";
 import { getPoolStats } from "./stats-service.js";
+import { getNpaCoverageReport } from "./npa-coverage.js";
 import type { AuthContext } from "../../../auth/middleware.js";
 
 type AuthReq = FastifyRequest & { auth?: AuthContext };
@@ -178,6 +179,35 @@ export async function registerAdminNumberPoolRoutes(app: any): Promise<void> {
       const stats = await getPoolStats(auth.tenantId, id);
       if (!stats) return reply.code(404).send({ code: "not_found", message: "Pool not found" });
       return reply.send(stats);
+    },
+  );
+
+  // GET /api/admin/number-pools/:id/npa-coverage  (X05)
+  app.get(
+    `${BASE}/:id/npa-coverage`,
+    { preHandler: [app.requireAuth, app.requirePermission("number_pool:read")] },
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const auth = getAuth(req);
+      const params = req.params as { id: string };
+      let id: bigint;
+      try { id = parseId(params.id); } catch {
+        return reply.code(400).send({ code: "invalid_id", message: "Invalid pool ID" });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const valkey = (app as any).valkey ?? (app as any).redis;
+      if (!valkey) {
+        return reply.code(503).send({ code: "unavailable", message: "Valkey client not available" });
+      }
+      try {
+        const report = await getNpaCoverageReport(BigInt(auth.tenantId), id, valkey);
+        return reply.send(report);
+      } catch (err) {
+        const e = err as Error;
+        if (e.message === "pool not found") {
+          return reply.code(404).send({ code: "not_found", message: "Pool not found" });
+        }
+        throw err;
+      }
     },
   );
 

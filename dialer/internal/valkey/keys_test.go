@@ -98,6 +98,25 @@ func TestX04PoolKeys(t *testing.T) {
 	}
 }
 
+// TestX05LocalPresenceKeys verifies X05 NPA index key format.
+func TestX05LocalPresenceKeys(t *testing.T) {
+	k := NewKeys(1)
+	poolID := int64(7)
+	didID := int64(1001)
+
+	cases := []struct{ got, want string }{
+		{k.PoolNPAIndex(poolID, "415"), "t:1:pool:{7}:npa:415"},
+		{k.PoolStateIndex(poolID, "CA"), "t:1:pool:{7}:state:CA"},
+		{k.PoolNPAIndexBuilt(poolID), "t:1:pool:{7}:npa_index_built"},
+		{k.DIDQuarantined(poolID, didID), "t:1:pool:{7}:did:{1001}:quarantined"},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("X05 key: got %q want %q", c.got, c.want)
+		}
+	}
+}
+
 func TestKeysPanicsOnBadTenant(t *testing.T) {
 	defer func() {
 		if recover() == nil {
