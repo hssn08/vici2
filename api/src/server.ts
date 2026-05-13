@@ -73,6 +73,7 @@ app.get("/", async () => ({ service: SERVICE, message: "hello from vici2 api" })
 
 import { registerAuthRoutes } from "./routes/auth/index.js";
 import { registerLeadRoutes } from "./leads/index.js";
+import { registerListRoutes } from "./lists/index.js";
 import { registerCampaignRoutes } from "./routes/campaigns/index.js";
 import { registerDncRoutes } from "./routes/dnc/index.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
@@ -94,6 +95,7 @@ const start = async (): Promise<void> => {
   try {
     await registerAuthRoutes(app);
     await registerLeadRoutes(app);
+    await registerListRoutes(app);
     await registerCampaignRoutes(app);
     await registerDncRoutes(app);
     await registerAdminRoutes(app);
