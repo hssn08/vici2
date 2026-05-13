@@ -1,0 +1,41 @@
+state,dow,open_local,close_local,blackout,holiday_kind,holiday_value,autodialer_only,citation,comment
+# Federal floor — "FED" sentinel; applied in code as unconditional baseline
+FED,*,08:00,21:00,false,,,false,47 CFR 64.1200(c)(1),Federal floor
+# 8pm-cutoff states
+AL,Mon-Sat,08:00,20:00,false,,,false,Ala. Admin. Code 770-X-5-.17,8pm cutoff M-Sat
+AL,Sun,,,true,,,false,Ala. Admin. Code 770-X-5-.17,Sunday blackout
+AL,*,,,true,fixed,2026-01-01,false,,New Year's Day
+AL,*,,,true,fixed,2026-12-25,false,,Christmas Day
+CT,*,09:00,20:00,false,,,false,Conn. Gen. Stat. 42-288a(c),9am start + 8pm cutoff
+FL,*,08:00,20:00,false,,,false,Fla. Stat. 501.616,FTSA 8pm cutoff
+KY,*,10:00,21:00,false,,,false,KRS 367.46955,Latest start in nation (10am)
+LA,Mon-Sat,08:00,20:00,false,,,false,La. R.S. 45:844.31,8pm cutoff M-Sat
+LA,Sun,,,true,,,false,La. R.S. 45:844.31,Sunday blackout
+LA,*,,,true,named,MARDI_GRAS,false,La. R.S. 45:844.31,Mardi Gras (Fat Tuesday)
+LA,*,,,true,easter_offset,-2,false,La. R.S. 45:844.31,Good Friday (Easter-2)
+MD,*,08:00,20:00,false,,,false,Md. Com. Law 14-3201,Stop the Spam Calls Act
+MA,*,08:00,20:00,false,,,false,MGL Ch.159C 3,8pm cutoff
+ME,Mon-Fri,08:00,21:00,false,,,false,10 M.R.S. 1498,Live calls follow fed
+ME,Mon-Fri,09:00,17:00,false,,,true,10 M.R.S. 1498,Autodialer narrower window
+ME,Sat,08:00,21:00,false,,,false,10 M.R.S. 1498,Live calls follow fed on Sat
+ME,Sat,,,true,,,true,10 M.R.S. 1498,Autodialer prohibited on Sat
+ME,Sun,08:00,21:00,false,,,false,10 M.R.S. 1498,Live calls follow fed on Sun
+ME,Sun,,,true,,,true,10 M.R.S. 1498,Autodialer prohibited on Sun
+MI,*,09:00,21:00,false,,,false,MCL 750.540e(f),9am start
+MN,*,09:00,21:00,false,,,false,Minn. Stat. 325E.30,9am start
+MS,Mon-Sat,08:00,20:00,false,,,false,Miss. Code Ann. 77-3-723,8pm cutoff M-Sat
+MS,Sun,,,true,,,false,Miss. Code Ann. 77-3-723,Sunday blackout
+OK,*,08:00,20:00,false,,,false,15 OS 775C.4,OTSA 8pm cutoff
+PA,Mon-Sat,08:00,21:00,false,,,false,73 P.S. 2245.4,Fed window M-Sat
+PA,Sun,12:00,21:00,false,,,false,73 P.S. 2245.4,Noon start on Sunday
+RI,Mon-Fri,09:00,18:00,false,,,false,R.I. Gen. Laws 5-61-2,Most restrictive M-F
+RI,Sat,10:00,17:00,false,,,false,R.I. Gen. Laws 5-61-2,Saturday 10-5
+RI,Sun,,,true,,,false,R.I. Gen. Laws 5-61-2,Sunday blackout
+RI,*,,,true,fixed,2026-12-25,false,R.I. Gen. Laws 5-61-2,Christmas Day
+TX,Mon-Sat,09:00,21:00,false,,,false,Tex. Bus. & Com. Code 301.051,SB 140 9am
+TX,Sun,12:00,21:00,false,,,false,Tex. Bus. & Com. Code 301.051,Sunday noon start
+UT,Mon-Sat,08:00,21:00,false,,,false,Utah Code Ann. 13-25a-103,Fed window M-Sat
+UT,Sun,,,true,,,false,Utah Code Ann. 13-25a-103,Sunday blackout
+UT,*,,,true,fixed,2026-12-25,false,Utah Code Ann. 13-25a-103,Christmas Day
+WA,*,08:00,20:00,false,,,false,RCW 80.36.390,8pm cutoff (no B2B exemption)
+WY,*,08:00,20:00,false,,,false,Wyo. Stat. 40-12-302,8pm cutoff
