@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+  Safety pre-amble — F03 PLAN §4.1.
+  Applies to every call in the default context. Sets hangup_after_bridge,
+  continue_on_fail, and recording_follow_transfer defaults so downstream
+  extensions inherit safe behavior. `continue="true"` lets the engine fall
+  through to the next matching extension.
+-->
+<include>
+  <context name="default">
+    <extension name="catchall_safety" continue="true">
+      <condition field="destination_number" expression="^.*$">
+        <action application="set" data="hangup_after_bridge=true"/>
+        <action application="set" data="continue_on_fail=true"/>
+        <action application="set" data="recording_follow_transfer=true"/>
+        <action application="log" data="INFO dialplan default catchall dest=${destination_number} caller=${caller_id_number} uuid=${uuid}"/>
+      </condition>
+    </extension>
+  </context>
+</include>

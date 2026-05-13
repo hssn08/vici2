@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+  Public-context catchall — F03 PLAN §4.5.
+  Loaded LAST alphabetically; any traffic that wasn't matched by an I02 DID
+  route (10_*…89_*.xml) drops with 503. **Numbering frozen** in F03 PLAN §14.4
+  — I02 MUST use 10–89; F03 owns 99_ catchall.
+-->
+<include>
+  <context name="public">
+    <extension name="public_drop">
+      <condition field="destination_number" expression="^.*$">
+        <action application="log" data="WARNING public dialplan drop dest=${destination_number} src=${network_addr}"/>
+        <action application="respond" data="503 Service Unavailable"/>
+        <action application="hangup"/>
+      </condition>
+    </extension>
+  </context>
+</include>

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+  Outbound bridge fallback — F03 PLAN §4.3. Stub; T04 owns final form.
+  Most outbound calls bypass this file: T04 issues an `originate` with
+  inline `sofia/gateway/<carrier>/+1NXXNXXXXXX` and a `transfer:conf_<tid>_<uid>
+  XML default` continuation. This extension is the click-to-dial / transfer-out
+  fallback path.
+-->
+<include>
+  <context name="default">
+
+    <extension name="outbound_via_carrier">
+      <condition field="destination_number" expression="^(\+?1?\d{10,15})$">
+        <action application="set" data="effective_caller_id_number=${origination_caller_id_number}"/>
+        <action application="set" data="effective_caller_id_name=${origination_caller_id_name}"/>
+        <action application="bridge" data="sofia/gateway/${carrier_name}/$1"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>

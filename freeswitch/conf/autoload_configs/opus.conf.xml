@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+  mod_opus tuning — F03 PLAN §10.
+  Tuned for voice: complexity=10 (highest quality CPU permitting),
+  maxaveragebitrate=24000 (24 kbps), inband FEC, DTX silence suppression.
+  Browsers strongly prefer OPUS on the wss profile.
+-->
+<configuration name="opus.conf" description="Opus Codec">
+  <settings>
+    <param name="use-vbr" value="1"/>
+    <param name="complexity" value="10"/>
+    <param name="maxaveragebitrate" value="24000"/>
+    <param name="maxplaybackrate" value="48000"/>
+    <param name="useinbandfec" value="1"/>
+    <param name="usedtx" value="1"/>
+    <param name="sprop-stereo" value="0"/>
+    <param name="stereo" value="0"/>
+    <param name="adjust-bitrate" value="1"/>
+  </settings>
+</configuration>

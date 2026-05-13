@@ -78,18 +78,31 @@ services:
     cap_add:
       - SYS_NICE
       - IPC_LOCK
+    # F03 PLAN §11.2 — stack=240 KB is the single biggest mitigation for the
+    # Artoo R2D2 ~1796-thread wall (RESEARCH §9.1). nofile/nproc tuned for
+    # high-call-volume; rtprio enables real-time scheduling for the RTP thread.
     ulimits:
-      rtprio: 99
+      nofile:
+        soft: 1048576
+        hard: 1048576
+      nproc: 65535
+      stack: 245760
+      core: -1
       memlock: -1
+      rtprio: 99
     volumes:
       - ./freeswitch/conf:/etc/freeswitch:ro
+      - ./freeswitch/tls:/etc/freeswitch/tls:ro
       - freeswitch_recordings:/var/lib/freeswitch/recordings
       - freeswitch_log:/var/log/freeswitch
     environment:
       <<: *common-env
       FS_EVENT_SOCKET_PASSWORD: ${FS_EVENT_SOCKET_PASSWORD}
+      FS_DEFAULT_SIP_PASSWORD: ${FS_DEFAULT_SIP_PASSWORD}
+      FS_XMLCURL_USER: ${FS_XMLCURL_USER}
+      FS_XMLCURL_PASS: ${FS_XMLCURL_PASS}
     healthcheck:
-      test: ["CMD-SHELL", "fs_cli -p ${FS_EVENT_SOCKET_PASSWORD} -x status | grep -q ^UP || exit 1"]
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 15s
       timeout: 5s
       retries: 5

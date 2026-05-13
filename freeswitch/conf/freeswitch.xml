@@ -1,7 +1,12 @@
 <?xml version="1.0"?>
 <!--
-  vici2 FreeSWITCH master config loader.
-  F01 ships a vanilla loader. F03 (FS base config) replaces / extends it.
+  vici2 FreeSWITCH master XML loader.
+  F03 ships the canonical layout per PLAN §15. Sections:
+    - vars.xml         : global variables (rendered from .tmpl by entrypoint)
+    - configuration    : autoload_configs/*.xml
+    - dialplan         : default and public contexts
+    - directory        : F05 populates default/*.xml per agent
+  Sofia profiles are pulled in by autoload_configs/sofia.conf.xml.
 -->
 <document type="freeswitch/xml">
 
@@ -15,6 +20,8 @@
     <X-PRE-PROCESS cmd="include" data="dialplan/*.xml"/>
   </section>
 
-  <section name="directory" description="User Directory"/>
+  <section name="directory" description="User Directory">
+    <X-PRE-PROCESS cmd="include" data="directory/*.xml"/>
+  </section>
 
 </document>

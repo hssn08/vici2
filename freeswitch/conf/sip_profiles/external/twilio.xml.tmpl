@@ -1,0 +1,20 @@
+<!--
+  Twilio BYOC carrier template — F03 PLAN §3.1.
+  T02 renders the real file from MySQL `carriers` row. This .tmpl ships
+  so an operator can drop a working carrier in by hand pre-T02.
+  Inbound auth: Twilio edge IPs added to ACL `carriers` (acl.conf.xml).
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="username" value="${TWILIO_TERMINATION_USER}"/>
+    <param name="password" value="${TWILIO_TERMINATION_PASS}"/>
+    <param name="realm" value="Twilio-outbound"/>
+    <param name="proxy" value="${TWILIO_PROXY}"/>
+    <param name="register" value="false"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="PCMU,PCMA"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+    <param name="retry-seconds" value="30"/>
+  </gateway>
+</include>

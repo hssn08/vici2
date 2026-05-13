@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+<!--
+  SIPp scenario — OPTIONS ping the internal profile (5060) or external (5080)
+  and expect 200.
+
+  Usage:
+    sipp -sf options-ping.xml -m 1 \
+         -i 127.0.0.1 -p 5061 127.0.0.1:5060
+-->
+<scenario name="vici2 SIP OPTIONS ping">
+  <send retrans="500">
+    <![CDATA[
+      OPTIONS sip:ping@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: ping <sip:ping@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 1 OPTIONS
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      User-Agent: vici2-sipp-test
+      Content-Length: 0
+
+    ]]>
+  </send>
+  <recv response="200"/>
+</scenario>

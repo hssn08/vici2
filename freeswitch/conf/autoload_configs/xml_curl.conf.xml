@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!--
+  mod_xml_curl — F03 PLAN §7.
+  Phase 1: bindings empty. Module is loaded so downstream agents (F05/I01/I03)
+  can add bindings and trigger `fs_cli -x 'reload mod_xml_curl'` without
+  FreeSWITCH restart.
+
+  Wire-up contract for downstream modules:
+    gateway-url: $${xmlcurl_url}/<binding-type>    (api:3000)
+    HTTP basic auth: $${xmlcurl_user} / $${xmlcurl_pass} (env-injected)
+    disable-100-continue=true, timeout=10, auth-scheme=basic
+-->
+<configuration name="xml_curl.conf" description="cURL XML Gateway">
+  <bindings>
+    <!-- Phase 1: empty. -->
+  </bindings>
+</configuration>
