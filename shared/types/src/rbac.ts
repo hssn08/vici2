@@ -114,6 +114,9 @@ export const VERBS = [
   'eavesdrop:any',
   'callback:read',
   'callback:edit',
+  // alert / on-call (O03)
+  'alert:read',
+  'alert:configure',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -230,6 +233,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'eavesdrop:any':        { scope: 'tenant', sensitive: true },
     'callback:read':        { scope: 'tenant' },
     'callback:edit':        { scope: 'tenant' },
+    'alert:read':           { scope: 'tenant' },
+    'alert:configure':      { scope: 'tenant' },
   },
 
   admin: {
@@ -290,6 +295,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'eavesdrop:any':        { scope: 'tenant', sensitive: true },
     'callback:read':        { scope: 'tenant' },
     'callback:edit':        { scope: 'tenant' },
+    'alert:read':           { scope: 'tenant' },
+    'alert:configure':      { scope: 'tenant' },
   },
 
   supervisor: {
@@ -327,6 +334,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'eavesdrop:any':        { scope: 'group', sensitive: true },
     'callback:read':        { scope: 'group' },
     'callback:edit':        { scope: 'group' },
+    'alert:read':           { scope: 'group' },
   },
 
   agent: {
@@ -379,6 +387,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'tenant:read':          { scope: 'self' }, // own tenant only
     'wallboard:view':       { scope: 'tenant' },
     'callback:read':        { scope: 'tenant' },
+    'alert:read':           { scope: 'tenant' },
   },
 
   integrator: {
