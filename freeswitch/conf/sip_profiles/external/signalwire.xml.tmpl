@@ -1,0 +1,17 @@
+<!--
+  SignalWire BYOC carrier template — F03 PLAN §3.4.
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="username" value="${SW_PROJECT_TOKEN_USER}"/>
+    <param name="password" value="${SW_PROJECT_TOKEN}"/>
+    <param name="realm" value="${SW_SPACE}.sip.signalwire.com"/>
+    <param name="proxy" value="${SW_SPACE}.sip.signalwire.com"/>
+    <param name="register" value="true"/>
+    <param name="register-transport" value="tls"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="PCMU,PCMA,OPUS"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+  </gateway>
+</include>

@@ -1,0 +1,17 @@
+<!--
+  Telnyx BYOC carrier template — F03 PLAN §3.3.
+  Set TELNYX_REGISTER=true for credentials trunk, false for IP trunk.
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="username" value="${TELNYX_USER}"/>
+    <param name="password" value="${TELNYX_PASS}"/>
+    <param name="realm" value="sip.telnyx.com"/>
+    <param name="proxy" value="sip.telnyx.com"/>
+    <param name="register" value="${TELNYX_REGISTER}"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="PCMU,PCMA"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+  </gateway>
+</include>

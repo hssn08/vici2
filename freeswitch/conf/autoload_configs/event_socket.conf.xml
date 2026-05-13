@@ -1,16 +1,22 @@
 <?xml version="1.0"?>
 <!--
-  Event Socket Library config.
-  Binds to 0.0.0.0:8021 in dev so containers using `host.docker.internal` can
-  connect. Password comes from $${default_password} which is fed by env var
-  FS_EVENT_SOCKET_PASSWORD via vars.xml. F03 may tighten ACL.
+  Event Socket Library — F03 PLAN §6.
+  Frozen interface for T01: host:8021/TCP, password from FS_EVENT_SOCKET_PASSWORD.
+  ACL esl_clients defined in acl.conf.xml (loopback + Docker bridge families).
+  Rotation procedure: `fs_cli -x 'reload mod_event_socket'` (drops clients;
+  T01 MUST reconnect with backoff).
 -->
 <configuration name="event_socket.conf" description="Socket Client">
   <settings>
     <param name="nat-map" value="false"/>
     <param name="listen-ip" value="0.0.0.0"/>
     <param name="listen-port" value="8021"/>
-    <param name="password" value="$${default_password}"/>
-    <param name="apply-inbound-acl" value="loopback.auto"/>
+    <param name="password" value="$${esl_password}"/>
+    <param name="apply-inbound-acl" value="esl_clients"/>
+    <param name="stop-on-bind-error" value="true"/>
+    <!-- Tuning -->
+    <param name="max-sessions" value="10000"/>
+    <param name="cmd-timeout" value="60"/>
+    <param name="max-event-bytes" value="1048576"/>
   </settings>
 </configuration>

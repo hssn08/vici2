@@ -1,0 +1,15 @@
+<!--
+  Bandwidth BYOC carrier template — F03 PLAN §3.5.
+  Inbound auth: Bandwidth published edge IPs in `carriers` ACL.
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="proxy" value="${BW_REALM}"/>
+    <param name="realm" value="${BW_REALM}"/>
+    <param name="register" value="false"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="PCMU,PCMA"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+  </gateway>
+</include>

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!--
+  Sofia loader — F03 PLAN §1.
+  Pulls in the 3 frozen profiles: internal (5060), wss (7443+5066), external (5080).
+  Each profile XML lives at ../sip_profiles/*.xml.
+-->
+<configuration name="sofia.conf" description="sofia Endpoint">
+  <global_settings>
+    <param name="log-level" value="0"/>
+    <param name="auto-restart" value="false"/>
+    <param name="debug-presence" value="0"/>
+    <param name="rewrite-multicasted-fs-path" value="true"/>
+  </global_settings>
+  <profiles>
+    <X-PRE-PROCESS cmd="include" data="../sip_profiles/*.xml"/>
+  </profiles>
+</configuration>

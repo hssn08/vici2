@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+  Music on hold source — F03 PLAN §15.
+  Single MoH directory; FS rotates files within it. Held parties hear MoH only
+  when the conference profile's moh-sound=local_stream://moh is engaged and
+  the channel is NOT flagged nomoh.
+-->
+<configuration name="local_stream.conf" description="Local Streams">
+  <directory name="moh" path="$${base_dir}/sounds/music/8000">
+    <param name="rate" value="8000"/>
+    <param name="shuffle" value="true"/>
+    <param name="channels" value="1"/>
+    <param name="interval" value="20"/>
+    <param name="timer-name" value="soft"/>
+    <param name="chime-time" value="60"/>
+    <param name="chime-max" value="100"/>
+  </directory>
+</configuration>
