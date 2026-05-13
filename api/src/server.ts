@@ -79,6 +79,7 @@ import { registerAdminRoutes } from "./routes/admin/index.js";
 import { registerImportRoutes } from "./import/index.js";
 import { registerStatusRoutes } from "./statuses/index.js";
 import { registerCallbackRoutes } from "./callbacks/index.js";
+import { registerRecordingRoutes } from "./routes/recordings/index.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -90,6 +91,7 @@ const start = async (): Promise<void> => {
     await registerImportRoutes(app);
     await registerStatusRoutes(app);
     await registerCallbackRoutes(app);
+    await registerRecordingRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {

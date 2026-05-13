@@ -904,12 +904,16 @@ model Recording {
   legalHold           Boolean            @default(false) @map("legal_hold")
   lifecycleState      RecordingLifecycle @default(encoding) @map("lifecycle_state")
   s3StorageClass      String?            @map("s3_storage_class") @db.VarChar(32)
+  // R02 amendment §6.2 — two-phase delete flag: TRUE after upload+verify; sweeper clears after fs.unlink
+  deletionPending     Boolean            @default(false) @map("deletion_pending")
   createdAt           DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt           DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_recordings_tenant")
 
   @@index([tenantId, lifecycleState], map: "idx_recordings_t_lifecycle")
+  // R02 sweeper index: filter on deletion_pending + lifecycle_state + updated_at
+  @@index([tenantId, deletionPending, lifecycleState, updatedAt], map: "idx_recordings_sweep")
   @@map("recordings")
 }
 
@@ -1250,23 +1254,42 @@ enum ConsentStatus {
   assumed
 }
 
+// R02 amendment §6.1 — recording upload lifecycle state machine.
+enum RecordingLogLifecycle {
+  recording_complete          // R01 wrote row; awaiting R02
+  uploading                   // R02 picked up; upload in-flight
+  uploaded                    // confirmed in S3; local file still present
+  available                   // sweep complete; local file deleted; S3 is authoritative
+  failed                      // R01 or R02 terminal failure
+  corrupt                     // SHA-256 mismatch after 3 retries
+  consent_declined_no_upload  // C02 prompted_declined or skipped → local file deleted without upload
+  orphan                      // RECORD_STOP event fired but file not found on disk
+  too_short                   // duration_sec < RECORD_MIN_SEC
+}
+
 model RecordingLog {
-  id            BigInt        @default(autoincrement())
-  tenantId      BigInt        @default(1) @map("tenant_id")
-  uuid          String        @db.VarChar(40)
-  callLogId     BigInt?       @map("call_log_id")
-  leadId        BigInt?       @map("lead_id")
-  campaignId    String?       @map("campaign_id") @db.VarChar(32)
-  userId        BigInt?       @map("user_id")
-  filename      String        @db.VarChar(255)
-  storageUrl    String?       @map("storage_url") @db.VarChar(512)
-  startTime     DateTime      @map("start_time") @db.DateTime(6)
-  durationSec   Int?          @map("duration_sec")
-  sizeBytes     BigInt?       @map("size_bytes")
-  encodedAt     DateTime?     @map("encoded_at") @db.DateTime(6)
-  consentStatus ConsentStatus @default(not_required) @map("consent_status")
-  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt     DateTime      @default(now()) @map("updated_at") @db.DateTime(6)
+  id             BigInt                @default(autoincrement())
+  tenantId       BigInt                @default(1) @map("tenant_id")
+  uuid           String                @db.VarChar(40)
+  callLogId      BigInt?               @map("call_log_id")
+  leadId         BigInt?               @map("lead_id")
+  campaignId     String?               @map("campaign_id") @db.VarChar(32)
+  userId         BigInt?               @map("user_id")
+  filename       String                @db.VarChar(255)
+  storageUrl     String?               @map("storage_url") @db.VarChar(512)
+  // R02 amendment §6.1 — SHA-256 of WAV bytes (written post-upload)
+  sha256         Bytes?                @map("sha256") @db.Binary(32)
+  // R02 amendment §6.1 — upload pipeline lifecycle state
+  lifecycleState RecordingLogLifecycle @default(recording_complete) @map("lifecycle_state")
+  // R02 amendment §6.1 — terminal failure reason code (max 64 chars)
+  failureReason  String?               @map("failure_reason") @db.VarChar(64)
+  startTime      DateTime              @map("start_time") @db.DateTime(6)
+  durationSec    Int?                  @map("duration_sec")
+  sizeBytes      BigInt?               @map("size_bytes")
+  encodedAt      DateTime?             @map("encoded_at") @db.DateTime(6)
+  consentStatus  ConsentStatus         @default(not_required) @map("consent_status")
+  createdAt      DateTime              @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt      DateTime              @default(now()) @map("updated_at") @db.DateTime(6)
 
   @@id([id, startTime])
   @@unique([uuid, startTime], map: "uk_recording_log_uuid")
@@ -1274,6 +1297,7 @@ model RecordingLog {
   @@index([tenantId, campaignId, startTime], map: "idx_recording_log_t_camp_started")
   @@index([tenantId, callLogId], map: "idx_recording_log_t_call")
   @@index([tenantId, userId, startTime], map: "idx_recording_log_t_user_started")
+  @@index([tenantId, lifecycleState], map: "idx_recording_log_t_lifecycle")
   @@map("recording_log")
 }
 
