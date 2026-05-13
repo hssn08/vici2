@@ -183,7 +183,8 @@ export class RecordingLogWriter {
     }
 
     const startedAt = nsToMysqlDatetime(ev.started_at_ns);
-    const endedAt = nsToMysqlDatetime(ev.ended_at_ns);
+    // ended_at_ns is stored for R02 reference; F02 recording_log schema uses start_time only.
+    void ev.ended_at_ns;
     const durationSec = Math.round(ev.duration_ms / 1000);
     const consentStatus = ev.consent_status ?? 'not_required';
     const lifecycleState = ev.lifecycle_state ?? 'recording_complete';
