@@ -9,6 +9,34 @@ import { SideNav } from "@/components/shell/SideNav";
 import { StatusBar } from "@/components/shell/StatusBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SipProvider } from "@/lib/sip";
+import { useAgentStateSync } from "@/lib/agent";
+
+/** Inner shell — mounts inside SipProvider so hooks work. */
+function AgentShellInner({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  // Wire WS → agent store sync (A03)
+  useAgentStateSync();
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <TopNav />
+      <div className="flex flex-1 overflow-hidden">
+        <SideNav />
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-auto bg-[var(--color-surface)] p-6"
+        >
+          {children}
+        </main>
+      </div>
+      <StatusBar />
+    </div>
+  );
+}
 
 export function AgentShell({
   children,
@@ -55,20 +83,7 @@ export function AgentShell({
 
   return (
     <SipProvider>
-      <div className="flex min-h-screen flex-col">
-        <TopNav />
-        <div className="flex flex-1 overflow-hidden">
-          <SideNav />
-          <main
-            id="main-content"
-            tabIndex={-1}
-            className="flex-1 overflow-auto bg-[var(--color-surface)] p-6"
-          >
-            {children}
-          </main>
-        </div>
-        <StatusBar />
-      </div>
+      <AgentShellInner>{children}</AgentShellInner>
     </SipProvider>
   );
 }
