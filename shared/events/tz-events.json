@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "vici2.phone_codes.invalidate",
+  "title": "vici2.phone_codes.invalidate Valkey pubsub payload",
+  "description": "Payload for the vici2.phone_codes.invalidate Valkey pubsub channel. Published by D03 admin handlers after writes to phone_codes_overrides. All services subscribed to this channel reload the affected override row (or the full cache on FULL).",
+  "type": "string",
+  "oneOf": [
+    {
+      "description": "Full cache reload — all processes call Preload().",
+      "const": "FULL"
+    },
+    {
+      "description": "Single NXX invalidation — 6 ASCII digits: NPA (3) + NXX (3). Processes reload only this override row from MySQL.",
+      "pattern": "^[0-9]{6}$",
+      "examples": ["317555", "212555", "850200"]
+    }
+  ]
+}

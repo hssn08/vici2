@@ -248,6 +248,39 @@ restore-from-backup: ## Restore MySQL from S3 backup to staging. Requires BACKUP
 	  --date "$${BACKUP}" \
 	  --target staging
 
+# ----- D03 timezone resolver -------------------------------------------------
+
+build-phone-codes: ## Refresh db/seeds/phone_codes.csv from NANPA + LCG crosswalk.
+	@echo "[build-phone-codes] Building phone_codes seed data…"
+	(cd dialer && go run ../scripts/build-phone-codes.go)
+
+build-zip-codes: ## Refresh db/seeds/zip_codes.csv from Census ZCTA + TBB polygons.
+	@echo "[build-zip-codes] Building zip_codes seed data…"
+	(cd dialer && go run ../scripts/build-zip-codes.go)
+
+db-seed-tz: ## UPSERT phone_codes + zip_codes + publish FULL invalidate.
+	@echo "[db-seed-tz] Seeding timezone reference tables…"
+	cd api && pnpm exec prisma db seed
+
+test-tz: ## Run all D03 unit tests (Go + Node).
+	@echo "[test-tz] Running Go tz tests…"
+	(cd dialer && go test ./internal/tz/... -v)
+	@echo "[test-tz] Running Node tz tests…"
+	cd api && node_modules/.bin/vitest run src/tz/__tests__
+
+bench-tz: ## Run Go benchmarks for D03 timezone resolver.
+	@echo "[bench-tz] Running D03 benchmarks…"
+	(cd dialer && go test -bench=. -benchtime=5s ./internal/tz/)
+
+tz-debug: ## Ad-hoc resolver debug. Usage: make tz-debug PHONE=+13175551212
+	@if [ -z "$${PHONE:-}" ]; then \
+	  echo "Usage: make tz-debug PHONE=+13175551212 [ZIP=46201] [STATE=IN]"; \
+	  exit 1; \
+	fi
+	@echo "[tz-debug] Resolving $$PHONE…"
+	cd api && PHONE="$$PHONE" ZIP="$$ZIP" STATE="$$STATE" \
+	  node --loader ts-node/esm src/tz/debug-cli.ts
+
 # ----- housekeeping ----------------------------------------------------------
 
 clean: ## Stop stack + remove volumes + remove generated artifacts.
@@ -268,4 +301,5 @@ hooks: ## Install lefthook git hooks.
 	fs-up fs-down fs-reload fs-cli valkey-cli redis-cli mysql-cli \
 	valkey-sync-lua audit-ddl audit-verify-7d \
 	backup-mysql backup-valkey backup-preflight restore-from-backup \
-	clean reset hooks
+	clean reset hooks \
+	build-phone-codes build-zip-codes db-seed-tz test-tz bench-tz tz-debug
