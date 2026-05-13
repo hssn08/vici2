@@ -169,6 +169,11 @@ model Tenant {
   // I03: voicemail
   voicemailBoxes    VoicemailBox[]
   voicemailBoxUsers VoicemailBoxUser[]
+  // S05: coaching
+  scorecardTemplates ScorecardTemplate[]
+  callScorecards     CallScorecard[]
+  callAnnotations    CallAnnotation[]
+  agentFeedback      AgentFeedback[]
 
   @@map("tenants")
 }
@@ -220,6 +225,13 @@ model User {
   notificationPrefs NotificationPref[]
   // I03: voicemail box access
   voicemailBoxUsers VoicemailBoxUser[]
+  // S05: coaching
+  scorecardTemplatesCreated ScorecardTemplate[] @relation("TemplateCreator")
+  scorecardsSupervisor      CallScorecard[]     @relation("ScorecardSupervisor")
+  scorecardsAgent           CallScorecard[]     @relation("ScorecardAgent")
+  annotationsSupervisor     CallAnnotation[]    @relation("AnnotationSupervisor")
+  feedbackReceived          AgentFeedback[]     @relation("FeedbackAgent")
+  feedbackGiven             AgentFeedback[]     @relation("FeedbackSupervisor")
 
   @@unique([tenantId, username], map: "uk_users_tenant_username")
   @@unique([tenantId, email], map: "uk_users_tenant_email")
@@ -2436,4 +2448,121 @@ model Voicemail {
   @@index([tenantId, createdAt], map: "idx_vm_tenant_created")
   @@index([tenantId, callUuid], map: "idx_vm_call_uuid")
   @@map("voicemails")
+}
+
+// =============================================================================
+// S05 — Supervisor Coaching Tools
+// scorecard_templates, call_scorecards, call_annotations, agent_feedback
+// + calibration scaffold tables (Phase 2)
+// =============================================================================
+
+enum ScorecardStatus {
+  draft
+  finalized
+}
+
+enum AnnotationTag {
+  positive
+  needs_improvement
+  training_opportunity
+  compliance_flag
+  praise
+}
+
+model ScorecardTemplate {
+  id          BigInt    @id @default(autoincrement())
+  tenantId    BigInt    @default(1) @map("tenant_id")
+  parentId    BigInt?   @map("parent_id")
+  version     Int       @default(1) @db.UnsignedSmallInt
+  name        String    @db.VarChar(128)
+  description String?   @db.Text
+  criteria    Json
+  active      Boolean   @default(true)
+  createdBy   BigInt?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sct_tenant")
+  parent    ScorecardTemplate? @relation("TemplateVersions", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_sct_parent")
+  children  ScorecardTemplate[] @relation("TemplateVersions")
+  creator   User?              @relation("TemplateCreator", fields: [createdBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_sct_creator")
+  scorecards CallScorecard[]
+
+  @@index([tenantId, active], map: "idx_sct_t_active")
+  @@map("scorecard_templates")
+}
+
+model CallScorecard {
+  id             BigInt          @id @default(autoincrement())
+  tenantId       BigInt          @default(1) @map("tenant_id")
+  callUuid       String          @map("call_uuid") @db.VarChar(40)
+  templateId     BigInt          @map("template_id")
+  supervisorId   BigInt?         @map("supervisor_id")
+  agentId        BigInt?         @map("agent_id")
+  campaignId     String?         @map("campaign_id") @db.VarChar(32)
+  scores         Json
+  totalScore     Decimal         @default(0.00) @map("total_score") @db.Decimal(5, 2)
+  comments       String?         @db.Text
+  status         ScorecardStatus @default(draft)
+  isCalibration  Boolean         @default(false) @map("is_calibration")
+  finalizedAt    DateTime?       @map("finalized_at") @db.DateTime(6)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cs_tenant")
+  template    ScorecardTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_cs_template")
+  supervisor  User?             @relation("ScorecardSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_cs_supervisor")
+  agent       User?             @relation("ScorecardAgent", fields: [agentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_cs_agent")
+  annotations CallAnnotation[]
+  feedback    AgentFeedback[]
+
+  @@index([tenantId, agentId, createdAt], map: "idx_cs_t_agent")
+  @@index([tenantId, templateId, status, createdAt], map: "idx_cs_t_template")
+  @@index([tenantId, callUuid], map: "idx_cs_t_call_uuid")
+  @@index([tenantId, supervisorId, createdAt], map: "idx_cs_t_supervisor")
+  @@map("call_scorecards")
+}
+
+model CallAnnotation {
+  id            BigInt        @id @default(autoincrement())
+  tenantId      BigInt        @default(1) @map("tenant_id")
+  callUuid      String        @map("call_uuid") @db.VarChar(40)
+  scorecardId   BigInt?       @map("scorecard_id")
+  supervisorId  BigInt?       @map("supervisor_id")
+  timestampMs   Int           @map("timestamp_ms") @db.UnsignedInt
+  text          String        @db.Text
+  tag           AnnotationTag @default(needs_improvement)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ca_tenant")
+  scorecard  CallScorecard? @relation(fields: [scorecardId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_ca_scorecard")
+  supervisor User?          @relation("AnnotationSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_ca_supervisor")
+
+  @@index([tenantId, callUuid, timestampMs], map: "idx_ca_t_call")
+  @@index([scorecardId, timestampMs], map: "idx_ca_scorecard")
+  @@map("call_annotations")
+}
+
+model AgentFeedback {
+  id                  BigInt    @id @default(autoincrement())
+  tenantId            BigInt    @default(1) @map("tenant_id")
+  agentId             BigInt    @map("agent_id")
+  supervisorId        BigInt?   @map("supervisor_id")
+  relatedScorecardId  BigInt?   @map("related_scorecard_id")
+  relatedCallUuid     String?   @map("related_call_uuid") @db.VarChar(40)
+  body                String    @db.Text
+  acknowledgedAt      DateTime? @map("acknowledged_at") @db.DateTime(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_af_tenant")
+  agent     User           @relation("FeedbackAgent", fields: [agentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_af_agent")
+  supervisor User?         @relation("FeedbackSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_af_supervisor")
+  scorecard  CallScorecard? @relation(fields: [relatedScorecardId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_af_scorecard")
+
+  @@index([tenantId, agentId, createdAt], map: "idx_af_t_agent")
+  @@index([tenantId, supervisorId, createdAt], map: "idx_af_t_supervisor")
+  @@index([tenantId, agentId, acknowledgedAt], map: "idx_af_t_unack")
+  @@map("agent_feedback")
 }
