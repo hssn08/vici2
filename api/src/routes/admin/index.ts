@@ -38,6 +38,8 @@ import { registerAdminNumberPoolRoutes } from "./number-pools/index.js";
 import { registerSfIntegrationRoutes } from "../adapters/sf-integration/index.js";
 // N05 — Branded calling
 import { registerAdminBrandedCallingRoutes } from "./branded-calling/index.js";
+// N04 — HubSpot integration
+import { registerHubspotIntegrationRoutes } from "./integrations/hubspot/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -92,4 +94,6 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   await registerSfIntegrationRoutes(app);
   // N05 — Branded calling
   await registerAdminBrandedCallingRoutes(app);
+  // N04 — HubSpot integration
+  await registerHubspotIntegrationRoutes(app);
 }

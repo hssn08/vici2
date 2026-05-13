@@ -104,6 +104,8 @@ import { registerAgentFeedbackRoutes } from "./routes/agent/feedback/index.js";
 import { registerAgentPauseRoutes } from "./routes/agent/pause.js";
 // N03 — Salesforce Open CTI static files
 import fastifyStatic from "@fastify/static";
+// N04 — HubSpot public webhook
+import { registerHubspotWebhookRoute } from "./routes/webhooks/hubspot.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -154,6 +156,8 @@ const start = async (): Promise<void> => {
     await registerAgentFeedbackRoutes(app);
     // A09 — Agent pause codes + state
     await registerAgentPauseRoutes(app);
+    // N04 — HubSpot public webhook (HMAC-verified, no auth)
+    await registerHubspotWebhookRoute(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {
