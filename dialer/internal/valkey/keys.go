@@ -148,16 +148,6 @@ func (k Keys) CampaignPaceState(cid int64) string {
 	return fmt.Sprintf("t:%d:campaign:{%d}:pace_state", k.tid, cid)
 }
 
-// CampaignDropPct30d is the E05-published 30-day rolling drop% (E03 reads).
-func (k Keys) CampaignDropPct30d(cid int64) string {
-	return fmt.Sprintf("t:%d:campaign:{%d}:drop_pct_30d", k.tid, cid)
-}
-
-// CampaignDropGated is the E05-published compliance gate flag ("0"/"1").
-func (k Keys) CampaignDropGated(cid int64) string {
-	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gated", k.tid, cid)
-}
-
 // CampaignAdaptDecisions is the E03 audit STREAM (MAXLEN 5760 = 24h at 15s).
 func (k Keys) CampaignAdaptDecisions(cid int64) string {
 	return fmt.Sprintf("t:%d:campaign:{%d}:adapt_decisions", k.tid, cid)
