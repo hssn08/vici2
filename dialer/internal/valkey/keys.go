@@ -271,3 +271,33 @@ func (k Keys) AuthRefreshFamily(familyID string) string {
 func (k Keys) AuthRefreshUser(userID int64) string {
 	return fmt.Sprintf("t:%d:auth:refresh:user:%d", k.tid, userID)
 }
+
+// --- X04 number pool keys ---------------------------------------------------
+
+// PoolRRCursor is the round-robin cursor STRING for a pool (INCR; no TTL).
+// Hash tag {poolID} colocates all pool keys on the same Valkey cluster shard.
+func (k Keys) PoolRRCursor(poolID int64) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:rr_cursor", k.tid, poolID)
+}
+
+// PoolMembers is the cached active member list JSON STRING for a pool.
+func (k Keys) PoolMembers(poolID int64) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:members", k.tid, poolID)
+}
+
+// PoolInvalidate is the pub/sub channel name for pool cache invalidation.
+// Dialer processes subscribe; API publishes on membership change.
+func (k Keys) PoolInvalidate(poolID int64) string {
+	return fmt.Sprintf("t:%d:pool:{%d}:invalidate", k.tid, poolID)
+}
+
+// DIDDailyCalls is the per-DID daily call counter (INCR; TTL = seconds until midnight UTC).
+// Hash tag {didID} colocates the DID's daily and concurrent counters.
+func (k Keys) DIDDailyCalls(didID int64) string {
+	return fmt.Sprintf("t:%d:did:{%d}:daily_calls", k.tid, didID)
+}
+
+// DIDConcurrent is the per-DID concurrent active call counter (INCR on originate, DECR on hangup).
+func (k Keys) DIDConcurrent(didID int64) string {
+	return fmt.Sprintf("t:%d:did:{%d}:concurrent", k.tid, didID)
+}
