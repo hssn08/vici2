@@ -42,6 +42,12 @@ export const env = {
   bootstrapSuperadminPassword: process.env.BOOTSTRAP_SUPERADMIN_PASSWORD ?? "",
   bootstrapSuperadminTenantId: num(process.env.BOOTSTRAP_SUPERADMIN_TENANT_ID, 1),
 
+  // N04 HubSpot integration
+  hubspotClientId:     process.env.HUBSPOT_CLIENT_ID ?? "",
+  hubspotClientSecret: process.env.HUBSPOT_CLIENT_SECRET ?? "",
+  hubspotRedirectUri:  process.env.HUBSPOT_REDIRECT_URI ?? "",
+  hubspotAppToken:     process.env.HUBSPOT_APP_TOKEN ?? "",
+
   // N01 SMTP (Phase 1 — plain nodemailer; SES/Postmark Phase 2)
   smtpHost: process.env.VICI2_SMTP_HOST ?? "",
   smtpPort: num(process.env.VICI2_SMTP_PORT, 587),
