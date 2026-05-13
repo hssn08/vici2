@@ -1,0 +1,84 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Redis Up",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [{"expr": "redis_up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "stat",
+      "title": "Memory Used",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "targets": [{"expr": "redis_memory_used_bytes", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "stat",
+      "title": "Connected Clients",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "targets": [{"expr": "redis_connected_clients", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "stat",
+      "title": "Ops/sec",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "targets": [{"expr": "rate(redis_commands_processed_total[5m])", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Hit / Miss Rate",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 5,
+      "targets": [
+        {"expr": "rate(redis_keyspace_hits_total[5m])", "refId": "A", "legendFormat": "hits"},
+        {"expr": "rate(redis_keyspace_misses_total[5m])", "refId": "B", "legendFormat": "misses"}
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Evicted Keys (/s)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 6,
+      "targets": [{"expr": "rate(redis_evicted_keys_total[5m])", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage vs Max",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "id": 7,
+      "targets": [
+        {"expr": "redis_memory_used_bytes", "refId": "A", "legendFormat": "used"},
+        {"expr": "redis_memory_max_bytes", "refId": "B", "legendFormat": "max"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["vici2", "redis"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "utc",
+  "title": "vici2 / Redis",
+  "uid": "redis",
+  "version": 1
+}

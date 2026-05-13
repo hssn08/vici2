@@ -1,0 +1,88 @@
+# vici2 — compliance alerts.
+# Source: spec/modules/O01/PLAN.md §3.1.
+# These alerts are TIED TO SPEC §4.1 hard floors (FCC TCPA + DNC + recording
+# consent). All page-severity rules here are zero-tolerance: statutory damages
+# $500-$1500 per call if breached.
+
+groups:
+  - name: vici2_compliance
+    interval: 15s
+    rules:
+
+      - alert: Vici2DropRateApproachingFCC
+        expr: vici2_dialer_drop_ratio > 0.025
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+          compliance: "true"
+        annotations:
+          summary: "Campaign drop rate 2.5% — approaching FCC 3% ceiling"
+          description: "Campaign {{ $labels.campaign_id }} drop rate is {{ $value | humanizePercentage }}. FCC ceiling is 3% per 30-day rolling window per campaign."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2DropRateApproachingFCC"
+          dashboard: "/d/compliance"
+
+      - alert: Vici2DropRateImminentBreach
+        expr: vici2_dialer_drop_ratio > 0.029
+        for: 1m
+        labels:
+          severity: page
+          team: oncall
+          compliance: "true"
+        annotations:
+          summary: "Campaign drop rate 2.9% — 0.1% from FCC breach"
+          description: "Campaign {{ $labels.campaign_id }} drop rate is {{ $value | humanizePercentage }}. Pause campaign or reduce pacing IMMEDIATELY to avoid FCC TCPA breach."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2DropRateImminentBreach"
+          dashboard: "/d/compliance"
+
+      - alert: Vici2DNCBypass
+        expr: increase(vici2_compliance_dnc_bypass_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          team: oncall
+          compliance: "true"
+        annotations:
+          summary: "DNC bypass detected — zero-tolerance compliance event"
+          description: "{{ $value }} DNC bypass event(s) in last 5m. Statutory TCPA damages: $500-$1500 per call. STOP campaign immediately."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2DNCBypass"
+          dashboard: "/d/compliance"
+
+      - alert: Vici2TCPAOutsideWindow
+        expr: increase(vici2_compliance_tcpa_outside_window_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          team: oncall
+          compliance: "true"
+        annotations:
+          summary: "Call attempted outside TCPA 8am-9pm window"
+          description: "{{ $value }} TCPA-window violations in last 5m for campaign {{ $labels.campaign_id }}."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2TCPAOutsideWindow"
+          dashboard: "/d/compliance"
+
+      - alert: Vici2RecordingConsentMissing
+        expr: increase(vici2_compliance_recording_consent_missing_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          team: oncall
+          compliance: "true"
+        annotations:
+          summary: "Recording started without consent state in 2-party jurisdiction"
+          description: "{{ $value }} missing-consent recording events in last 5m, state={{ $labels.state }}."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2RecordingConsentMissing"
+          dashboard: "/d/compliance"
+
+      - alert: Vici2FreeSwitchDown
+        # Source-of-truth alert. Inhibits derivative alerts (see alertmanager.yml).
+        expr: vici2_freeswitch_up == 0
+        for: 30s
+        labels:
+          severity: page
+          team: oncall
+        annotations:
+          summary: "FreeSWITCH down on {{ $labels.fs_host }}"
+          description: "All call flow halted. Check fs-exporter logs and ESL connectivity."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2FreeSwitchDown"
+          dashboard: "/d/freeswitch"

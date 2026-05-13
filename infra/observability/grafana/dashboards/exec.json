@@ -1,0 +1,88 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Calls Active (FreeSWITCH sum)",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [{"expr": "vici2:freeswitch_calls_active:sum", "refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "stat",
+      "title": "Agents Ready / Logged-in",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "targets": [
+        {"expr": "sum(vici2_agent_state_count{state=\"ready\"})", "refId": "A", "legendFormat": "ready"},
+        {"expr": "sum(vici2_agent_state_count{state=\"loggedin\"})", "refId": "B", "legendFormat": "logged-in"}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "gauge",
+      "title": "Global Drop Rate (vs FCC 3% ceiling)",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "targets": [{"expr": "max(vici2_dialer_drop_ratio)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "max": 0.05, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.025}, {"color": "red", "value": 0.029}]}}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "stat",
+      "title": "Originates/sec (5m)",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "targets": [{"expr": "sum(vici2:dialer_originates_rate:5m)", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Drop Rate by Campaign (30d rolling)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 5,
+      "targets": [{"expr": "vici2_dialer_drop_ratio", "refId": "A", "legendFormat": "campaign={{campaign_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "custom": {"drawStyle": "line", "fillOpacity": 10}, "thresholds": {"mode": "absolute", "steps": [{"color": "transparent"}, {"color": "red", "value": 0.03}]}}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Originates vs Bridged (calls/s)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 6,
+      "targets": [
+        {"expr": "sum(vici2:dialer_originates_rate:5m)", "refId": "A", "legendFormat": "originates"},
+        {"expr": "sum(vici2:dialer_bridged_rate:5m)", "refId": "B", "legendFormat": "bridged"}
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "table",
+      "title": "Active Alerts (last 24h)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "id": 7,
+      "targets": [{"expr": "ALERTS{alertstate=\"firing\"}", "refId": "A", "instant": true, "format": "table"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["vici2", "exec"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "vici2 / Exec Summary",
+  "uid": "exec",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,0 +1,31 @@
+# vici2 — Grafana provisioned datasource for Prometheus.
+# Source: spec/modules/O01/PLAN.md §8.1.
+# Grafana 11.x file provider reads this on boot.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST
+      # Enable native-histogram-aware features.
+      exemplarTraceIdDestinations: []
+      manageAlerts: false
+      prometheusType: Prometheus
+      prometheusVersion: 3.0.0
+    version: 1
+
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
+    version: 1

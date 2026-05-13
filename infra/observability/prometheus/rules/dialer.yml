@@ -1,0 +1,75 @@
+# vici2 — dialer operational alerts.
+# Source: spec/modules/O01/PLAN.md §3.2.
+
+groups:
+  - name: vici2_dialer
+    interval: 15s
+    rules:
+
+      - alert: Vici2HopperStarved
+        expr: vici2_dialer_hopper_depth < (vici2_agent_state_count{state="ready"} * 1.5)
+        for: 2m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Hopper depth below 1.5x ready agents for campaign {{ $labels.campaign_id }}"
+          description: "Hopper {{ $value }}. Refill worker may be stalled or lead list exhausted."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2HopperStarved"
+          dashboard: "/d/dialer"
+
+      - alert: Vici2HopperFloor
+        expr: vici2_dialer_hopper_depth == 0 and vici2_agent_state_count{state="ready"} > 0
+        for: 1m
+        labels:
+          severity: page
+          team: oncall
+        annotations:
+          summary: "Hopper empty with ready agents on campaign {{ $labels.campaign_id }}"
+          description: "Agents idle, no leads in hopper. Productivity collapse imminent."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2HopperFloor"
+          dashboard: "/d/dialer"
+
+      - alert: Vici2DialerOriginateLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le) (rate(vici2_dialer_originate_latency_seconds_bucket[5m]))
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Dialer originate p99 > 1s"
+          description: "ESL originate path degraded. Check FS load and carrier signalling."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2DialerOriginateLatencyHigh"
+          dashboard: "/d/dialer"
+
+      - alert: Vici2DialerErrorRateHigh
+        expr: sum(rate(vici2_dialer_errors_total[5m])) > 1
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Dialer error rate > 1/s sustained"
+          description: "Sustained dialer errors. See errors-by-code panel."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2DialerErrorRateHigh"
+          dashboard: "/d/dialer"
+
+      - alert: Vici2DialerPacingDrift
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(vici2_dialer_pacing_drift_seconds_bucket[5m]))
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Pacing tick drift p95 > 500ms"
+          description: "Dialer pacing loop falling behind target interval."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2DialerPacingDrift"
+          dashboard: "/d/dialer"

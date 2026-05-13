@@ -1,0 +1,38 @@
+# vici2 — agent state alerts.
+# Source: spec/modules/O01/PLAN.md §3.3.
+
+groups:
+  - name: vici2_agents
+    interval: 30s
+    rules:
+
+      - alert: Vici2AgentNoneReady
+        expr: |
+          sum(vici2_agent_state_count{state="ready"}) == 0
+          and
+          sum(vici2_agent_state_count{state="loggedin"}) > 0
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "All logged-in agents off-ready for 5m"
+          description: "{{ with query \"sum(vici2_agent_state_count{state='loggedin'})\" }}{{ . | first | value }}{{ end }} agents logged in but zero ready. Pause-code surge or queue stall."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2AgentNoneReady"
+          dashboard: "/d/agents"
+
+      - alert: Vici2AgentAHTOutlier
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(vici2_agent_state_duration_seconds_bucket{state="incall"}[15m]))
+          ) > 1800
+        for: 10m
+        labels:
+          severity: info
+          team: oncall
+        annotations:
+          summary: "Agent AHT p95 > 30min"
+          description: "Possible stuck call leg or training need."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2AgentAHTOutlier"
+          dashboard: "/d/agents"
