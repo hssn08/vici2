@@ -529,6 +529,9 @@ model List {
   callerIdName     String?   @map("caller_id_name") @db.VarChar(32)
   // D02 amendment §4.3 — column-mapping snapshot persisted per list.
   columnMapping    Json?     @map("column_mapping")
+  // D07 amendments — list management.
+  ownerUserId      BigInt?   @map("owner_user_id")
+  settings         Json      @default("{}") @map("settings")
   createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -539,6 +542,7 @@ model List {
 
   @@unique([tenantId, name], map: "uk_lists_tenant_name")
   @@index([tenantId, active], map: "idx_lists_t_active")
+  @@index([tenantId, ownerUserId], map: "idx_lists_t_owner")
   @@map("lists")
 }
 
@@ -551,6 +555,8 @@ model CampaignList {
   campaignId String   @map("campaign_id") @db.VarChar(32)
   listId     BigInt   @map("list_id")
   priority   Int      @default(0) @db.SmallInt
+  // D07 amendment — per-assignment active toggle (disable without unlinking).
+  active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
 
   campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_camp_lists_campaign")
