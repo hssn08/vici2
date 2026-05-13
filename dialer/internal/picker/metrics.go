@@ -31,8 +31,14 @@ type Metrics struct {
 	// vici2_picker_predictive_drop_total — reason: no_agent|agent_transfer_failed|agent_logged_out
 	PredictiveDrop *prometheus.CounterVec
 
-	// vici2_picker_amd_action_total — action: drop|transfer|message|park
+	// vici2_picker_amd_action_total — action: drop|transfer|message|park|vmdrop
 	AMDAction *prometheus.CounterVec
+
+	// I05: vici2_picker_vmdrop_played_total — VM drop audio played successfully.
+	VMDropPlayed *prometheus.CounterVec
+
+	// I05: vici2_picker_vmdrop_fallback_total — VM drop fell back (no asset or error).
+	VMDropFallback *prometheus.CounterVec
 
 	// vici2_picker_tokens_consumed_total
 	TokensConsumed *prometheus.CounterVec
@@ -132,6 +138,16 @@ func NewMetricsWithRegisterer(reg prometheus.Registerer) *Metrics {
 			"vici2_picker_amd_action_total",
 			"AMD detection actions taken per list and action type.",
 			[]string{"tenant", "campaign", "list", "action"},
+		),
+		VMDropPlayed: newCounter(
+			"vici2_picker_vmdrop_played_total",
+			"I05: VM drop audio played successfully (AMD detected machine, vmdrop action).",
+			[]string{"tenant", "campaign"},
+		),
+		VMDropFallback: newCounter(
+			"vici2_picker_vmdrop_fallback_total",
+			"I05: VM drop fell back to plain drop (no asset configured or broadcast error).",
+			[]string{"tenant", "campaign", "reason"},
 		),
 		TokensConsumed: newCounter(
 			"vici2_picker_tokens_consumed_total",

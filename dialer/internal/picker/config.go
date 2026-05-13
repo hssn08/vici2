@@ -37,6 +37,11 @@ type CampaignConfig struct {
 	DialTimeoutSec int // ring seconds; default 22
 	Active         bool
 	AMDEnabled     bool
+	// I05: VM drop action and asset path (set by M02 when amd_action=vmdrop)
+	AMDAction  string // "drop" | "vmdrop" | "agent" | "transfer" | "message" | "park"
+	VMDropPath string // resolved local_path from voicemail_drop_assets
+	// I05: when true, consent gate blocks VM drop for cell numbers (TCPA)
+	VMDropRequiresConsent bool
 }
 
 // configSnapshotKey returns the Valkey key for the campaign config snapshot.
@@ -72,6 +77,10 @@ type configJSONSnapshot struct {
 	Active         bool   `json:"active"`
 	AMDEnabled     bool   `json:"amd_enabled"`
 	CampaignIDStr  string `json:"campaign_id_str"`
+	// I05: VM drop fields — set by M02 when amd_action=vmdrop
+	AMDAction             string `json:"amd_action"`
+	VMDropLocalPath       string `json:"vmdrop_local_path"`
+	VMDropRequiresConsent bool   `json:"vmdrop_requires_consent"`
 }
 
 // LoadCampaignConfig loads a CampaignConfig from Valkey.
@@ -115,15 +124,19 @@ func parseConfigSnapshot(tenantID, campaignID int64, raw string) (CampaignConfig
 	}
 
 	return CampaignConfig{
-		TenantID:       tenantID,
-		CampaignID:     campaignID,
-		CampaignIDStr:  cidStr,
-		Mode:           mode,
-		CallStrategy:   strategy,
-		LeadLockTTLSec: lockTTL,
-		DialTimeoutSec: dialTO,
-		Active:         snap.Active,
-		AMDEnabled:     snap.AMDEnabled,
+		TenantID:              tenantID,
+		CampaignID:            campaignID,
+		CampaignIDStr:         cidStr,
+		Mode:                  mode,
+		CallStrategy:          strategy,
+		LeadLockTTLSec:        lockTTL,
+		DialTimeoutSec:        dialTO,
+		Active:                snap.Active,
+		AMDEnabled:            snap.AMDEnabled,
+		// I05: VM drop fields
+		AMDAction:             snap.AMDAction,
+		VMDropPath:            snap.VMDropLocalPath,
+		VMDropRequiresConsent: snap.VMDropRequiresConsent,
 	}, nil
 }
 

@@ -103,6 +103,32 @@ func TestAMDHandler_GroupName(t *testing.T) {
 	}
 }
 
+// TestAMDHandler_ActionVMDrop verifies "vmdrop" action is recognised.
+func TestAMDHandler_ActionVMDrop(t *testing.T) {
+	listActionFn := func(_ int64) string { return "vmdrop" }
+	action := listActionFn(4)
+	if action != "vmdrop" {
+		t.Errorf("expected vmdrop, got %s", action)
+	}
+}
+
+// TestAMDHandler_SetVMDropPath verifies SetVMDropPath stores the path.
+func TestAMDHandler_SetVMDropPath(t *testing.T) {
+	h := NewAMDHandler(1, 1, nil, nil, testMetrics(), nil, "pod-test", nil)
+	h.SetVMDropPath("/var/lib/vici2/vmdrop/1/42.wav")
+	if h.vmDropPath != "/var/lib/vici2/vmdrop/1/42.wav" {
+		t.Errorf("vmDropPath: got %q, want /var/lib/vici2/vmdrop/1/42.wav", h.vmDropPath)
+	}
+}
+
+// TestAMDHandler_VMDropPath_Empty verifies empty vmDropPath is correctly reported.
+func TestAMDHandler_VMDropPath_Empty(t *testing.T) {
+	h := NewAMDHandler(1, 1, nil, nil, testMetrics(), nil, "pod-test", nil)
+	if h.vmDropPath != "" {
+		t.Errorf("expected empty vmDropPath, got %q", h.vmDropPath)
+	}
+}
+
 // TestAnswerHandler_GroupName verifies answer handler consumer group name.
 func TestAnswerHandler_GroupName(t *testing.T) {
 	vc, _ := newTestValkey(t)
