@@ -429,6 +429,25 @@ model Campaign {
   // E04 amendment §3.3 — agent-selection strategy for PROGRESSIVE dial.
   // Phase 3 ships random/fewest_calls/rank; today only longest_wait is implemented.
   callStrategy           CallStrategy       @default(longest_wait) @map("call_strategy")
+  // E03 amendment §9.1 — 9 adaptive engine columns (FROZEN).
+  // adaptive_intensity: Vicidial-parity gain modifier -20..+20; multiplicative on step sizes.
+  adaptiveIntensity      Int                @default(0) @map("adaptive_intensity") @db.TinyInt
+  // adaptive_dl_diff_target: Phase 3 differential target; E03 ignores in Phase 2.
+  adaptiveDlDiffTarget   Int                @default(-1) @map("adaptive_dl_diff_target") @db.TinyInt
+  // adapt_tick_seconds: per-campaign outer tick interval (5-60s). Default 15 = Vicidial parity.
+  adaptTickSeconds       Int                @default(15) @map("adapt_tick_seconds") @db.UnsignedSmallInt
+  // hold_band_pp: drop-rate deadband half-width in percentage points (0.00-2.00).
+  holdBandPp             Decimal            @default(0.30) @map("hold_band_pp") @db.Decimal(3, 2)
+  // warmup_min_answered: warm-up exit gate: min answered calls (Vicidial's $VCScalls_today > 50).
+  warmupMinAnswered      Int                @default(50) @map("warmup_min_answered") @db.UnsignedSmallInt
+  // warmup_min_seconds: warm-up exit gate: min elapsed seconds (5 min default).
+  warmupMinSeconds       Int                @default(300) @map("warmup_min_seconds") @db.UnsignedSmallInt
+  // drop_gated_debounce_sec: fast-cut debounce window in seconds (0-300).
+  dropGatedDebounceSec   Int                @default(30) @map("drop_gated_debounce_sec") @db.UnsignedSmallInt
+  // shift_start_local: local-time shift start for ADAPT_TAPERED taper formula.
+  shiftStartLocal        DateTime?          @map("shift_start_local") @db.Time
+  // shift_end_local: local-time shift end for ADAPT_TAPERED taper formula.
+  shiftEndLocal          DateTime?          @map("shift_end_local") @db.Time
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
