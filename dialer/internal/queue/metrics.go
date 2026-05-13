@@ -28,8 +28,18 @@ type Metrics struct {
 	CallbackLookupTimeout *prometheus.CounterVec
 	NoAgentsSeconds *prometheus.CounterVec
 
+	// I04 — Inbound Callback Queue counters
+	I04CallbackFired    *prometheus.CounterVec
+	I04CallbackDeferred *prometheus.CounterVec
+	I04CallbackDead     *prometheus.CounterVec
+	I04LockContention   *prometheus.CounterVec
+	I04StubLeadCreated  *prometheus.CounterVec
+
 	// Histograms
 	WaitSeconds *prometheus.HistogramVec
+
+	// I04 — Inbound Callback Queue histograms
+	I04TimeToFire *prometheus.HistogramVec
 
 	// internal
 	skillCacheHits   prometheus.Counter
@@ -176,6 +186,50 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			Help: "Seconds with zero ready agents.",
 		}, []string{"ingroup_id"})
 	}).(*prometheus.CounterVec)
+
+	// I04 — Inbound Callback Queue metrics
+	m.I04CallbackFired = factory(func() prometheus.Collector {
+		return prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "vici2_i04_callback_fired_total",
+			Help: "Successful inbound callback originates (Go dispatcher).",
+		}, []string{"ingroup_id", "tcpa_outcome"})
+	}).(*prometheus.CounterVec)
+
+	m.I04CallbackDeferred = factory(func() prometheus.Collector {
+		return prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "vici2_i04_callback_deferred_go_total",
+			Help: "Inbound callbacks re-snoozed by TCPA (Go dispatcher).",
+		}, []string{"ingroup_id", "reason"})
+	}).(*prometheus.CounterVec)
+
+	m.I04CallbackDead = factory(func() prometheus.Collector {
+		return prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "vici2_i04_callback_dead_go_total",
+			Help: "Inbound callbacks terminated (Go dispatcher).",
+		}, []string{"ingroup_id", "reason"})
+	}).(*prometheus.CounterVec)
+
+	m.I04LockContention = factory(func() prometheus.Collector {
+		return prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "vici2_i04_lock_contention_total",
+			Help: "Fire lock contention (concurrent dispatcher pods).",
+		}, []string{"ingroup_id"})
+	}).(*prometheus.CounterVec)
+
+	m.I04StubLeadCreated = factory(func() prometheus.Collector {
+		return prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "vici2_i04_stub_lead_created_go_total",
+			Help: "Stub leads created by Go dispatcher for anonymous callers.",
+		}, []string{"ingroup_id"})
+	}).(*prometheus.CounterVec)
+
+	m.I04TimeToFire = factory(func() prometheus.Collector {
+		return prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "vici2_i04_time_to_fire_seconds",
+			Help:    "Seconds from callback created_at to fired_at (Go dispatcher).",
+			Buckets: []float64{30, 60, 120, 300, 600, 1800, 3600, 7200, 86400},
+		}, []string{"ingroup_id"})
+	}).(*prometheus.HistogramVec)
 
 	return m
 }

@@ -69,11 +69,15 @@ export async function callbackFireTick(
 
     const dueBy = new Date(Date.now() + graceWindowSeconds * 1000);
 
-    const due = await prisma.callback.findMany({
+    // I04 AC18: INBOUND callbacks are fired exclusively by the I01 Go dispatcher.
+    // D06 worker must NOT fire source=INBOUND callbacks.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const due = await (prisma.callback as any).findMany({
       where: {
         tenantId,
         status: "PENDING",
         callbackAt: { lte: dueBy },
+        source: { in: ["AGENT", "GLOBAL"] },  // I04: skip INBOUND
       },
       orderBy: { callbackAt: "asc" },
       take: 500,
