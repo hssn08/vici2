@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* brand scale */
+  --color-brand-50: oklch(98% 0.02 245);
+  --color-brand-100: oklch(95% 0.04 245);
+  --color-brand-200: oklch(90% 0.08 245);
+  --color-brand-300: oklch(82% 0.12 245);
+  --color-brand-400: oklch(72% 0.16 245);
+  --color-brand-500: oklch(60% 0.18 245);
+  --color-brand-600: oklch(54% 0.18 245);
+  --color-brand-700: oklch(48% 0.16 245);
+  --color-brand-800: oklch(38% 0.13 245);
+  --color-brand-900: oklch(28% 0.1 245);
+
+  /* semantic call-state palette */
+  --color-state-idle: oklch(80% 0 0);
+  --color-state-ringing: oklch(75% 0.18 90);
+  --color-state-active: oklch(68% 0.18 145);
+  --color-state-hold: oklch(75% 0.1 50);
+  --color-state-wrap: oklch(70% 0.18 280);
+  --color-state-dispo: oklch(70% 0.2 30);
+  --color-state-transfer: oklch(72% 0.16 200);
+  --color-state-error: oklch(60% 0.22 25);
+
+  /* surface tokens - light */
+  --color-surface: oklch(99% 0.002 245);
+  --color-surface-muted: oklch(96% 0.005 245);
+  --color-surface-elevated: oklch(100% 0 0);
+  --color-surface-border: oklch(90% 0.005 245);
+  --color-fg: oklch(20% 0.01 245);
+  --color-fg-muted: oklch(48% 0.01 245);
+
+  --radius-pill: 9999px;
+  --radius-card: 0.75rem;
+
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+/* dark theme overrides via class on <html> */
+@layer base {
+  :where(.dark) {
+    --color-surface: oklch(15% 0.01 245);
+    --color-surface-muted: oklch(20% 0.012 245);
+    --color-surface-elevated: oklch(23% 0.014 245);
+    --color-surface-border: oklch(30% 0.015 245);
+    --color-fg: oklch(95% 0.005 245);
+    --color-fg-muted: oklch(70% 0.01 245);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  * {
+    border-color: var(--color-surface-border);
+  }
+}
+
+@keyframes ringing-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-state-ringing);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@keyframes dispo-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@layer utilities {
+  .animate-ringing-pulse {
+    animation: ringing-pulse 1.4s ease-in-out infinite;
+  }
+  .animate-dispo-bounce {
+    animation: dispo-bounce 1s ease-in-out infinite;
+  }
+  .animate-spin-slow {
+    animation: spin 1.2s linear infinite;
+  }
+}
+
+/* universal focus-visible ring */
+@layer base {
+  :where(button, [role="button"], a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
