@@ -1,6 +1,6 @@
 # X02 — Kamailio SIP Dispatcher: Handoff
 
-_Status: NOT_STARTED — This is a stub. Fill in after implementation._
+_Status: COMPLETE | Implemented: 2026-05-13_
 
 ---
 
@@ -67,6 +67,32 @@ kamcmd permissions.reload
 - FS external profile must set `outbound-proxy = sip:10.0.0.100:5060` so all carrier-bound SIP exits through Kamailio.
 - FS ACL: `<list name="kamailio_trust">` with Kamailio VIP + both replica IPs.
 
+## Implementation Notes
+
+### Files Created
+- `infra/kamailio/` — Dockerfile, kamailio.cfg, router.lua, dispatcher.list, tls.cfg,
+  acl-carriers.conf, scripts/{entrypoint,healthcheck,kamailio-reload}.sh,
+  scripts/{dispatcher-list-renderer,check_fs_load}.py
+- `infra/keepalived/keepalived.conf` — VRRP active-passive HA
+- `infra/observability/prometheus/rules/kamailio.rules.yml` — alert rules
+
+### Files Modified
+- `docker-compose.dev.yml` — added `kamailio` service
+- `docker-compose.macos.yml` — added `kamailio` Mac override
+- `infra/observability/prometheus/prometheus.yml` — added `kamailio` scrape job
+
+### X03 Integration Detail
+`router.lua::route_initial_invite()` checks for `X-FS-Affinity` header first.
+If present, the header is stripped (not forwarded to FS) and the call is routed
+directly to the specified FS URI via `KSR.pv.sets("$ru", affinity_uri)`.
+The failure route (`ksr_failure_route_fs_failure`) fires on affinity-FS failure
+but `ds_next_dst()` will return -1 (no set context). X03 should handle 503
+from Kamailio and fall back to sending without the affinity header.
+
+### rtpengine pcall guards
+All rtpengine calls use `pcall()` in router.lua. An X01 outage does not block
+SIP routing — calls proceed with FS-native media handling.
+
 ## Runbook Pointer
 
-Full operations runbook: `spec/runbooks/kamailio.md` (created during implementation).
+Full operations runbook: `spec/runbooks/kamailio.md` (to be created by ops).

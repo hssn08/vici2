@@ -41,3 +41,12 @@ services:
       # Reduced port range for Mac Docker Desktop (avoids slow 10k-port publish).
       # Supports ~250 concurrent bridged calls (1000 ports / 4 ports per call).
       - "30000-31000:30000-31000/udp"
+
+  # X02: Kamailio Mac override.
+  # No changes needed — Kamailio already runs in bridge mode by default.
+  # rtpengine is reachable via the Docker service name "rtpengine".
+  # TLS/WSS port 7443 maps to host 7443 for browser SIP.js testing.
+  kamailio:
+    environment:
+      # On Mac, rtpengine is on the bridge (not loopback)
+      RTPENGINE_HOST: "rtpengine"

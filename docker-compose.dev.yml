@@ -487,6 +487,49 @@ services:
       - "${NODE_EXPORTER_PORT:-9107}:9107"
     networks: [vici2_default]
 
+  # ---------------------------------------------------------------------------
+  # X02: Kamailio SIP dispatcher — load balances to FreeSWITCH pool.
+  # Two replicas in production (active-passive VRRP behind VIP 10.0.0.100).
+  # In dev: single instance on bridge network; no keepalived needed.
+  # rtpengine (X01) must be up first for SDP rewrite to work; guarded in
+  # router.lua with pcall so Kamailio starts cleanly without rtpengine.
+  # ---------------------------------------------------------------------------
+  kamailio:
+    build:
+      context: ./infra/kamailio
+    image: vici2/kamailio:6.0
+    container_name: vici2_kamailio
+    restart: unless-stopped
+    environment:
+      # MySQL URL for dispatcher + permissions tables (kamailio schema)
+      KAMAILIO_DB_URL: >-
+        mysql://${KAMAILIO_DB_USER:-kamailio}:${KAMAILIO_DB_PASS:-kamailio}@mysql:3306/${KAMAILIO_DB_NAME:-kamailio}
+      # rtpengine ng-control socket (X01)
+      RTPENGINE_HOST: "${RTPENGINE_HOST:-rtpengine}"
+      RTPENGINE_NG_PORT: "${RTPENGINE_NG_PORT:-22222}"
+      # Topology hiding: mask internal FS IPs from carriers
+      TOPOH_SECRET: "${TOPOH_SECRET:-dev-topoh-secret-change-in-prod}"
+      KAMAILIO_PUBLIC_IP: "${KAMAILIO_PUBLIC_IP:-127.0.0.1}"
+      KAMAILIO_DOMAIN: "${KAMAILIO_DOMAIN:-kamailio.local}"
+      # SIP port for healthcheck.sh
+      KAMAILIO_SIP_PORT: "5060"
+    ports:
+      - "${KAMAILIO_SIP_PORT:-5060}:5060/udp"
+      - "${KAMAILIO_SIP_PORT:-5060}:5060/tcp"
+      - "${KAMAILIO_SIP_TLS_PORT:-5061}:5061/tcp"
+      - "${KAMAILIO_WSS_PORT:-7443}:7443/tcp"
+      - "${KAMAILIO_METRICS_PORT:-9190}:9090/tcp"
+      - "${KAMAILIO_JSONRPC_PORT:-8080}:8080/tcp"
+    depends_on:
+      mysql: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/kamailio-scripts/healthcheck.sh"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [vici2_default]
+
 volumes:
   mysql_data:
   valkey_data:

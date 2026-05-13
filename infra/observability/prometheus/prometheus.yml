@@ -142,6 +142,20 @@ scrape_configs:
           service: rtpengine
           layer: telephony
 
+  # --- X02: Kamailio SIP dispatcher ---
+  # Kamailio exposes Prometheus metrics via xhttp_prom module on port 9090 (/metrics).
+  # In dev (bridge): reachable as "kamailio:9090". In prod: both replicas scraped.
+  # Port 9190 is the host-side mapping (avoids conflict with Prometheus itself on 9090).
+  - job_name: kamailio
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 7s
+    static_configs:
+      - targets: ["kamailio:9090"]
+        labels:
+          service: kamailio
+          layer: telephony
+
   # --- Prometheus self-monitoring ---
 
   - job_name: prometheus
