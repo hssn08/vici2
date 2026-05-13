@@ -132,7 +132,35 @@ func (k Keys) JanitorLock() string {
 	return fmt.Sprintf("t:%d:janitor:lock", k.tid)
 }
 func (k Keys) AdaptLock(cid int64) string {
-	return fmt.Sprintf("t:%d:adapt:lock:%d", k.tid, cid)
+	return fmt.Sprintf("t:%d:adapt:lock:{%d}", k.tid, cid)
+}
+
+// AdaptFastcutLock is the fast-cut coalescing lock key (E03 PLAN §10.2).
+// TTL=5s; prevents multi-pod fast-cut storms.
+func (k Keys) AdaptFastcutLock(cid int64) string {
+	return fmt.Sprintf("t:%d:adapt:fastcut:{%d}", k.tid, cid)
+}
+
+// CampaignPaceState is the E03 controller HASH key (E03 PLAN §10.1).
+// Contains integral_term, last_level, warm_up_calls_remaining, and 6 other fields.
+// No TTL — persistent. Hash tag {cid} colocates with dial_level and active_calls.
+func (k Keys) CampaignPaceState(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:pace_state", k.tid, cid)
+}
+
+// CampaignDropPct30d is the E05-published 30-day rolling drop% (E03 reads).
+func (k Keys) CampaignDropPct30d(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_pct_30d", k.tid, cid)
+}
+
+// CampaignDropGated is the E05-published compliance gate flag ("0"/"1").
+func (k Keys) CampaignDropGated(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gated", k.tid, cid)
+}
+
+// CampaignAdaptDecisions is the E03 audit STREAM (MAXLEN 5760 = 24h at 15s).
+func (k Keys) CampaignAdaptDecisions(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:adapt_decisions", k.tid, cid)
 }
 
 // --- pub/sub channels --------------------------------------------------------
