@@ -7,7 +7,9 @@ import { useUiStore } from "@/lib/stores/ui";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Button } from "@/components/ui/button";
 import { AgentStateWidget } from "@/components/agent/AgentStateWidget";
+import { AgentStatsWidget } from "@/components/agent/AgentStatsWidget";
 import { ConnectionIndicator } from "@/components/agent/ConnectionIndicator";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function TopNav(): React.ReactElement {
   const user = useAuthStore((s) => s.user);
@@ -43,9 +45,11 @@ export function TopNav(): React.ReactElement {
         <AgentStateWidget />
       </div>
 
-      {/* Right: connection indicator + tenant/user info + theme + logout */}
+      {/* Right: stats + connection indicator + bell + tenant/user info + theme + logout */}
       <div className="flex items-center gap-3">
+        <AgentStatsWidget />
         <ConnectionIndicator />
+        <NotificationBell />
 
         {user ? (
           <span

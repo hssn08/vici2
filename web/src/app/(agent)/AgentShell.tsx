@@ -7,6 +7,7 @@ import { refreshAccessToken } from "@/lib/auth";
 import { TopNav } from "@/components/shell/TopNav";
 import { SideNav } from "@/components/shell/SideNav";
 import { StatusBar } from "@/components/shell/StatusBar";
+import { HotkeyHelpOverlay } from "@/components/shell/HotkeyHelpOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SipProvider } from "@/lib/sip";
 import { useAgentStateSync } from "@/lib/agent";
@@ -34,6 +35,8 @@ function AgentShellInner({
         </main>
       </div>
       <StatusBar />
+      {/* A07: F1 hotkey help overlay — mounted once, always listening */}
+      <HotkeyHelpOverlay />
     </div>
   );
 }
