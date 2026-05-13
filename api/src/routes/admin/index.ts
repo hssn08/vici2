@@ -7,10 +7,12 @@
 import { registerAdminUserRoutes } from "./users/index.js";
 import { registerAdminSettingsRoutes } from "./settings/index.js";
 import { registerAdminIngroupRoutes } from "./ingroups.js";
+import { registerAdminAlertReceiverRoutes } from "./alert-receivers/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
   await registerAdminUserRoutes(app);
   await registerAdminSettingsRoutes(app);
   await registerAdminIngroupRoutes(app);
+  await registerAdminAlertReceiverRoutes(app);
 }
