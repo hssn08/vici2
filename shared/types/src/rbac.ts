@@ -161,6 +161,9 @@ export const VERBS = [
   // HubSpot integration (N04)
   'integration:hs:configure',
   'integration:hs:click_to_dial',
+  // infra / fs-nodes (X03)
+  'infra:fs_node:read',
+  'infra:fs_node:edit',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -337,6 +340,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N04 — HubSpot integration
     'integration:hs:configure':    { scope: 'tenant' },
     'integration:hs:click_to_dial': { scope: 'tenant' },
+    // X03 — FS node infra
+    'infra:fs_node:read':      { scope: 'tenant' },
+    'infra:fs_node:edit':      { scope: 'tenant' },
   },
 
   admin: {
@@ -440,6 +446,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N04 — HubSpot integration
     'integration:hs:configure':    { scope: 'tenant' },
     'integration:hs:click_to_dial': { scope: 'tenant' },
+    // X03 — FS node infra (admin: read-only)
+    'infra:fs_node:read':      { scope: 'tenant' },
   },
 
   supervisor: {
