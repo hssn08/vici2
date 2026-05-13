@@ -1,0 +1,27 @@
+{
+  "_comment": "call_window_audit ALLOW decision with full TZ resolution",
+  "table": "call_window_audit",
+  "row": {
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tenant_id": 1,
+    "id": 1,
+    "created_at": "2026-05-12T14:30:00.000000Z",
+    "lead_id": 12345,
+    "phone_e164": "+15551234567",
+    "campaign_id": "CAMP001",
+    "decision": "ALLOW",
+    "reason": "within_window",
+    "tz_iana": "America/New_York",
+    "tz_confidence": "KNOWN",
+    "state_code": "NY",
+    "zip": "10001",
+    "party_local": "2026-05-12T10:30:00.000000Z",
+    "party_dow": 2,
+    "effective_open_min": 480,
+    "effective_close_min": 1200,
+    "rule_applied": "state:NY",
+    "enforcement_point": "originate_path",
+    "next_open_at": null,
+    "call_uuid": "call-abc123"
+  }
+}
