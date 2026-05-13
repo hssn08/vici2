@@ -19,13 +19,21 @@
 set -euo pipefail
 
 SCHEMA="${SCHEMA:-api/prisma/schema.prisma}"
-EXEMPT_MODELS_REGEX='^(PhoneCode|PhoneCodeOverride|ZipCode|AuthConfig)$'
+# Models exempt from tenant_id leadership entirely (no tenant_id column,
+# global reference / single-row / system).
+#   PhoneCode, PhoneCodeOverride, ZipCode  — global NANP / ZIP reference
+#   AuthConfig                             — single-row F05 hook
+#   StateHoliday                           — global C01 admin lookup
+#   DncSyncConfig, DncSyncLog              — D05 sync state (system-scoped)
+EXEMPT_MODELS_REGEX='^(PhoneCode|PhoneCodeOverride|ZipCode|AuthConfig|StateHoliday|DncSyncConfig|DncSyncLog)$'
 # Per-(model, index-map-name) exemptions for indexes that legitimately do
 # NOT lead with tenant_id. Listed here so any future addition is reviewed.
 #   Dnc.idx_dnc_phone_only      — federal-scrub fast path (PLAN §4.14)
 #   CallLog.uk_call_log_uuid    — uuid + partition col uniqueness (PLAN §4.24)
 #   RecordingLog.uk_recording_log_uuid — same (PLAN §4.26)
-EXEMPT_INDEXES_REGEX='^(idx_dnc_phone_only|uk_call_log_uuid|uk_recording_log_uuid)$'
+#   OriginateAudit.uq_originate_audit_attempt — attempt_uuid global idempotency (T04 §7)
+#   OriginateAudit.idx_originate_audit_call_uuid — joins call_log via uuid (T04 §7)
+EXEMPT_INDEXES_REGEX='^(idx_dnc_phone_only|uk_call_log_uuid|uk_recording_log_uuid|uq_originate_audit_attempt|idx_originate_audit_call_uuid)$'
 
 if [[ ! -f "$SCHEMA" ]]; then
   echo "[check] schema not found at $SCHEMA — run from repo root" >&2
@@ -124,7 +132,14 @@ if [[ -n "${DATABASE_URL:-}" ]] && command -v mysql >/dev/null 2>&1; then
           AND c.COLUMN_NAME = 'tenant_id'
       )
         AND idx.cols NOT LIKE 'tenant_id%'
-        AND idx.TABLE_NAME NOT IN ('phone_codes','phone_codes_overrides','zip_codes','auth_config','_prisma_migrations')
+        AND idx.TABLE_NAME NOT IN ('phone_codes','phone_codes_overrides','zip_codes','auth_config','_prisma_migrations','state_holidays','dnc_sync_config','dnc_sync_log')
+        AND CONCAT(idx.TABLE_NAME, '.', idx.INDEX_NAME) NOT IN (
+          'dnc.idx_dnc_phone_only',
+          'call_log.uk_call_log_uuid',
+          'recording_log.uk_recording_log_uuid',
+          'originate_audit.uq_originate_audit_attempt',
+          'originate_audit.idx_originate_audit_call_uuid'
+        )
         AND (LOCATE(',', idx.cols) > 0);
     " 2>/dev/null || echo "")
 

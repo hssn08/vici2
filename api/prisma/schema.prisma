@@ -29,6 +29,49 @@
 //   A4: zip_codes table (D03 ZIP cascade)
 //   A5: phone_codes_overrides (D03 manual override resolver)
 //   A6: bootstrap super_admin shape (no row seeded — F05 owns)
+//
+// Wave-5 amendments (feat/F02-amendments — additive only, no DROP):
+//   C01.1  call_window_audit table (partitioned, INSERT-only) — TCPA decisions log
+//   C01.2  state_holidays table (admin-display lookup; non-partitioned)
+//   C01.3  campaigns.unknown_tz_policy ENUM('deny','warn_pass') DEFAULT 'deny'
+//   C01.4  leads.tz_blocked TINYINT(1) DEFAULT 0  (M03 admin-review flag)
+//   T02.1  carriers.kind ENUM widened from 5 → 8 values (telnyx-creds/-ip,
+//          bandwidth, flowroute added; legacy 'telnyx' kept for back-compat)
+//   T02.2  carriers.send_pai BOOLEAN DEFAULT false  (per-call PAI default)
+//   T02.3  carriers.is_emergency BOOLEAN DEFAULT false  (E911 tag)
+//   T02.4  carriers.max_concurrent INT NULL  (carrier-wide concurrency cap)
+//   T02.5  carriers.notes JSON NOT NULL DEFAULT (JSON_OBJECT())  (operator memos)
+//   T02.6  carriers.version INT NOT NULL DEFAULT 1  (optimistic concurrency)
+//   T02.7  gateways.weight SMALLINT NOT NULL DEFAULT 100  (Phase-2 distributor)
+//   T02.8  gateways.max_concurrent INT NULL
+//   T02.9  gateways.version INT NOT NULL DEFAULT 1
+//   T02.10 gateways.cost_per_min_cents INT NULL  (Phase-2 forward-compat)
+//   D01.1  leads.version SMALLINT NOT NULL DEFAULT 1  (optimistic-lock token)
+//   D05.1  tenant_id=0 sentinel row supported by FK (seed insert id=0)
+//   D05.2  dnc_sync_config table (per-source cadence + last/next_run_at)
+//   D05.3  dnc_sync_log table (partitioned, INSERT-only) — sync run summaries
+//   D05.4  tenants.internal_dnc_retention_years SMALLINT DEFAULT 5  (max 99)
+//   E01.1  campaigns.dial_level DECIMAL(4,2) DEFAULT 1.50
+//   E01.2  campaigns.dial_timeout_sec already exists; re-named not needed
+//   E01.3  campaigns.lock_ttl_sec SMALLINT DEFAULT 30
+//   E01.4  campaigns.min_hopper_level INT DEFAULT 50
+//   E01.5  campaigns.max_hopper_level INT DEFAULT 5000
+//   E01.6  campaigns.hopper_buffer_multiplier DECIMAL(3,1) DEFAULT 1.5
+//   E01.7  campaigns.recycle_delay_seconds INT DEFAULT 600
+//   E01.8  campaigns.max_calls_per_lead TINYINT DEFAULT 5
+//   E01.9  campaigns.dial_statuses JSON DEFAULT (JSON_ARRAY('NEW','NA','B','CALLBK'))
+//   E01.10 campaigns.low_water_pct TINYINT DEFAULT 25
+//   E01.11 campaigns.high_water_pct TINYINT DEFAULT 90
+//   E01.12 campaigns.over_fetch_ratio DECIMAL(3,1) DEFAULT 1.5
+//   E01.13 campaigns.machine_terminal BOOL DEFAULT true
+//   E01.14 campaigns.lead_filter_sql TEXT NULL
+//   E01.15 campaigns.multi_list_mix ENUM('EVEN','MULTI','NONE') DEFAULT 'EVEN'
+//   E01.16 campaign_status_overrides table (per-campaign status recycle override)
+//   T04.1  originate_audit table (partitioned by originated_at; INSERT+UPDATE-once)
+//   T04.2  4 new D04 statuses seeded: TCPA, CONSENT_NOT_OBTAINED,
+//          CARRIER_FAIL, GATEWAY_LIMIT_TRY_LATER (under campaign_id='__SYS__')
+//   T04.3  lists.caller_id_override VARCHAR(16) NULL
+//   T04.4  lists.caller_id_name VARCHAR(32) NULL
 
 generator client {
   provider = "prisma-client-js"
@@ -44,13 +87,16 @@ datasource db {
 // =============================================================================
 
 model Tenant {
-  id        BigInt   @id @default(autoincrement())
-  name      String   @db.VarChar(128)
-  slug      String   @unique @db.VarChar(64)
-  active    Boolean  @default(true)
-  settings  Json
-  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+  id                        BigInt   @id @default(autoincrement())
+  name                      String   @db.VarChar(128)
+  slug                      String   @unique @db.VarChar(64)
+  active                    Boolean  @default(true)
+  settings                  Json
+  // D05 amendment — per-tenant FCC 64.1200(d) internal-DNC retention,
+  // default 5 years (FCC floor); operator may extend up to 99.
+  internalDncRetentionYears Int      @default(5) @map("internal_dnc_retention_years") @db.SmallInt
+  createdAt                 DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt                 DateTime @updatedAt @map("updated_at") @db.DateTime(6)
 
   users          User[]
   userGroups     UserGroup[]
@@ -246,51 +292,82 @@ enum PauseCodesRequired {
   FORCE
 }
 
-model Campaign {
-  tenantId           BigInt             @default(1) @map("tenant_id")
-  id                 String             @db.VarChar(32)
-  name               String             @db.VarChar(128)
-  active             Boolean            @default(true)
-  dialMethod         DialMethod         @default(MANUAL) @map("dial_method")
-  autoDialLevel      Decimal            @default(0.00) @map("auto_dial_level") @db.Decimal(4, 2)
-  adaptiveMaxLevel   Decimal            @default(3.00) @map("adaptive_max_level") @db.Decimal(4, 2)
-  adaptiveDropPct    Decimal            @default(1.50) @map("adaptive_drop_pct") @db.Decimal(4, 2)
-  dialTimeoutSec     Int                @default(22) @map("dial_timeout_sec") @db.SmallInt
-  wrapupSeconds      Int                @default(10) @map("wrapup_seconds") @db.SmallInt
-  nextAgentCall      NextAgentCall      @default(longest_wait) @map("next_agent_call")
-  availableOnlyTally Boolean            @default(false) @map("available_only_tally")
-  hopperSizeTarget   Int                @default(0) @map("hopper_size_target")
-  hopperMultiplier   Decimal            @default(2.0) @map("hopper_multiplier") @db.Decimal(3, 1)
-  callerIdCarrierId  BigInt?            @map("caller_id_carrier_id")
-  callerIdOverride   String?            @map("caller_id_override") @db.VarChar(16)
-  recordingMode      RecordingMode      @default(ALL) @map("recording_mode")
-  amdEnabled         Boolean            @default(false) @map("amd_enabled")
-  amdAction          AmdAction          @default(drop) @map("amd_action")
-  vmdropAudio        String?            @map("vmdrop_audio") @db.VarChar(255)
-  safeHarborAudio    String?            @map("safe_harbor_audio") @db.VarChar(255)
-  scriptId           BigInt?            @map("script_id")
-  webformUrl         String?            @map("webform_url") @db.VarChar(512)
-  dialStatusFilter   Json               @map("dial_status_filter")
-  callTimeId         BigInt?            @map("call_time_id")
-  useInternalDnc     Boolean            @default(true) @map("use_internal_dnc")
-  useFederalDnc      Boolean            @default(true) @map("use_federal_dnc")
-  useStateDnc        Boolean            @default(true) @map("use_state_dnc")
-  pauseCodesRequired PauseCodesRequired @default(OPTIONAL) @map("pause_codes_required")
-  hotKeysActive      Boolean            @default(true) @map("hot_keys_active")
-  closerIngroups     Json               @map("closer_ingroups")
-  createdAt          DateTime           @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt          DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
+// C01 amendment — per-campaign policy when TZ resolution returns NONE.
+enum UnknownTzPolicy {
+  deny
+  warn_pass
+}
 
-  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_campaigns_tenant")
-  callerIdCarrier Carrier?       @relation("CampaignCallerCarrier", fields: [callerIdCarrierId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_caller_carrier")
-  script          Script?        @relation(fields: [scriptId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_script")
-  callTime        CallTime?      @relation(fields: [callTimeId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_calltime")
+// E01 amendment — multi-list ordering / mixing strategy.
+enum MultiListMix {
+  EVEN
+  MULTI
+  NONE
+}
+
+model Campaign {
+  tenantId               BigInt             @default(1) @map("tenant_id")
+  id                     String             @db.VarChar(32)
+  name                   String             @db.VarChar(128)
+  active                 Boolean            @default(true)
+  dialMethod             DialMethod         @default(MANUAL) @map("dial_method")
+  autoDialLevel          Decimal            @default(0.00) @map("auto_dial_level") @db.Decimal(4, 2)
+  adaptiveMaxLevel       Decimal            @default(3.00) @map("adaptive_max_level") @db.Decimal(4, 2)
+  adaptiveDropPct        Decimal            @default(1.50) @map("adaptive_drop_pct") @db.Decimal(4, 2)
+  dialTimeoutSec         Int                @default(22) @map("dial_timeout_sec") @db.SmallInt
+  wrapupSeconds          Int                @default(10) @map("wrapup_seconds") @db.SmallInt
+  nextAgentCall          NextAgentCall      @default(longest_wait) @map("next_agent_call")
+  availableOnlyTally     Boolean            @default(false) @map("available_only_tally")
+  hopperSizeTarget       Int                @default(0) @map("hopper_size_target")
+  hopperMultiplier       Decimal            @default(2.0) @map("hopper_multiplier") @db.Decimal(3, 1)
+  callerIdCarrierId      BigInt?            @map("caller_id_carrier_id")
+  callerIdOverride       String?            @map("caller_id_override") @db.VarChar(16)
+  recordingMode          RecordingMode      @default(ALL) @map("recording_mode")
+  amdEnabled             Boolean            @default(false) @map("amd_enabled")
+  amdAction              AmdAction          @default(drop) @map("amd_action")
+  vmdropAudio            String?            @map("vmdrop_audio") @db.VarChar(255)
+  safeHarborAudio        String?            @map("safe_harbor_audio") @db.VarChar(255)
+  scriptId               BigInt?            @map("script_id")
+  webformUrl             String?            @map("webform_url") @db.VarChar(512)
+  dialStatusFilter       Json               @map("dial_status_filter")
+  callTimeId             BigInt?            @map("call_time_id")
+  useInternalDnc         Boolean            @default(true) @map("use_internal_dnc")
+  useFederalDnc          Boolean            @default(true) @map("use_federal_dnc")
+  useStateDnc            Boolean            @default(true) @map("use_state_dnc")
+  pauseCodesRequired     PauseCodesRequired @default(OPTIONAL) @map("pause_codes_required")
+  hotKeysActive          Boolean            @default(true) @map("hot_keys_active")
+  closerIngroups         Json               @map("closer_ingroups")
+  // C01 amendment §8.3 — per-campaign unknown-TZ policy (deny | warn_pass).
+  unknownTzPolicy        UnknownTzPolicy    @default(deny) @map("unknown_tz_policy")
+  // E01 amendment §10 — 16 hopper / pacing tunables (additive).
+  dialLevel              Decimal            @default(1.50) @map("dial_level") @db.Decimal(4, 2)
+  lockTtlSec             Int                @default(30) @map("lock_ttl_sec") @db.SmallInt
+  minHopperLevel         Int                @default(50) @map("min_hopper_level")
+  maxHopperLevel         Int                @default(5000) @map("max_hopper_level")
+  hopperBufferMultiplier Decimal            @default(1.5) @map("hopper_buffer_multiplier") @db.Decimal(3, 1)
+  recycleDelaySeconds    Int                @default(600) @map("recycle_delay_seconds")
+  maxCallsPerLead        Int                @default(5) @map("max_calls_per_lead") @db.TinyInt
+  dialStatuses           Json               @map("dial_statuses")
+  lowWaterPct            Int                @default(25) @map("low_water_pct") @db.TinyInt
+  highWaterPct           Int                @default(90) @map("high_water_pct") @db.TinyInt
+  overFetchRatio         Decimal            @default(1.5) @map("over_fetch_ratio") @db.Decimal(3, 1)
+  machineTerminal        Boolean            @default(true) @map("machine_terminal")
+  leadFilterSql          String?            @map("lead_filter_sql") @db.Text
+  multiListMix           MultiListMix       @default(EVEN) @map("multi_list_mix")
+  createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_campaigns_tenant")
+  callerIdCarrier Carrier?                 @relation("CampaignCallerCarrier", fields: [callerIdCarrierId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_caller_carrier")
+  script          Script?                  @relation(fields: [scriptId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_script")
+  callTime        CallTime?                @relation(fields: [callTimeId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_calltime")
   campaignLists   CampaignList[]
   pauseCodes      PauseCode[]
-  scripts         Script[]       @relation("ScriptCampaign")
+  scripts         Script[]                 @relation("ScriptCampaign")
   callbacks       Callback[]
   hopperMirror    HopperMirror[]
   dispositions    Disposition[]
+  statusOverrides CampaignStatusOverride[]
 
   @@id([tenantId, id])
   @@index([tenantId, active, dialMethod], map: "idx_campaigns_t_active_method")
@@ -298,20 +375,48 @@ model Campaign {
 }
 
 // =============================================================================
+// E01 amendment §10/§12 — campaign_status_overrides
+//
+// Per-campaign override of `statuses.recycle_delay_seconds` (the column lives
+// on D04's statuses table; this table allows the value to differ per campaign
+// without touching the system-wide row).
+// =============================================================================
+
+model CampaignStatusOverride {
+  tenantId            BigInt   @default(1) @map("tenant_id")
+  campaignId          String   @map("campaign_id") @db.VarChar(32)
+  statusCode          String   @map("status_code") @db.VarChar(8)
+  recycleDelaySeconds Int?     @map("recycle_delay_seconds")
+  maxCalls            Int?     @map("max_calls") @db.TinyInt
+  notes               String?  @db.VarChar(255)
+  createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_camp_status_ovr_campaign")
+
+  @@id([tenantId, campaignId, statusCode])
+  @@index([tenantId, statusCode], map: "idx_camp_status_ovr_t_status")
+  @@map("campaign_status_overrides")
+}
+
+// =============================================================================
 // 4.7  lists
 // =============================================================================
 
 model List {
-  id          BigInt    @id @default(autoincrement())
-  tenantId    BigInt    @default(1) @map("tenant_id")
-  name        String    @db.VarChar(128)
-  description String?   @db.Text
-  active      Boolean   @default(true)
-  resetTime   DateTime? @map("reset_time") @db.Time(0)
-  expiration  DateTime? @db.Date
-  source      String?   @db.VarChar(64)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+  id               BigInt    @id @default(autoincrement())
+  tenantId         BigInt    @default(1) @map("tenant_id")
+  name             String    @db.VarChar(128)
+  description      String?   @db.Text
+  active           Boolean   @default(true)
+  resetTime        DateTime? @map("reset_time") @db.Time(0)
+  expiration       DateTime? @db.Date
+  source           String?   @db.VarChar(64)
+  // T04 amendment — per-list caller-ID waterfall tier 2 (overrides campaign).
+  callerIdOverride String?   @map("caller_id_override") @db.VarChar(16)
+  callerIdName     String?   @map("caller_id_name") @db.VarChar(32)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_lists_tenant")
   campaignLists CampaignList[]
@@ -475,6 +580,10 @@ model Lead {
   lastLocalCallTime DateTime? @map("last_local_call_time") @db.Time(0)
   tzOffsetMin       Int?      @map("tz_offset_min") @db.SmallInt
   knownTimezone     String?   @map("known_timezone") @db.VarChar(40)
+  // C01 amendment §8.4 — surface BLOCK_INVALID(no_timezone) leads to M03.
+  tzBlocked         Boolean   @default(false) @map("tz_blocked")
+  // D01 amendment §13.1 — optimistic-lock token for /api/leads PATCH (If-Match).
+  version           Int       @default(1) @db.SmallInt
   deletedAt         DateTime? @map("deleted_at") @db.DateTime(6)
   entryAt           DateTime  @default(now()) @map("entry_at") @db.DateTime(6)
   modifyAt          DateTime  @default(now()) @map("modify_at") @db.DateTime(6)
@@ -723,28 +832,38 @@ model Disposition {
 
 enum CarrierKind {
   twilio
-  telnyx
+  telnyx // legacy — retagged to telnyx-creds/-ip on T02 IMPLEMENT
+  telnyx_creds @map("telnyx-creds")
+  telnyx_ip    @map("telnyx-ip")
   signalwire
   ringcentral
+  bandwidth
+  flowroute
   byoc
 }
 
 model Carrier {
-  id           BigInt      @id @default(autoincrement())
-  tenantId     BigInt      @default(1) @map("tenant_id")
-  name         String      @db.VarChar(64)
-  kind         CarrierKind
-  proxy        String      @db.VarChar(255)
-  usernameCt   Bytes?      @map("username_ct") @db.VarBinary(512)
-  passwordCt   Bytes?      @map("password_ct") @db.VarBinary(512)
-  kekVersion   Int         @default(1) @map("kek_version") @db.SmallInt
-  register     Boolean     @default(false)
-  callerIdE164 String?     @map("caller_id_e164") @db.VarChar(16)
-  active       Boolean     @default(true)
-  ipAllowlist  Json        @map("ip_allowlist")
-  configJson   Json        @map("config_json")
-  createdAt    DateTime    @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt    DateTime    @updatedAt @map("updated_at") @db.DateTime(6)
+  id            BigInt      @id @default(autoincrement())
+  tenantId      BigInt      @default(1) @map("tenant_id")
+  name          String      @db.VarChar(64)
+  kind          CarrierKind
+  proxy         String      @db.VarChar(255)
+  usernameCt    Bytes?      @map("username_ct") @db.VarBinary(512)
+  passwordCt    Bytes?      @map("password_ct") @db.VarBinary(512)
+  kekVersion    Int         @default(1) @map("kek_version") @db.SmallInt
+  register      Boolean     @default(false)
+  callerIdE164  String?     @map("caller_id_e164") @db.VarChar(16)
+  active        Boolean     @default(true)
+  ipAllowlist   Json        @map("ip_allowlist")
+  configJson    Json        @map("config_json")
+  // T02 amendment §14.5 — extra columns (additive).
+  sendPai       Boolean     @default(false) @map("send_pai")
+  isEmergency   Boolean     @default(false) @map("is_emergency")
+  maxConcurrent Int?        @map("max_concurrent")
+  notes         Json        @map("notes")
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_carriers_tenant")
   gateways   Gateway[]
@@ -783,6 +902,11 @@ model Gateway {
   priority          Int              @default(100) @db.SmallInt
   active            Boolean          @default(true)
   templateOverrides Json             @map("template_overrides")
+  // T02 amendment §14.5 — distributor weight + concurrency cap + version + cost.
+  weight            Int              @default(100) @db.SmallInt
+  maxConcurrent     Int?             @map("max_concurrent")
+  version           Int              @default(1)
+  costPerMinCents   Int?             @map("cost_per_min_cents")
   createdAt         DateTime         @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.DateTime(6)
 
@@ -1098,4 +1222,264 @@ model AuthConfig {
   lockoutWindowSeconds   Int @default(900) @map("lockout_window_seconds")
 
   @@map("auth_config")
+}
+
+// =============================================================================
+// C01 amendment §8.1 — call_window_audit
+//
+// Per-decision TCPA audit log. Partitioned monthly RANGE COLUMNS(created_at).
+// INSERT-only via grant + trigger pair (mirrors audit_log). C03 owns S3
+// archival + retention rotation. NO foreign keys (partitioned-table rule).
+// =============================================================================
+
+enum CwaDecision {
+  ALLOW
+  ALLOW_WARN
+  SKIP_UNTIL
+  BLOCK_INVALID
+}
+
+enum CwaTzConfidence {
+  KNOWN
+  ZIP
+  NXX
+  NPA
+  STATE_DEFAULT
+  CAMPAIGN_DEFAULT
+  NONE
+}
+
+enum CwaEnforcementPoint {
+  hopper_filler
+  originate_path
+  pacing
+  manual_dial
+}
+
+model CallWindowAudit {
+  id                BigInt              @default(autoincrement())
+  tenantId          BigInt              @default(1) @map("tenant_id")
+  leadId            BigInt              @map("lead_id")
+  phoneE164         String              @map("phone_e164") @db.VarChar(16)
+  campaignId        String              @map("campaign_id") @db.VarChar(32)
+  decision          CwaDecision
+  reason            String              @db.VarChar(64)
+  tzIana            String?             @map("tz_iana") @db.VarChar(40)
+  tzConfidence      CwaTzConfidence?    @map("tz_confidence")
+  stateCode         String?             @map("state_code") @db.Char(2)
+  zip               String?             @db.VarChar(16)
+  partyLocal        DateTime?           @map("party_local") @db.DateTime(6)
+  partyDow          Int?                @map("party_dow") @db.TinyInt
+  effectiveOpenMin  Int?                @map("effective_open_min") @db.SmallInt
+  effectiveCloseMin Int?                @map("effective_close_min") @db.SmallInt
+  ruleApplied       String?             @map("rule_applied") @db.VarChar(64)
+  enforcementPoint  CwaEnforcementPoint @map("enforcement_point")
+  nextOpenAt        DateTime?           @map("next_open_at") @db.DateTime(6)
+  callUuid          String?             @map("call_uuid") @db.VarChar(64)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@id([id, createdAt])
+  @@index([tenantId, leadId, createdAt], map: "idx_cwa_t_lead_ts")
+  @@index([tenantId, decision, createdAt], map: "idx_cwa_t_decision_ts")
+  @@index([tenantId, campaignId, createdAt], map: "idx_cwa_t_campaign_ts")
+  @@index([tenantId, stateCode, createdAt], map: "idx_cwa_t_state_ts")
+  @@index([tenantId, callUuid], map: "idx_cwa_t_call_uuid")
+  @@map("call_window_audit")
+}
+
+// =============================================================================
+// C01 amendment §8.2 — state_holidays
+//
+// Admin-display lookup. Runtime gate uses an in-process HolidayCalendar
+// (computed via Easter computus for LA Mardi Gras / Good Friday). NOT
+// partitioned (small dataset; ~150 rows for 5y forward across all states).
+// No tenant_id — global reference like phone_codes.
+// =============================================================================
+
+model StateHoliday {
+  id          BigInt   @id @default(autoincrement())
+  stateCode   String   @map("state_code") @db.Char(2)
+  holidayDate DateTime @map("holiday_date") @db.Date
+  name        String   @db.VarChar(64)
+  citation    String?  @db.VarChar(128)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  @@unique([stateCode, holidayDate], map: "uk_state_holidays_state_date")
+  @@index([holidayDate], map: "idx_state_holidays_date")
+  @@map("state_holidays")
+}
+
+// =============================================================================
+// D05 amendment §4.2 — dnc_sync_config
+//
+// Per-source (federal | state:XX | litigator) cron config + last-run state.
+// Single row per source. Config secrets reference KEK-encrypted blobs in
+// `config_json` (F05 helper).
+// =============================================================================
+
+enum DncSyncCadence {
+  daily
+  weekly
+  monthly
+  quarterly
+}
+
+model DncSyncConfig {
+  source     String         @id @db.VarChar(32) // 'federal' | 'state:TX' | 'litigator'
+  enabled    Boolean        @default(false)
+  cadence    DncSyncCadence
+  lastRunAt  DateTime?      @map("last_run_at") @db.DateTime(6)
+  nextRunAt  DateTime?      @map("next_run_at") @db.DateTime(6)
+  configJson Json?          @map("config_json")
+  createdAt  DateTime       @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.DateTime(6)
+
+  @@index([enabled, nextRunAt], map: "idx_dnc_sync_config_enabled_next")
+  @@map("dnc_sync_config")
+}
+
+// =============================================================================
+// D05 amendment §4.x — dnc_sync_log
+//
+// One row per sync run (delta or full). INSERT-only via grant pattern.
+// Partitioned monthly RANGE COLUMNS(started_at) to align with C04 rotator.
+// =============================================================================
+
+enum DncSyncKind {
+  delta
+  full
+  bulk
+}
+
+enum DncSyncOutcome {
+  success
+  partial
+  failed
+}
+
+model DncSyncLog {
+  id          BigInt         @default(autoincrement())
+  source      String         @db.VarChar(32)
+  kind        DncSyncKind
+  outcome     DncSyncOutcome @default(success)
+  added       Int            @default(0)
+  removed     Int            @default(0)
+  errorCount  Int            @default(0) @map("error_count")
+  fileHash    String?        @map("file_hash") @db.VarChar(128)
+  startedAt   DateTime       @map("started_at") @db.DateTime(6)
+  completedAt DateTime?      @map("completed_at") @db.DateTime(6)
+  durationMs  Int?           @map("duration_ms")
+  notes       String?        @db.Text
+  createdAt   DateTime       @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@id([id, startedAt])
+  @@index([source, startedAt], map: "idx_dnc_sync_log_source_started")
+  @@index([outcome, startedAt], map: "idx_dnc_sync_log_outcome_started")
+  @@map("dnc_sync_log")
+}
+
+// =============================================================================
+// T04 amendment §7 — originate_audit
+//
+// Per-attempt outbound originate evidence (TCPA defense, 7y retention).
+// Partitioned monthly RANGE COLUMNS(originated_at). INSERT + one-shot UPDATE
+// (DAL guards UPDATE WHERE outcome='OTHER' AND outcome_at IS NULL).
+// =============================================================================
+
+enum OriginateMode {
+  PROGRESSIVE
+  PREDICTIVE
+  MANUAL
+  PREVIEW
+}
+
+enum OriginateDialTarget {
+  CONFERENCE
+  PARK
+}
+
+enum OriginateCidSource {
+  per_call
+  per_list
+  local_presence
+  campaign_default
+}
+
+enum OriginateTcpaDecision {
+  ALLOW
+  BLOCK
+  SKIP
+}
+
+enum OriginateDncDecision {
+  ALLOW
+  BLOCK
+}
+
+enum OriginateConsentDecision {
+  ALLOW
+  PROMPT
+  SKIP_RECORDING
+  BLOCK
+}
+
+enum OriginateOutcome {
+  SUCCESS
+  TCPA_BLOCKED
+  DNC_BLOCKED
+  CONSENT_BLOCKED
+  GATEWAY_LIMIT
+  RATE_LIMITED
+  GATEWAY_FAIL
+  TIMEOUT
+  JOB_ORPHANED
+  OTHER
+}
+
+model OriginateAudit {
+  id              BigInt                    @default(autoincrement())
+  tenantId        BigInt                    @default(1) @map("tenant_id")
+  attemptUuid     String                    @map("attempt_uuid") @db.VarChar(40)
+  callUuid        String?                   @map("call_uuid") @db.VarChar(40)
+  leadId          BigInt                    @map("lead_id")
+  campaignId      String?                   @map("campaign_id") @db.VarChar(32)
+  listId          BigInt?                   @map("list_id")
+  agentId         BigInt?                   @map("agent_id")
+  mode            OriginateMode
+  dialTarget      OriginateDialTarget       @map("dial_target")
+  carrierId       BigInt?                   @map("carrier_id")
+  gatewayId       BigInt?                   @map("gateway_id")
+  gatewayName     String?                   @map("gateway_name") @db.VarChar(64)
+  callerIdNumber  String?                   @map("caller_id_number") @db.VarChar(16)
+  callerIdSource  OriginateCidSource?       @map("caller_id_source")
+  phoneE164       String                    @map("phone_e164") @db.VarChar(16)
+  originatedAt    DateTime                  @map("originated_at") @db.DateTime(6)
+  tcpaDecision    OriginateTcpaDecision?    @map("tcpa_decision")
+  tcpaReason      String?                   @map("tcpa_reason") @db.VarChar(64)
+  tcpaTzResolved  String?                   @map("tcpa_tz_resolved") @db.VarChar(64)
+  dncDecision     OriginateDncDecision?     @map("dnc_decision")
+  dncSources      Json?                     @map("dnc_sources")
+  consentDecision OriginateConsentDecision? @map("consent_decision")
+  consentState    String?                   @map("consent_state") @db.Char(2)
+  bypassToken     String?                   @map("bypass_token") @db.VarChar(64)
+  outcome         OriginateOutcome          @default(OTHER)
+  outcomeAt       DateTime?                 @map("outcome_at") @db.DateTime(6)
+  durationMs      Int?                      @map("duration_ms")
+  errorMessage    String?                   @map("error_message") @db.Text
+  fsHost          String?                   @map("fs_host") @db.VarChar(64)
+  requestId       String?                   @map("request_id") @db.VarChar(64)
+  ipAddress       String?                   @map("ip_address") @db.VarChar(45)
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt       DateTime                  @default(now()) @map("updated_at") @db.DateTime(6)
+
+  @@id([id, originatedAt])
+  // Partition column must appear in every UNIQUE key (MySQL hard rule).
+  // App-level idempotency: SELECT-then-INSERT inside a tx using attempt_uuid.
+  @@unique([attemptUuid, originatedAt], map: "uq_originate_audit_attempt")
+  @@index([tenantId, leadId, originatedAt], map: "idx_originate_audit_t_lead_ts")
+  @@index([tenantId, campaignId, originatedAt], map: "idx_originate_audit_t_camp_ts")
+  @@index([tenantId, outcome, originatedAt], map: "idx_originate_audit_t_outcome_ts")
+  @@index([callUuid], map: "idx_originate_audit_call_uuid")
+  @@map("originate_audit")
 }
