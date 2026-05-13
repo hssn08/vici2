@@ -46,6 +46,9 @@ import {
   POOL_REAPER_JOB_OPTS,
   runPoolReaperJob,
 } from './jobs/number-pool-reaper/index.js';
+import { runHubspotSyncJob } from './jobs/hubspot-sync/index.js';
+import { runHubspotPushJob } from './jobs/hubspot-push/index.js';
+import { runHubspotWebhookJob } from './jobs/hubspot-webhook/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE = 'workers';
@@ -192,9 +195,39 @@ const DLQ_STREAMS = new Map([
   ['freeswitch-event-router', dlqStream('freeswitch-event-router')],
   ['callback-fire',           dlqStream('callback-fire')],
   ['number-pool-reaper',      dlqStream('number-pool-reaper')],
+  // N04 — HubSpot integration
+  ['hubspot-sync',            dlqStream('hubspot-sync')],
+  ['hubspot-push',            dlqStream('hubspot-push')],
+  ['hubspot-webhook',         dlqStream('hubspot-webhook')],
 ]);
 
 // ---- Workers startup -------------------------------------------------------
+
+// N04 HubSpot queue names
+const HUBSPOT_SYNC_QUEUE_NAME    = 'vici2:queue:hubspot-sync';
+const HUBSPOT_PUSH_QUEUE_NAME    = 'vici2:queue:hubspot-push';
+const HUBSPOT_WEBHOOK_QUEUE_NAME = 'vici2:queue:hubspot-webhook';
+
+const HUBSPOT_SYNC_JOB_OPTS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 30_000 },
+  removeOnComplete: { age: 7 * 24 * 3600, count: 5_000 },
+  removeOnFail: { age: 30 * 24 * 3600, count: 500 },
+};
+
+const HUBSPOT_PUSH_JOB_OPTS = {
+  attempts: 5,
+  backoff: { type: 'exponential' as const, delay: 5_000 },
+  removeOnComplete: { age: 3 * 24 * 3600, count: 10_000 },
+  removeOnFail: { age: 30 * 24 * 3600, count: 1_000 },
+};
+
+const HUBSPOT_WEBHOOK_JOB_OPTS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5_000 },
+  removeOnComplete: { age: 24 * 3600, count: 10_000 },
+  removeOnFail: { age: 7 * 24 * 3600, count: 500 },
+};
 
 async function startWorkers(): Promise<{
   leadImportWorker: Worker;
@@ -202,6 +235,9 @@ async function startWorkers(): Promise<{
   federalDncWorker: Worker;
   stateDncWorker: Worker;
   poolReaperWorker: Worker;
+  hubspotSyncWorker: Worker;
+  hubspotPushWorker: Worker;
+  hubspotWebhookWorker: Worker;
   intervals: NodeJS.Timeout[];
 }> {
   // -- Lead Import (sandboxed processor, PLAN §4) ---------------------------
@@ -350,6 +386,69 @@ async function startWorkers(): Promise<{
     logger.error({ err }, 'pool-reaper-worker: error'),
   );
 
+  // -- N04 HubSpot Sync (per-tenant repeatable, concurrency 2) ---------------
+  registerQueue(HUBSPOT_SYNC_QUEUE_NAME, HUBSPOT_SYNC_JOB_OPTS);
+
+  const hubspotSyncWorker = new Worker(
+    HUBSPOT_SYNC_QUEUE_NAME,
+    async (job) => {
+      await runHubspotSyncJob(job as Parameters<typeof runHubspotSyncJob>[0], prisma);
+    },
+    {
+      ...BASE_CONNECTION,
+      concurrency: 2,
+      lockDuration: 600_000,
+      stalledInterval: 60_000,
+    },
+  );
+  instrumentWorker(hubspotSyncWorker, HUBSPOT_SYNC_QUEUE_NAME);
+  attachDlqOnFailed(hubspotSyncWorker, 'hubspot-sync', HUBSPOT_SYNC_QUEUE_NAME);
+  hubspotSyncWorker.on('error', (err) =>
+    logger.error({ err }, 'hubspot-sync-worker: error'),
+  );
+
+  // -- N04 HubSpot Push (engagement write-back, concurrency 10) -------------
+  registerQueue(HUBSPOT_PUSH_QUEUE_NAME, HUBSPOT_PUSH_JOB_OPTS);
+
+  const hubspotPushWorker = new Worker(
+    HUBSPOT_PUSH_QUEUE_NAME,
+    async (job) => {
+      await runHubspotPushJob(job as Parameters<typeof runHubspotPushJob>[0], prisma);
+    },
+    {
+      ...BASE_CONNECTION,
+      concurrency: 10,
+      lockDuration: 60_000,
+      stalledInterval: 30_000,
+    },
+  );
+  instrumentWorker(hubspotPushWorker, HUBSPOT_PUSH_QUEUE_NAME);
+  attachDlqOnFailed(hubspotPushWorker, 'hubspot-push', HUBSPOT_PUSH_QUEUE_NAME);
+  hubspotPushWorker.on('error', (err) =>
+    logger.error({ err }, 'hubspot-push-worker: error'),
+  );
+
+  // -- N04 HubSpot Webhook (inbound event processor, concurrency 5) ----------
+  registerQueue(HUBSPOT_WEBHOOK_QUEUE_NAME, HUBSPOT_WEBHOOK_JOB_OPTS);
+
+  const hubspotWebhookWorker = new Worker(
+    HUBSPOT_WEBHOOK_QUEUE_NAME,
+    async (job) => {
+      await runHubspotWebhookJob(job as Parameters<typeof runHubspotWebhookJob>[0], prisma);
+    },
+    {
+      ...BASE_CONNECTION,
+      concurrency: 5,
+      lockDuration: 60_000,
+      stalledInterval: 30_000,
+    },
+  );
+  instrumentWorker(hubspotWebhookWorker, HUBSPOT_WEBHOOK_QUEUE_NAME);
+  attachDlqOnFailed(hubspotWebhookWorker, 'hubspot-webhook', HUBSPOT_WEBHOOK_QUEUE_NAME);
+  hubspotWebhookWorker.on('error', (err) =>
+    logger.error({ err }, 'hubspot-webhook-worker: error'),
+  );
+
   // -- Callback tick workers (setInterval + Valkey lock, PLAN §2.3) ---------
   // D06 IMPLEMENT replaces these stubs with full tick logic.
   const intervals: NodeJS.Timeout[] = [];
@@ -379,6 +478,9 @@ async function startWorkers(): Promise<{
     federalDncWorker,
     stateDncWorker,
     poolReaperWorker,
+    hubspotSyncWorker,
+    hubspotPushWorker,
+    hubspotWebhookWorker,
     intervals,
   };
 }
@@ -401,6 +503,9 @@ async function main(): Promise<void> {
     federalDncWorker,
     stateDncWorker,
     poolReaperWorker,
+    hubspotSyncWorker,
+    hubspotPushWorker,
+    hubspotWebhookWorker,
     intervals,
   } = await startWorkers();
 
@@ -440,6 +545,33 @@ async function main(): Promise<void> {
   });
 
   // BullMQ workers — drain with timeout (in reverse order of shutdown priority)
+  shutdownMgr.register({
+    name: 'hubspot-webhook-worker',
+    close: async () => {
+      await hubspotWebhookWorker.pause(true);
+      await hubspotWebhookWorker.close(false);
+    },
+    timeoutMs: SHUTDOWN_TIMEOUT_MS,
+  });
+
+  shutdownMgr.register({
+    name: 'hubspot-push-worker',
+    close: async () => {
+      await hubspotPushWorker.pause(true);
+      await hubspotPushWorker.close(false);
+    },
+    timeoutMs: SHUTDOWN_TIMEOUT_MS,
+  });
+
+  shutdownMgr.register({
+    name: 'hubspot-sync-worker',
+    close: async () => {
+      await hubspotSyncWorker.pause(true);
+      await hubspotSyncWorker.close(false);
+    },
+    timeoutMs: SHUTDOWN_TIMEOUT_MS,
+  });
+
   shutdownMgr.register({
     name: 'pool-reaper-worker',
     close: async () => {

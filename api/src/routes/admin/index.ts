@@ -34,6 +34,8 @@ import { registerAdminScriptRoutes } from "./scripts/index.js";
 import { registerAdminRndRoutes } from "./rnd/index.js";
 // X04 — Number pool + rotation
 import { registerAdminNumberPoolRoutes } from "./number-pools/index.js";
+// N04 — HubSpot integration
+import { registerHubspotIntegrationRoutes } from "./integrations/hubspot/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -84,4 +86,6 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   await registerAdminRndRoutes(app);
   // X04 — Number pool + rotation
   await registerAdminNumberPoolRoutes(app);
+  // N04 — HubSpot integration
+  await registerHubspotIntegrationRoutes(app);
 }

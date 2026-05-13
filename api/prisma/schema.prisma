@@ -183,6 +183,9 @@ model Tenant {
   rndUsageLogs       RndUsageLog[]
   // X04: number pools
   numberPools        NumberPool[]
+  // N04: HubSpot integration
+  hubspotIntegration HubspotIntegration?
+  leadExternalRefs   LeadExternalRef[]
 
   @@map("tenants")
 }
@@ -809,6 +812,8 @@ model Lead {
   callbacks    Callback[]
   hopper       HopperMirror[]
   dispositions Disposition[]
+  // N04: HubSpot external ref
+  externalRefs LeadExternalRef[]
 
   @@index([tenantId, listId, status, modifyAt], map: "idx_leads_t_list_status_modify")
   @@index([tenantId, phoneE164], map: "idx_leads_t_phone")
@@ -2867,4 +2872,114 @@ model RndUsageLog {
 
   @@unique([tenantId, periodYear, periodMonth], map: "uk_rnd_usage_tenant_period")
   @@map("rnd_usage_log")
+}
+
+// =============================================================================
+// N04 — HubSpot Integration
+// =============================================================================
+
+enum HubspotIntegrationStatus {
+  connected
+  error
+  disconnected
+}
+
+enum HubspotSyncMode {
+  ALL_CONTACTS
+  LIST_ONLY
+}
+
+model HubspotIntegration {
+  id                    BigInt                   @id @default(autoincrement())
+  tenantId              BigInt                   @unique @map("tenant_id")
+  portalId              BigInt                   @map("portal_id")
+  hubDomain             String?                  @map("hub_domain") @db.VarChar(128)
+
+  // Envelope-encrypted OAuth tokens (F05 pattern)
+  accessTokenEnc        Bytes                    @map("access_token_enc") @db.VarBinary(512)
+  refreshTokenEnc       Bytes                    @map("refresh_token_enc") @db.VarBinary(512)
+  kekVersion            Int                      @default(1) @map("kek_version") @db.SmallInt
+  tokenExpiresAt        DateTime                 @map("token_expires_at") @db.DateTime(6)
+
+  // Sync configuration
+  status                HubspotIntegrationStatus @default(connected)
+  syncMode              HubspotSyncMode          @default(ALL_CONTACTS) @map("sync_mode")
+  syncIntervalMinutes   Int                      @default(15) @map("sync_interval_minutes") @db.SmallInt
+  lastSyncCursor        DateTime?                @map("last_sync_cursor") @db.DateTime(6)
+  lastSyncAt            DateTime?                @map("last_sync_at") @db.DateTime(6)
+  rateLimitBackoffUntil DateTime?                @map("rate_limit_backoff_until") @db.DateTime(6)
+
+  // Configurable JSON mappings
+  statusMap             Json                     @default("{}") @map("status_map")
+  dispositionMap        Json                     @default("{}") @map("disposition_map")
+
+  // Feature toggles
+  includeRecordingUrl   Boolean                  @default(true) @map("include_recording_url")
+  syncOverwritesManual  Boolean                  @default(false) @map("sync_overwrites_manual_edits")
+
+  // Soft delete
+  deletedAt             DateTime?                @map("deleted_at") @db.DateTime(6)
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_hs_integration_tenant")
+  syncJobs HubspotSyncJob[]
+
+  @@index([portalId], map: "idx_hs_integration_portal_id")
+  @@map("hubspot_integrations")
+}
+
+enum HubspotSyncJobStatus {
+  running
+  completed
+  failed
+  cancelled
+}
+
+model HubspotSyncJob {
+  id               BigInt               @id @default(autoincrement())
+  tenantId         BigInt               @map("tenant_id")
+  integrationId    BigInt               @map("integration_id")
+  bullmqJobId      String?              @map("bullmq_job_id") @db.VarChar(64)
+  status           HubspotSyncJobStatus @default(running)
+  syncMode         HubspotSyncMode      @map("sync_mode")
+  pagingCursor     String?              @map("paging_cursor") @db.VarChar(256)
+
+  // Progress
+  contactsFetched  Int                  @default(0) @map("contacts_fetched")
+  contactsUpserted Int                  @default(0) @map("contacts_upserted")
+  contactsSkipped  Int                  @default(0) @map("contacts_skipped")
+  contactsFailed   Int                  @default(0) @map("contacts_failed")
+  errorSummary     Json?                @map("error_summary")
+
+  // Timing
+  startedAt    DateTime  @default(now()) @map("started_at") @db.DateTime(6)
+  completedAt  DateTime? @map("completed_at") @db.DateTime(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  integration HubspotIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade, map: "fk_hs_sync_job_integration")
+
+  @@index([tenantId, startedAt(sort: Desc)], map: "idx_hs_sync_job_tenant_started")
+  @@index([integrationId, status], map: "idx_hs_sync_job_integration_status")
+  @@map("hubspot_sync_jobs")
+}
+
+model LeadExternalRef {
+  id           BigInt    @id @default(autoincrement())
+  tenantId     BigInt    @map("tenant_id")
+  leadId       BigInt    @map("lead_id")
+  source       String    @db.VarChar(32)
+  externalId   String    @map("external_id") @db.VarChar(128)
+  syncWarnings Json?     @map("sync_warnings")
+  lastSyncedAt DateTime? @map("last_synced_at") @db.DateTime(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade, map: "fk_ler_lead")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_ler_tenant")
+
+  @@unique([tenantId, source, externalId], map: "uk_ler_tenant_source_ext")
+  @@index([tenantId, leadId], map: "idx_ler_tenant_lead")
+  @@map("lead_external_refs")
 }
