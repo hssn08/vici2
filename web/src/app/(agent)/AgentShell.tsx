@@ -11,6 +11,7 @@ import { HotkeyHelpOverlay } from "@/components/shell/HotkeyHelpOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SipProvider } from "@/lib/sip";
 import { useAgentStateSync } from "@/lib/agent";
+import { CallbackDueWatcher } from "@/lib/hooks/useCallbacksDue";
 
 /** Inner shell — mounts inside SipProvider so hooks work. */
 function AgentShellInner({
@@ -37,6 +38,8 @@ function AgentShellInner({
       <StatusBar />
       {/* A07: F1 hotkey help overlay — mounted once, always listening */}
       <HotkeyHelpOverlay />
+      {/* A08: callback due watcher — WS + poll fallback for due-callback toasts */}
+      <CallbackDueWatcher />
     </div>
   );
 }
