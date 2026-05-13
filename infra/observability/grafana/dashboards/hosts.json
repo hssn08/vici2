@@ -1,0 +1,78 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "CPU Utilisation",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [{"expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "refId": "A", "legendFormat": "{{instance}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Available %",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "targets": [{"expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes", "refId": "A", "legendFormat": "{{instance}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk Free %",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "targets": [{"expr": "node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"}", "refId": "A", "legendFormat": "{{instance}}:{{mountpoint}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Network I/O",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "targets": [
+        {"expr": "rate(node_network_receive_bytes_total[5m])", "refId": "A", "legendFormat": "rx {{device}}"},
+        {"expr": "rate(node_network_transmit_bytes_total[5m])", "refId": "B", "legendFormat": "tx {{device}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Load Average",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "targets": [
+        {"expr": "node_load1", "refId": "A", "legendFormat": "1m / {{instance}}"},
+        {"expr": "node_load5", "refId": "B", "legendFormat": "5m / {{instance}}"},
+        {"expr": "node_load15", "refId": "C", "legendFormat": "15m / {{instance}}"}
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "File Descriptors Used",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6,
+      "targets": [{"expr": "node_filefd_allocated", "refId": "A", "legendFormat": "{{instance}}"}],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["vici2", "hosts"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "utc",
+  "title": "vici2 / Hosts",
+  "uid": "hosts",
+  "version": 1
+}

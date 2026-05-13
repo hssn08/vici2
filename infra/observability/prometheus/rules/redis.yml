@@ -1,0 +1,55 @@
+# vici2 — Redis/Valkey alerts.
+# Source: spec/modules/O01/PLAN.md §3.6. Metric names from redis_exporter.
+
+groups:
+  - name: vici2_redis
+    interval: 30s
+    rules:
+
+      - alert: Vici2RedisDown
+        expr: redis_up == 0
+        for: 30s
+        labels:
+          severity: page
+          team: oncall
+        annotations:
+          summary: "Redis/Valkey down"
+          description: "Hopper and agent-state ephemeral cache offline. Dialer pacing halted."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2RedisDown"
+          dashboard: "/d/redis"
+
+      - alert: Vici2RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Redis memory > 90% of maxmemory"
+          description: "Eviction imminent. Review keyspace growth."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2RedisMemoryHigh"
+          dashboard: "/d/redis"
+
+      - alert: Vici2RedisEvictions
+        expr: increase(redis_evicted_keys_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Redis evicting keys"
+          description: "{{ $value }} keys evicted in last 5m. Hopper or agent-state may be lost."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2RedisEvictions"
+          dashboard: "/d/redis"
+
+      - alert: Vici2RedisReplicationLag
+        expr: redis_master_repl_offset - redis_slave_repl_offset > 1000000
+        for: 5m
+        labels:
+          severity: warn
+          team: oncall
+        annotations:
+          summary: "Redis replication lag > 1MB offset"
+          description: "Replica behind master. Failover would lose recent writes."
+          runbook: "https://repo/spec/runbooks/oncall.md#Vici2RedisReplicationLag"
+          dashboard: "/d/redis"

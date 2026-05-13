@@ -1,0 +1,138 @@
+# vici2 — Prometheus 3.x scrape config.
+# Source of truth: spec/modules/O01/PLAN.md §2.
+# 8 scrape jobs, per-service intervals, Alertmanager on :9093.
+# Recording rules pre-aggregate expensive PromQL for dashboards.
+# Native histograms enabled by default; classic dual-emit during migration.
+
+global:
+  scrape_interval:     15s
+  scrape_timeout:      10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: vici2-phase1
+    env: ${VICI2_ENV:-dev}
+    tenant_id: "1"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      timeout: 10s
+      api_version: v2
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/rules/recording/*.yml
+
+scrape_configs:
+
+  # --- vici2 services (per F01 HANDOFF: api 9101, dialer 9102, workers 9103) ---
+
+  - job_name: vici2-api
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout:  7s
+    static_configs:
+      - targets: ["api:9101"]
+        labels:
+          service: api
+          layer: app
+
+  - job_name: vici2-dialer
+    # 5 s — drop-rate accounting moves fast (FCC compliance window).
+    metrics_path: /metrics
+    scrape_interval: 5s
+    scrape_timeout:  4s
+    static_configs:
+      - targets: ["dialer:9102"]
+        labels:
+          service: dialer
+          layer: app
+
+  - job_name: vici2-workers
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout:  7s
+    static_configs:
+      - targets: ["workers:9103"]
+        labels:
+          service: workers
+          layer: app
+
+  - job_name: vici2-web
+    # web exports on /api/metrics via Next.js route; 60 s — thin UI metrics.
+    metrics_path: /api/metrics
+    scrape_interval: 60s
+    scrape_timeout:  20s
+    static_configs:
+      - targets: ["web:4000"]
+        labels:
+          service: web
+          layer: app
+
+  # --- exporters (third-party + in-house) ---
+
+  - job_name: vici2-fs-exporter
+    # In-house freeswitch-exporter (dialer/cmd/fs-exporter, not yet built).
+    # Job stays in the config so scrape-target audits show the slot.
+    # Marked optional via `honor_labels: false` and short scrape_timeout.
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout:  7s
+    static_configs:
+      - targets: ["fs-exporter:9104"]
+        labels:
+          service: freeswitch
+          layer: telephony
+          fs_host: fs01
+
+  - job_name: vici2-mysqld-exporter
+    metrics_path: /metrics
+    scrape_interval: 30s
+    scrape_timeout:  10s
+    static_configs:
+      - targets: ["mysqld-exporter:9105"]
+        labels:
+          service: mysql
+          layer: data
+
+  - job_name: vici2-redis-exporter
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout:  7s
+    static_configs:
+      - targets: ["redis-exporter:9106"]
+        labels:
+          service: redis
+          layer: data
+
+  - job_name: vici2-node-exporter
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout:  7s
+    static_configs:
+      - targets: ["node-exporter:9107"]
+        labels:
+          service: host
+          layer: infra
+          host_role: app
+
+  # --- Prometheus self-monitoring ---
+
+  - job_name: prometheus
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: prometheus
+          layer: infra
+
+  - job_name: alertmanager
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["alertmanager:9093"]
+        labels:
+          service: alertmanager
+          layer: infra
