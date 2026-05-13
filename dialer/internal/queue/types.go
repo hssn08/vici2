@@ -83,6 +83,12 @@ type InGroup struct {
 	CallbackOfferAfterSeconds int
 	BusinessHoursID           *int64
 
+	// I04 — Inbound Callback Queue configuration
+	OutboundCli                   string
+	CallbackNoAnswerPolicyInbound string  // leave_callbk | reschedule_30m | reschedule_24h | terminate_NA
+	CallbackExpiresHours          int
+	CallbackPositionExpiryMinutes int
+
 	// I01 PLAN §3.6 — skill requirements (loaded from ingroup_skills).
 	SkillRequirements []SkillRequirement
 }

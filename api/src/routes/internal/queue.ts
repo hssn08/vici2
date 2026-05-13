@@ -14,6 +14,9 @@ import { z } from "zod";
 import { getPrisma } from "../../lib/prisma.js";
 import { getRedis } from "../../lib/redis.js";
 import { env } from "../../lib/env.js";
+import { normalizePhone, ExitCallbackInboundQuery } from "../../inbound-callbacks/schemas.js";
+import { createInboundCallback, createStubLead } from "../../inbound-callbacks/service.js";
+import { i04AniMissingTotal } from "../../inbound-callbacks/metrics.js";
 
 const prisma = getPrisma();
 
@@ -222,29 +225,134 @@ export async function registerInternalQueueRoutes(app: any): Promise<void> {
   );
 
   // POST /internal/queue/exit_callback
-  // Callback offer accepted: schedule D06 callback + remove from queue.
-  // I01 PLAN §11.3.
+  // Callback offer accepted: schedule D06 (AGENT/GLOBAL) or I04 (INBOUND) callback.
+  // I01 PLAN §11.3; extended in I04 PLAN §3.1 for source=inbound.
   app.post("/internal/queue/exit_callback",
     async (req: FastifyRequest, reply: FastifyReply) => {
       if (!requireInternalSecret(req, reply)) return;
 
       const query = req.query as Record<string, string>;
-      const parsed = ExitCallbackSchema.safeParse(query);
-      if (!parsed.success) return reply.code(400).send({ code: "validation_error" });
-
-      const { call_uuid: callUuid, number: callbackNumber, tenant: tenantId } = parsed.data;
+      const tenantId = Number(query.tenant ?? 1);
       const rdb = getRedis();
       const now = Date.now();
 
       // Get call state to find ingroup_id and position.
-      const callHash = await rdb.hgetall(`t:${tenantId}:queue_call:${callUuid}`);
-      const ingroupId = callHash?.ingroup_id ?? "UNKNOWN";
+      const callUuid = String(query.call_uuid ?? "");
+      const callHash = callUuid ? await rdb.hgetall(`t:${tenantId}:queue_call:${callUuid}`) : null;
+      const ingroupId = callHash?.ingroup_id ?? query.ingroup_id ?? "UNKNOWN";
+
+      // ── I04 Path A: source=inbound extension ─────────────────────────────────
+      if (query.source === "inbound") {
+        const inboundParsed = ExitCallbackInboundQuery.safeParse(query);
+        if (!inboundParsed.success) {
+          return reply.code(400).send({ code: "validation_error", message: inboundParsed.error.message });
+        }
+
+        const { number: rawNumber } = inboundParsed.data;
+        const callbackNumber = normalizePhone(rawNumber);
+
+        if (!callbackNumber) {
+          i04AniMissingTotal.inc({ ingroup_id: ingroupId });
+          return reply.code(400).send({ code: "invalid_callback_number", message: "ANI could not be normalised" });
+        }
+
+        // Remove from queue ZSET.
+        if (callUuid && ingroupId !== "UNKNOWN") {
+          await rdb.zrem(`t:${tenantId}:ingroup:${ingroupId}:queue`, callUuid);
+        }
+
+        // Update call hash exit state.
+        if (callUuid) {
+          await rdb.hset(`t:${tenantId}:queue_call:${callUuid}`,
+            "exit_at", String(now),
+            "exit_reason", "callback",
+          );
+        }
+
+        // Resolve or create lead (I04 PLAN §3.1).
+        setImmediate(async () => {
+          try {
+            const tid = BigInt(tenantId);
+
+            // Look up lead by phone number
+            let leadId: bigint | null = null;
+            const existingLead = await prisma.lead.findFirst({
+              where: { tenantId: tid, phone: callbackNumber },
+              select: { id: true },
+            });
+            if (existingLead) {
+              leadId = existingLead.id;
+            } else {
+              // Create stub lead for anonymous caller
+              leadId = await createStubLead(prisma, {
+                phone: callbackNumber,
+                tenantId: tid,
+                ingroupId,
+              });
+            }
+
+            // Determine queue position from hash or query
+            const queuePosition = callHash?.queue_position_at_offer
+              ? Number(callHash.queue_position_at_offer)
+              : (inboundParsed.data.queue_position ?? null);
+
+            // Calculate original wait seconds
+            const enterTs = callHash?.enter_ts ? Number(callHash.enter_ts) : null;
+            const originalWaitSeconds = enterTs ? Math.floor((now - enterTs) / 1000) : null;
+
+            if (leadId === null) {
+              console.error("queue/exit_callback[inbound]: no leadId resolved; skipping callback creation");
+              return;
+            }
+
+            // Create INBOUND callback row
+            await createInboundCallback(prisma, {
+              tenantId: tid,
+              ingroupId,
+              callbackNumber,
+              leadId: leadId as bigint,
+              originalWaitSeconds,
+              queuePositionAtOffer: queuePosition,
+              comments: `Inbound callback request from queue. Wait: ${originalWaitSeconds ?? "unknown"}s, position: ${queuePosition ?? "unknown"}`,
+              path: "queue_offer",
+            });
+
+            // Update queue_calls exit reason
+            if (callUuid) {
+              await prisma.$executeRaw`
+                UPDATE queue_calls
+                SET exit_at = FROM_UNIXTIME(${now} / 1000),
+                    exit_reason = 'callback'
+                WHERE tenant_id = ${tenantId} AND call_uuid = ${callUuid}
+              `;
+            }
+
+            // Publish event
+            await rdb.xadd("events:vici2.callback.inbound_accepted", "*",
+              "tenant_id", String(tenantId),
+              "ingroup_id", ingroupId,
+              "ts", String(Date.now()),
+            ).catch(() => {});
+
+          } catch (err) {
+            console.error("queue/exit_callback[inbound]: DB insert failed", err);
+          }
+        });
+
+        return reply.code(200).send({ ok: true, source: "inbound", callbackNumber });
+      }
+
+      // ── Original D06 path (AGENT/GLOBAL) ─────────────────────────────────────
+      const parsed = ExitCallbackSchema.safeParse(query);
+      if (!parsed.success) return reply.code(400).send({ code: "validation_error" });
+
+      const { call_uuid: parsedCallUuid, number: callbackNumber } = parsed.data;
 
       // Remove from queue ZSET.
-      await rdb.zrem(`t:${tenantId}:ingroup:${ingroupId}:queue`, callUuid);
+      await rdb.zrem(`t:${tenantId}:ingroup:${ingroupId}:queue`, parsedCallUuid);
 
       // Update call state.
-      await rdb.hset(`t:${tenantId}:queue_call:${callUuid}`,
+      await rdb.hset(`t:${tenantId}:queue_call:${parsedCallUuid}`,
         "exit_at", String(now),
         "exit_reason", "callback",
       );
@@ -268,7 +376,7 @@ export async function registerInternalQueueRoutes(app: any): Promise<void> {
             UPDATE queue_calls
             SET exit_at = FROM_UNIXTIME(${now} / 1000),
                 exit_reason = 'callback'
-            WHERE tenant_id = ${tenantId} AND call_uuid = ${callUuid}
+            WHERE tenant_id = ${tenantId} AND call_uuid = ${parsedCallUuid}
           `;
         } catch (err) {
           console.error("queue/exit_callback: DB insert failed", err);

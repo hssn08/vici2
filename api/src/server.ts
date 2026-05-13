@@ -95,6 +95,7 @@ import { registerEmailTemplateRoutes } from "./email-templates/index.js";
 import { registerAgentStatsRoutes } from "./routes/agent-stats.js";
 import { registerVoicemailRoutes } from "./routes/voicemails.js";
 import { registerInternalVoicemailRoutes } from "./routes/internal/voicemail-hooks.js";
+import { registerInboundCallbackRoutes } from "./routes/inbound-callbacks.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -122,6 +123,7 @@ const start = async (): Promise<void> => {
     await registerAgentStatsRoutes(app);
     await registerVoicemailRoutes(app);
     await registerInternalVoicemailRoutes(app);
+    await registerInboundCallbackRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {
