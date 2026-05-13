@@ -145,6 +145,10 @@ export const VERBS = [
   'scorecard:template_edit',
   'feedback:read',
   'feedback:create',
+  // rnd scrub (N06)
+  'rnd:scrub',
+  'rnd:configure',
+  'rnd:override',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -199,6 +203,9 @@ export const SENSITIVE_VERBS = new Set<Verb>([
   // S05 — coaching: finalize locks scorecard; template_edit modifies golden-table
   'scorecard:finalize',
   'scorecard:template_edit',
+  // N06 — RND configure writes credentials; override removes DNC entries
+  'rnd:configure',
+  'rnd:override',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -299,6 +306,10 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'scorecard:template_edit': { scope: 'tenant', sensitive: true },
     'feedback:read':           { scope: 'tenant' },
     'feedback:create':         { scope: 'tenant' },
+    // N06 — rnd scrub
+    'rnd:scrub':               { scope: 'tenant' },
+    'rnd:configure':           { scope: 'tenant', sensitive: true },
+    'rnd:override':            { scope: 'tenant', sensitive: true },
   },
 
   admin: {
@@ -387,6 +398,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'scorecard:template_edit': { scope: 'tenant', sensitive: true },
     'feedback:read':           { scope: 'tenant' },
     'feedback:create':         { scope: 'tenant' },
+    // N06 — rnd scrub (admin: scrub + configure; NOT override — super_admin only)
+    'rnd:scrub':               { scope: 'tenant' },
+    'rnd:configure':           { scope: 'tenant', sensitive: true },
   },
 
   supervisor: {
