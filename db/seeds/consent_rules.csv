@@ -1,0 +1,15 @@
+state,minimum_mode,beep_accepted,b2b_exempt,citation,comment
+CA,PROMPT_MESSAGE,false,false,Cal. Penal Code §§632 632.7,CIPA; $5K/call §637.2
+CT,PROMPT_MESSAGE,false,false,Conn. Gen. Stat. §52-570d,Civil-safety posture
+DE,PROMPT_MESSAGE,false,false,11 Del.C. §1335,
+FL,PROMPT_MESSAGE,false,false,Fla. Stat. §934.03,Felony violation
+IL,PROMPT_MESSAGE,false,false,720 ILCS 5/14-2,Post-2014 intent-to-be-private test
+MD,PROMPT_MESSAGE,false,false,Md. Cts. & Jud. Proc. §10-402,Felony
+MA,PROMPT_MESSAGE,false,false,Mass. Gen. Laws ch.272 §99,Secretly test (§99 operative word)
+MI,PROMPT_MESSAGE,false,false,Mich. Comp. Laws §750.539c,Sullivan v. Gray conservative read
+MT,PROMPT_MESSAGE,false,false,Mont. Code Ann. §45-8-213,
+NH,PROMPT_MESSAGE,false,false,N.H. Rev. Stat. §570-A:2,Strictest tier
+OR,PROMPT_MESSAGE,false,false,Or. Rev. Stat. §165.540,Phone tech 1-party; UTPA overlay → 2-party posture
+PA,PROMPT_MESSAGE,false,true,18 Pa.C.S. §§5703-5704,B2B carveout §5704(15); 1-yr retention
+WA,PROMPT_MESSAGE,false,false,Wash. Rev. Code §9.73.030,Announcement-then-continued-call doctrine
+# All other US states + DC + AS/GU/MP/PR/VI: absence = ALLOW (1-party federal floor)
