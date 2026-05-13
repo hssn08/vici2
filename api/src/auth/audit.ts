@@ -28,7 +28,15 @@ export type AuditAction =
   | "auth.sip.viewed"
   | "auth.kek.rotation_started"
   | "auth.kek.rotation_completed"
-  | "auth.jwt.keys.rotated";
+  | "auth.jwt.keys.rotated"
+  // O03 alert events
+  | "alert.received"
+  | "alert.delivered"
+  | "alert.delivery_failed"
+  | "alert.receiver.created"
+  | "alert.receiver.updated"
+  | "alert.receiver.deleted"
+  | "alert.receiver.test_fired";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
