@@ -76,6 +76,7 @@ import { registerLeadRoutes } from "./leads/index.js";
 import { registerCampaignRoutes } from "./routes/campaigns/index.js";
 import { registerDncRoutes } from "./routes/dnc/index.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
+import { registerImportRoutes } from "./import/index.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -84,6 +85,7 @@ const start = async (): Promise<void> => {
     await registerCampaignRoutes(app);
     await registerDncRoutes(app);
     await registerAdminRoutes(app);
+    await registerImportRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {

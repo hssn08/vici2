@@ -144,6 +144,7 @@ model Tenant {
   ingroupAgents  IngroupAgent[]
   ivrTrees       IvrTree[]
   settingsRows   Setting[]
+  imports        Import[]
 
   @@map("tenants")
 }
@@ -186,6 +187,7 @@ model User {
   ingroupAgents  IngroupAgent[]
   ownedLeads     Lead[]
   dispositions   Disposition[]
+  imports        Import[]
 
   @@unique([tenantId, username], map: "uk_users_tenant_username")
   @@unique([tenantId, email], map: "uk_users_tenant_email")
@@ -454,12 +456,15 @@ model List {
   // T04 amendment — per-list caller-ID waterfall tier 2 (overrides campaign).
   callerIdOverride String?   @map("caller_id_override") @db.VarChar(16)
   callerIdName     String?   @map("caller_id_name") @db.VarChar(32)
+  // D02 amendment §4.3 — column-mapping snapshot persisted per list.
+  columnMapping    Json?     @map("column_mapping")
   createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_lists_tenant")
   campaignLists CampaignList[]
   leads         Lead[]
+  imports       Import[]
 
   @@unique([tenantId, name], map: "uk_lists_tenant_name")
   @@index([tenantId, active], map: "idx_lists_t_active")
@@ -1669,4 +1674,73 @@ model AuditAttestation {
   @@index([tenantId, tableName, computedAt], map: "idx_t_table_computed")
   @@index([tenantId, hashAt], map: "idx_t_hash_at")
   @@map("audit_attestation")
+}
+
+// =============================================================================
+// D02  imports  (D02 PLAN §4.1)
+// =============================================================================
+
+enum ImportStatus {
+  queued
+  running
+  done
+  failed
+  cancelled
+}
+
+model Import {
+  id                String       @id @db.Char(26)     // ULID
+  tenantId          BigInt       @default(1) @map("tenant_id")
+  listId            BigInt       @map("list_id")
+  ownerUserId       BigInt       @map("owner_user_id")
+  status            ImportStatus @default(queued)
+  sourceKey         String       @map("source_key") @db.VarChar(512)
+  errorsKey         String?      @map("errors_key") @db.VarChar(512)
+  fileBytes         BigInt?      @map("file_bytes")
+  rowCountTotal     Int?         @map("row_count_total")
+  rowCountProcessed Int          @default(0) @map("row_count_processed")
+  rowCountInserted  Int          @default(0) @map("row_count_inserted")
+  rowCountSkipped   Int          @default(0) @map("row_count_skipped")
+  rowCountErrored   Int          @default(0) @map("row_count_errored")
+  meta              Json
+  errorSummary      Json?        @map("error_summary")
+  startedAt         DateTime?    @map("started_at") @db.DateTime(6)
+  completedAt       DateTime?    @map("completed_at") @db.DateTime(6)
+  failedReason      String?      @map("failed_reason") @db.VarChar(255)
+  errorLimit        Int          @default(10000) @map("error_limit")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_imports_tenant")
+  list   List   @relation(fields: [listId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_imports_list")
+  owner  User   @relation(fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_imports_owner")
+
+  @@index([tenantId, status, createdAt], map: "idx_imports_t_status_created")
+  @@index([tenantId, listId, createdAt], map: "idx_imports_t_list_created")
+  @@map("imports")
+}
+
+// =============================================================================
+// D02  import_errors  (partitioned — D02 PLAN §4.2)
+//
+// Composite PK (id, created_at) per F02 partitioned-table convention.
+// No FK to imports (partitioned tables carry no FK per F02 rule).
+// INSERT-only (immutability triggers in migration.sql).
+// =============================================================================
+
+model ImportError {
+  id           BigInt   @default(autoincrement())
+  tenantId     BigInt   @default(1) @map("tenant_id")
+  importId     String   @map("import_id") @db.Char(26)
+  sourceLine   Int      @map("source_line")
+  sourceRecord Int      @map("source_record")
+  errorCode    String   @map("error_code") @db.VarChar(48)
+  errorMsg     String?  @map("error_msg") @db.VarChar(512)
+  rawRow       Json?    @map("raw_row")
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@id([id, createdAt])
+  @@index([tenantId, importId, sourceLine], map: "idx_import_errors_t_import_line")
+  @@index([tenantId, importId, errorCode], map: "idx_import_errors_t_import_code")
+  @@map("import_errors")
 }
