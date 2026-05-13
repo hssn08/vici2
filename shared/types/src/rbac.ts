@@ -133,6 +133,13 @@ export const VERBS = [
   // voicemail (I03)
   'voicemail:read',
   'voicemail:manage',
+  // coaching / quality management (S05)
+  'scorecard:read',
+  'scorecard:create',
+  'scorecard:finalize',
+  'scorecard:template_edit',
+  'feedback:read',
+  'feedback:create',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -184,6 +191,9 @@ export const SENSITIVE_VERBS = new Set<Verb>([
   'list:delete',
   // W02 — drain is destructive
   'jobs:drain',
+  // S05 — coaching: finalize locks scorecard; template_edit modifies golden-table
+  'scorecard:finalize',
+  'scorecard:template_edit',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -272,6 +282,13 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // I03 — voicemail
     'voicemail:read':       { scope: 'tenant' },
     'voicemail:manage':     { scope: 'tenant' },
+    // S05 — coaching
+    'scorecard:read':          { scope: 'tenant' },
+    'scorecard:create':        { scope: 'tenant' },
+    'scorecard:finalize':      { scope: 'tenant', sensitive: true },
+    'scorecard:template_edit': { scope: 'tenant', sensitive: true },
+    'feedback:read':           { scope: 'tenant' },
+    'feedback:create':         { scope: 'tenant' },
   },
 
   admin: {
@@ -348,6 +365,13 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // I03 — voicemail
     'voicemail:read':       { scope: 'tenant' },
     'voicemail:manage':     { scope: 'tenant' },
+    // S05 — coaching
+    'scorecard:read':          { scope: 'tenant' },
+    'scorecard:create':        { scope: 'tenant' },
+    'scorecard:finalize':      { scope: 'tenant', sensitive: true },
+    'scorecard:template_edit': { scope: 'tenant', sensitive: true },
+    'feedback:read':           { scope: 'tenant' },
+    'feedback:create':         { scope: 'tenant' },
   },
 
   supervisor: {
@@ -393,6 +417,12 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'email_templates:read': { scope: 'tenant' },
     // I03 — voicemail (supervisor: group scope)
     'voicemail:read':       { scope: 'group' },
+    // S05 — coaching (supervisor: group scope)
+    'scorecard:read':       { scope: 'group' },
+    'scorecard:create':     { scope: 'group' },
+    'scorecard:finalize':   { scope: 'group', sensitive: true },
+    'feedback:read':        { scope: 'group' },
+    'feedback:create':      { scope: 'group' },
   },
 
   agent: {
@@ -418,6 +448,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:read':        { scope: 'own' },
     'callback:edit':        { scope: 'own' },
     'voicemail:read':       { scope: 'own' },
+    // S05 — coaching (agent: own scorecards + feedback only)
+    'scorecard:read':       { scope: 'own' },
+    'feedback:read':        { scope: 'own' },
   },
 
   viewer: {
@@ -449,6 +482,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'alert:read':           { scope: 'tenant' },
     'list:read':            { scope: 'tenant' },
     'voicemail:read':       { scope: 'tenant' },
+    // S05 — coaching (viewer: read all in tenant)
+    'scorecard:read':       { scope: 'tenant' },
+    'feedback:read':        { scope: 'tenant' },
   },
 
   integrator: {

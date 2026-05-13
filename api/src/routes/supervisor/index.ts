@@ -23,6 +23,8 @@ import { registerDashboardAgentsRoute } from "./dashboard.agents.js";
 import { registerDashboardCampaignsRoute } from "./dashboard.campaigns.js";
 import { registerDashboardHealthRoute } from "./dashboard.health.js";
 import { registerWallboardLayoutsRoute } from "./wallboard.layouts.js";
+// S05 coaching
+import { registerSupCoachingRoutes } from "../sup/coaching/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerSupervisorRoutes(app: any): Promise<void> {
@@ -38,4 +40,6 @@ export async function registerSupervisorRoutes(app: any): Promise<void> {
   registerDashboardHealthRoute(app as FastifyInstance);
   // S04 wallboard
   registerWallboardLayoutsRoute(app as FastifyInstance);
+  // S05 coaching
+  await registerSupCoachingRoutes(app as FastifyInstance);
 }
