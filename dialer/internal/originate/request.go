@@ -116,6 +116,12 @@ type OriginateRequest struct {
 	IsAutoDialer   bool                  // campaigns.dial_method != MANUAL
 	MaxConcurrent  int                   // gateways.max_concurrent; 0 = unlimited
 	DropCapPct     float64               // campaigns.adaptive_drop_pct; 0 = skip Phase-1 stub
+
+	// I05: VM drop fields — propagated from CampaignConfig by E04 picker.
+	// When AMDAction="vmdrop" and VMDropRequiresConsent=true, the consent gate
+	// treats the call as consent-required even if recording policy is NEVER.
+	AMDAction             string // "drop" | "vmdrop" | "message" | "park" | "transfer"
+	VMDropRequiresConsent bool   // campaigns.vmdrop_requires_consent (default true)
 }
 
 // OriginateResult is returned on full pipeline pass or idempotent replay.
