@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  mod_logfile — F03 PLAN §17.1 #7.
+  Writes /var/log/freeswitch/freeswitch.log; rotation handed to host
+  logrotate (per F01 PLAN). Console (stdout) capture handled by mod_console
+  for Docker log capture.
+-->
+<configuration name="logfile.conf" description="File Logging">
+  <settings>
+    <param name="rotate-on-hup" value="true"/>
+  </settings>
+  <profiles>
+    <profile name="default">
+      <settings>
+        <param name="logfile" value="/var/log/freeswitch/freeswitch.log"/>
+        <!-- Rollover at 100 MB; keep 10 (rotation in-process; host logrotate may also do dated archives). -->
+        <param name="rollover" value="104857600"/>
+        <param name="maximum-rotate" value="10"/>
+        <param name="uuid" value="true"/>
+      </settings>
+      <mappings>
+        <map name="all" value="debug,info,notice,warning,err,crit,alert"/>
+      </mappings>
+    </profile>
+  </profiles>
+</configuration>

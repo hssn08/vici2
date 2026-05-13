@@ -1,0 +1,21 @@
+<!--
+  Generic BYOC carrier template — F03 PLAN §3.7.
+  Catchall for any standards-compliant carrier; toggle register and codec via env.
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="username" value="${GW_USER}"/>
+    <param name="password" value="${GW_PASS}"/>
+    <param name="realm" value="${GW_REALM}"/>
+    <param name="proxy" value="${GW_PROXY}"/>
+    <param name="from-domain" value="${GW_FROM_DOMAIN}"/>
+    <param name="register" value="${GW_REGISTER}"/>
+    <param name="register-transport" value="${GW_TRANSPORT}"/>
+    <param name="expire-seconds" value="${GW_EXPIRE}"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="${GW_CODECS}"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+    <param name="retry-seconds" value="30"/>
+  </gateway>
+</include>

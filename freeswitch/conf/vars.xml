@@ -1,23 +1,65 @@
 <?xml version="1.0"?>
 <!--
-  vici2 FreeSWITCH global variables.
-  F01 stub — F03 expands. Keep tenant-agnostic; carrier credentials are
-  rendered separately under sip_profiles/external/.
+  vici2 FreeSWITCH global variables (F03).
+  This file is rendered from vars.xml.tmpl by scripts/entrypoint.sh.
+  Source of FS-internal vars referenced as $${var} in other config.
+  Per F03 PLAN §13 — frozen public surface for downstream modules.
 -->
 <include>
-
-  <X-PRE-PROCESS cmd="set" data="default_password=$${env(FS_EVENT_SOCKET_PASSWORD)}"/>
+  <!-- Domain -->
   <X-PRE-PROCESS cmd="set" data="domain=$${local_ip_v4}"/>
-  <X-PRE-PROCESS cmd="set" data="hold_music=local_stream://moh"/>
+  <X-PRE-PROCESS cmd="set" data="domain_name=$${domain}"/>
+  <X-PRE-PROCESS cmd="set" data="hostname=freeswitch"/>
 
-  <!-- SIP / RTP defaults -->
-  <X-PRE-PROCESS cmd="set" data="external_rtp_ip=auto"/>
-  <X-PRE-PROCESS cmd="set" data="external_sip_ip=auto"/>
+  <!-- Tenancy (Phase 1 single-tenant per SPEC §4.5; RFC-002 keeps tid in conf names) -->
+  <X-PRE-PROCESS cmd="set" data="tenant_id=1"/>
+
+  <!-- Sofia ports -->
+  <X-PRE-PROCESS cmd="set" data="internal_sip_port=5060"/>
+  <X-PRE-PROCESS cmd="set" data="internal_tls_port=5061"/>
+  <X-PRE-PROCESS cmd="set" data="external_sip_port=5080"/>
+  <X-PRE-PROCESS cmd="set" data="wss_port=7443"/>
+  <X-PRE-PROCESS cmd="set" data="ws_port=5066"/>
+
+  <!-- NAT / public addressing — operator overrides via FS_* env in prod -->
+  <X-PRE-PROCESS cmd="set" data="external_rtp_ip=auto-nat"/>
+  <X-PRE-PROCESS cmd="set" data="external_sip_ip=auto-nat"/>
+
+  <!-- Codec policy (per profile; F03 PLAN §10) -->
+  <X-PRE-PROCESS cmd="set" data="internal_codec_prefs=PCMU,PCMA,OPUS,G722"/>
+  <X-PRE-PROCESS cmd="set" data="external_codec_prefs=PCMU,PCMA"/>
+  <X-PRE-PROCESS cmd="set" data="wss_codec_prefs=OPUS,PCMU"/>
+  <X-PRE-PROCESS cmd="set" data="global_codec_prefs=PCMU,PCMA,OPUS,G722"/>
+  <X-PRE-PROCESS cmd="set" data="outbound_codec_prefs=PCMU,PCMA,OPUS"/>
+
+  <!-- RTP port range (matches switch.conf.xml) -->
   <X-PRE-PROCESS cmd="set" data="rtp_start_port=16384"/>
   <X-PRE-PROCESS cmd="set" data="rtp_end_port=32768"/>
 
-  <!-- Codecs (G.711 only in MVP; F03/T02 may add Opus, G.722, G.729) -->
-  <X-PRE-PROCESS cmd="set" data="global_codec_prefs=PCMU,PCMA"/>
-  <X-PRE-PROCESS cmd="set" data="outbound_codec_prefs=PCMU,PCMA"/>
+  <!-- Recording (R01 consumes this path convention; F03 PLAN §14.2) -->
+  <X-PRE-PROCESS cmd="set" data="recordings_dir=/var/lib/freeswitch/recordings"/>
 
+  <!-- Certs -->
+  <X-PRE-PROCESS cmd="set" data="certs_dir=/etc/freeswitch/tls"/>
+
+  <!-- Music on hold -->
+  <X-PRE-PROCESS cmd="set" data="hold_music=local_stream://moh"/>
+
+  <!--
+    Secrets pulled from env (rendered by entrypoint envsubst over vars.xml.tmpl).
+    NEVER hardcode the literal value here; .tmpl is the substitution source.
+  -->
+  <X-PRE-PROCESS cmd="set" data="esl_password=$${env(FS_EVENT_SOCKET_PASSWORD)}"/>
+  <X-PRE-PROCESS cmd="set" data="default_password=$${env(FS_DEFAULT_SIP_PASSWORD)}"/>
+
+  <!-- Sound paths -->
+  <X-PRE-PROCESS cmd="set" data="sound_prefix=$${sounds_dir}/en/us/callie"/>
+
+  <!-- xml_curl future binding (empty in F03; downstream modules add their own) -->
+  <X-PRE-PROCESS cmd="set" data="xmlcurl_url=http://api:3000/internal/freeswitch"/>
+  <X-PRE-PROCESS cmd="set" data="xmlcurl_user=$${env(FS_XMLCURL_USER)}"/>
+  <X-PRE-PROCESS cmd="set" data="xmlcurl_pass=$${env(FS_XMLCURL_PASS)}"/>
+
+  <!-- C02 default consent message audio (M02 overrides per campaign) -->
+  <X-PRE-PROCESS cmd="set" data="consent_msg_audio=$${sounds_dir}/en/us/callie/voicemail/8000/vm-record_message.wav"/>
 </include>

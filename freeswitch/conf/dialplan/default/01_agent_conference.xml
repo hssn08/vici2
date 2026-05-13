@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<!--
+  Agent conference extensions — F03 PLAN §4.2 + RFC-002 naming convention.
+  Stub form: T03 IMPLEMENT will replace with the production extension.
+
+  RFC-002: conference name MUST be `agent_t<tenant_id>_u<user_id>@default`.
+  We extract (tid, uid) from the dialed extension into channel vars so
+  every downstream consumer (R01, T01, S02) sees them.
+
+  Park-and-join pattern: `*9<tid>_<uid>` (e.g. *91_1042). Phase-1 single-tenant
+  always uses tid=1.
+
+  Customer leg lands in `customer_into_agent_conf` when T04 originates
+  `transfer:conf_<tid>_<uid> XML default`. R01 owns the actual record_session
+  via consent gate; this file only sets the recording vars and joins the conf.
+-->
+<include>
+  <context name="default">
+
+    <!-- *9<tid>_<uid> = agent joins their personal conference (browser dials this on login) -->
+    <extension name="agent_conference_join">
+      <condition field="destination_number" expression="^\*9(\d+)_(\d+)$">
+        <action application="answer"/>
+        <action application="set" data="vici2_tenant_id=$1"/>
+        <action application="set" data="vici2_user_id=$2"/>
+        <action application="set" data="vici2_role=agent_leg"/>
+        <action application="set" data="vici2_conf_name=agent_t${vici2_tenant_id}_u${vici2_user_id}"/>
+        <action application="set" data="conference_enter_sound=silence_stream://1"/>
+        <action application="set" data="conference_exit_sound=silence_stream://1"/>
+        <action application="conference" data="agent_t${vici2_tenant_id}_u${vici2_user_id}@default+flags{moderator,nomoh}"/>
+        <action application="hangup"/>
+      </condition>
+    </extension>
+
+    <!-- conf_<tid>_<uid> = customer leg lands here on bridge from T04 originate inline target -->
+    <extension name="customer_into_agent_conf">
+      <condition field="destination_number" expression="^conf_(\d+)_(\d+)$">
+        <action application="answer"/>
+        <action application="set" data="vici2_tenant_id=$1"/>
+        <action application="set" data="vici2_user_id=$2"/>
+        <action application="set" data="vici2_role=customer_leg"/>
+        <action application="set" data="vici2_conf_name=agent_t${vici2_tenant_id}_u${vici2_user_id}"/>
+        <action application="set" data="RECORD_STEREO=true"/>
+        <action application="set" data="RECORD_MIN_SEC=2"/>
+        <action application="set" data="recording_follow_transfer=true"/>
+        <!-- C02 consent gate (R01 reads consent_record_enabled before record_session) -->
+        <action application="execute_extension" data="recording_consent_check XML default"/>
+        <action application="conference" data="agent_t${vici2_tenant_id}_u${vici2_user_id}@default+flags{endconf=false}"/>
+        <action application="hangup"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>

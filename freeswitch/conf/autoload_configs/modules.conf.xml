@@ -1,51 +1,53 @@
 <?xml version="1.0"?>
 <!--
-  Modules to load at startup. F01 ships the vanilla minimum; F03 prunes
-  unused modules and adds mod_callcenter / mod_avmd / mod_say variants
-  required by Phase 1 + Phase 2 features.
+  vici2 Module load allowlist — F03 PLAN §8.
+  Intentionally NOT loaded in Phase 1:
+    mod_xml_rpc        (insecure HTTP-only with default creds — RESEARCH §1#4)
+    mod_xml_cdr        (we emit ESL events instead)
+    mod_voicemail      (Phase 3 / I05)
+    mod_callcenter     (I01 enables for inbound queues)
+    mod_avmd / mod_amd (Phase 2 / E03)
+    mod_v8 / mod_lua / mod_python3 (no scripting in Phase 1)
+    mod_h26x / mod_vpx (audio-only)
+    mod_curl           (no HTTP from dialplan in Phase 1)
+    mod_spandsp        (no fax)
+    mod_g729           (paid codec, skip for OSS)
 -->
 <configuration name="modules.conf" description="Modules">
   <modules>
-
     <!-- Loggers -->
     <load module="mod_console"/>
     <load module="mod_logfile"/>
 
-    <!-- Event handlers -->
+    <!-- Event socket — CRITICAL: T01 connects on 8021/TCP -->
     <load module="mod_event_socket"/>
 
-    <!-- XML interfaces -->
-    <load module="mod_xml_curl"/>
-
-    <!-- SIP / WebRTC -->
+    <!-- SIP stack + loopback -->
     <load module="mod_sofia"/>
+    <load module="mod_loopback"/>
 
-    <!-- Dialplan -->
+    <!-- Conference — the SACRED primitive per SPEC §4.4 -->
+    <load module="mod_conference"/>
+
+    <!-- Dialplan + apps -->
     <load module="mod_dialplan_xml"/>
-
-    <!-- Codecs -->
-    <load module="mod_g711"/>
-    <load module="mod_g722"/>
-    <load module="mod_opus"/>
-
-    <!-- Apps -->
     <load module="mod_dptools"/>
     <load module="mod_commands"/>
-    <load module="mod_conference"/>
-    <load module="mod_callcenter"/>
-    <load module="mod_say_en"/>
-    <load module="mod_curl"/>
     <load module="mod_db"/>
     <load module="mod_hash"/>
+    <load module="mod_say_en"/>
 
-    <!-- Streams / files -->
-    <load module="mod_local_stream"/>
-    <load module="mod_native_file"/>
-    <load module="mod_sndfile"/>
-    <load module="mod_tone_stream"/>
+    <!-- File / stream sources -->
+    <load module="mod_sndfile"/>          <!-- WAV record + playback -->
+    <load module="mod_native_file"/>      <!-- pass-through native -->
+    <load module="mod_local_stream"/>     <!-- music on hold -->
+    <load module="mod_tone_stream"/>      <!-- silence_stream:// + tone_stream:// -->
 
-    <!-- Voicemail -->
-    <load module="mod_voicemail"/>
+    <!-- API integration. F03 ships empty bindings; I01/I03/F05 wire later. -->
+    <load module="mod_xml_curl"/>
 
+    <!-- Codecs. PCMU/PCMA are core-built-in. -->
+    <load module="mod_g722"/>
+    <load module="mod_opus"/>
   </modules>
 </configuration>

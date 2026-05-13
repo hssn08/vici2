@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+  Feature codes — F03 PLAN §4.4.
+  Reserved range *0-*9 for future supervisor/agent feature codes (S02, A07).
+  F03 ships the hold toggle and reservation comments; downstream modules fill in.
+-->
+<include>
+  <context name="default">
+
+    <!-- *0 silent supervisor mode (S02 placeholder) -->
+    <!-- *1 listen-only eavesdrop (S02) -->
+    <!-- *2 whisper (S02) -->
+    <!-- *3 barge (S02) -->
+    <!-- *7 hold toggle -->
+    <extension name="hold_toggle">
+      <condition field="destination_number" expression="^\*7$">
+        <action application="bind_meta_app" data="2 a s execute_extension::hold_toggle XML default"/>
+        <action application="hold"/>
+      </condition>
+    </extension>
+
+    <!-- Reserved *0-*9; S02/A07 expand. -->
+  </context>
+</include>

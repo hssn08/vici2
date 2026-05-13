@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<!--
+  WSS profile — F03 PLAN §2.2. Ports 7443 (WSS) + 5066 (WS dev-only).
+  Browser SIP.js softphones; DTLS-SRTP mandatory. Codec prefs invert
+  to OPUS-first (browsers prefer Opus). A02 connects here.
+
+  Cert convention: $${certs_dir}/wss.pem (combined cert+key+chain).
+  Renewal procedure (prod): post-renewal hook concatenates new pem and
+  runs `fs_cli -x 'sofia profile wss restart'` — drops only WSS clients,
+  hardphones unaffected (justifies the 3-profile split).
+-->
+<profile name="wss">
+  <aliases/>
+  <gateways/>
+  <domains>
+    <domain name="all" alias="true" parse="false"/>
+  </domains>
+  <settings>
+    <param name="debug" value="0"/>
+    <param name="context" value="default"/>
+    <param name="dialplan" value="XML"/>
+    <param name="rfc2833-pt" value="101"/>
+
+    <!-- Bindings: SIP/UDP off; WSS (TLS) + WS plain (dev only) -->
+    <param name="sip-port" value="5067"/>
+    <param name="ws-binding" value=":5066"/>
+    <param name="wss-binding" value=":7443"/>
+
+    <!-- TLS -->
+    <param name="tls" value="true"/>
+    <param name="tls-only" value="false"/>
+    <param name="tls-cert-dir" value="$${certs_dir}"/>
+    <param name="tls-version" value="tlsv1.2,tlsv1.3"/>
+
+    <!-- Auth -->
+    <param name="auth-calls" value="true"/>
+    <param name="accept-blind-reg" value="false"/>
+    <param name="accept-blind-auth" value="false"/>
+    <param name="nonce-ttl" value="60"/>
+    <param name="challenge-realm" value="auto_from"/>
+
+    <!-- Codecs: OPUS first for browsers -->
+    <param name="inbound-codec-prefs" value="$${wss_codec_prefs}"/>
+    <param name="outbound-codec-prefs" value="$${wss_codec_prefs}"/>
+    <param name="inbound-codec-negotiation" value="generous"/>
+
+    <!-- DTLS-SRTP mandatory for browsers -->
+    <param name="rtp-secure-media" value="mandatory"/>
+    <param name="rtp-secure-media-inbound" value="mandatory"/>
+    <param name="rtp-secure-media-outbound" value="mandatory"/>
+
+    <!-- WebRTC ICE -->
+    <param name="apply-candidate-acl" value="webrtc_candidates"/>
+    <param name="ext-rtp-ip" value="$${external_rtp_ip}"/>
+    <param name="ext-sip-ip" value="$${external_sip_ip}"/>
+    <param name="rtp-ip" value="$${local_ip_v4}"/>
+    <param name="local-network-acl" value="localnet.auto"/>
+    <param name="rtp-timer-name" value="soft"/>
+
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="manage-presence" value="false"/>
+    <param name="record-template" value="$${recordings_dir}/${vici2_tenant_id}/${strftime(%Y/%m/%d)}/${vici2_campaign_id}_${vici2_lead_id}_${uuid}.wav"/>
+  </settings>
+</profile>

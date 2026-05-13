@@ -1,0 +1,14 @@
+<!--
+  Flowroute BYOC carrier template — F03 PLAN §3.6.
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="proxy" value="us-west-or.sip.flowroute.com"/>
+    <param name="realm" value="sip.flowroute.com"/>
+    <param name="register" value="false"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="PCMU,PCMA"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+  </gateway>
+</include>

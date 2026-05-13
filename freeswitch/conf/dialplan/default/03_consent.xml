@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!--
+  C02 recording-consent extensions — RESEARCH §10.2 (4 extensions, verbatim).
+  Invoked by the customer leg (customer_into_agent_conf) BEFORE conference join.
+  R01 reads `consent_record_enabled` channel-var to decide whether to start
+  record_session; defense-in-depth re-verification happens in R01.StartRecording.
+
+  Modes (set on customer leg by T04 from C02 CheckResult):
+    ALLOW            — 1-party state, record immediately
+    PROMPT_BEEP      — opt-in continuous tone (rare)
+    PROMPT_MESSAGE   — verbal disclosure + implied consent (most common 2-party mode)
+    REQUIRE_ACTIVE   — DTMF press-1 confirmation
+    SKIP             — record disabled (no recording at all)
+-->
+<include>
+  <context name="default">
+
+    <!-- Dispatcher: choose one of the 4 leaf extensions based on consent mode -->
+    <extension name="recording_consent_check">
+      <condition field="${vici2_consent_mode}" expression="^ALLOW$">
+        <action application="set" data="consent_record_enabled=true"/>
+        <action application="set" data="vici2_consent_status=not_required"/>
+      </condition>
+      <condition field="${vici2_consent_mode}" expression="^PROMPT_BEEP$">
+        <action application="execute_extension" data="consent_beep_continuous XML default"/>
+      </condition>
+      <condition field="${vici2_consent_mode}" expression="^PROMPT_MESSAGE$">
+        <action application="execute_extension" data="consent_message_only XML default"/>
+      </condition>
+      <condition field="${vici2_consent_mode}" expression="^REQUIRE_ACTIVE$">
+        <action application="execute_extension" data="consent_message_active XML default"/>
+      </condition>
+      <condition field="${vici2_consent_mode}" expression="^SKIP$">
+        <action application="set" data="consent_record_enabled=false"/>
+        <action application="set" data="vici2_consent_status=skipped"/>
+      </condition>
+    </extension>
+
+    <!-- PROMPT_MESSAGE: verbal disclosure + implied consent via continued participation -->
+    <extension name="consent_message_only">
+      <condition>
+        <action application="answer"/>
+        <action application="playback" data="${consent_msg_audio}"/>
+        <action application="set" data="consent_record_enabled=true"/>
+        <action application="set" data="vici2_consent_status=prompted_assumed"/>
+      </condition>
+    </extension>
+
+    <!-- REQUIRE_ACTIVE: DTMF press-1 to consent, press-2 to decline -->
+    <extension name="consent_message_active">
+      <condition>
+        <action application="answer"/>
+        <action application="play_and_get_digits" data="1 1 3 5000 # ${consent_msg_audio} silence_stream://250 vici2_consent_dtmf [12]"/>
+        <action application="set" data="consent_record_enabled=${expr(${vici2_consent_dtmf} == 1)}"/>
+        <action application="set" data="vici2_consent_status=${cond(${vici2_consent_dtmf} == 1 ? prompted_accepted : prompted_declined)}"/>
+      </condition>
+    </extension>
+
+    <!-- PROMPT_BEEP: continuous tone notice (telco-carrier-style §64.501) -->
+    <extension name="consent_beep_continuous">
+      <condition>
+        <action application="answer"/>
+        <action application="set" data="record_beep_pre=tone_stream://%(500,0,1400)"/>
+        <action application="set" data="consent_record_enabled=true"/>
+        <action application="set" data="vici2_consent_status=beep_only"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>
