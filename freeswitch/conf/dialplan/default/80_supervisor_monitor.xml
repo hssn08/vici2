@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<!--
+  S02 supervisor live-monitor dialplan extensions.
+  S02 PLAN §5.3 — Single-conference model, three modes.
+
+  Extension pattern: *8{tid}_{target_uid}_{mode}
+  Examples:
+    *81_1042_listen  → eavesdrop on agent 1042 in tenant 1
+    *81_1042_whisper → whisper to agent 1042 in tenant 1
+    *81_1042_barge   → barge in on agent 1042 in tenant 1
+
+  Security layers (S02 PLAN §6.2 defense-in-depth):
+    1. SIP digest auth: ${sip_authorized_user} is attacker-unforgeable (F03 §2.1).
+    2. mod_xml_curl callout to api/internal/freeswitch/monitor_authz validates:
+       - JWT signature + expiry
+       - Role (supervisor or above)
+       - Tenant scope (jwt.tid == captured $1)
+       - JTI one-time use (replay guard)
+    3. join-only flag: fails closed if conference does not exist (agent offline).
+
+  endconf=false REQUIRED on every supervisor join — supervisor must never be a
+  conference lifecycle holder. Conference lifecycle is owned by the agent leg.
+  (S02 PLAN §3.1, §2.1.)
+
+  hangup_after_conference=true ensures the SIP leg terminates when the
+  supervisor leaves the conference (S02 PLAN §3.1).
+-->
+<include>
+  <context name="default">
+
+    <!-- ── Entry point: parse extension + token, delegate to mode sub-extensions ── -->
+    <extension name="supervisor_monitor_join">
+      <condition field="destination_number"
+                 expression="^\*8(\d+)_(\d+)_(listen|whisper|barge)$">
+        <!-- $1=tid  $2=target_uid  $3=initial_mode -->
+
+        <!-- Inner condition: ensure the caller is SIP-authenticated (non-empty authorized user).
+             anti-action rejects unauthenticated callers (should never happen on wss profile). -->
+        <condition field="${sip_authorized_user}" expression="^\d+$" break="never">
+          <!-- Store parsed values as channel vars for sub-extensions. -->
+          <action application="set" data="vici2_mon_tid=$1"/>
+          <action application="set" data="vici2_mon_target=$2"/>
+          <action application="set" data="vici2_mon_mode=$3"/>
+          <action application="set"
+                  data="vici2_mon_token=${sip_h_X-Vici2-Monitor-Token}"/>
+
+          <!-- Register hangup hook so the API can write the monitor.session.ended audit row.
+               The hook fires with the supervisor's call UUID appended as a query param. -->
+          <action application="set"
+                  data="api_hangup_hook=curl http://api:3000/internal/freeswitch/monitor_end?uuid=${uuid}"/>
+
+          <!-- mod_xml_curl authz callout.
+               The API validates token, role, tenant, jti one-time use.
+               On success: returns 200 OK and sets vici2_mon_authz_ok=true.
+               On failure: sets vici2_mon_authz_ok=false (or does not set it). -->
+          <action application="set"
+                  data="vici2_mon_authz_ok=${curl_auto(http://api:3000/internal/freeswitch/monitor_authz?caller_uid=${sip_authorized_user}&amp;target_tid=${vici2_mon_tid}&amp;target_uid=${vici2_mon_target}&amp;mode=${vici2_mon_mode}&amp;token=${vici2_mon_token})}"/>
+
+          <action application="execute_extension"
+                  data="supervisor_monitor_${vici2_mon_mode} XML default"/>
+
+          <anti-action application="respond" data="403 Forbidden"/>
+        </condition>
+      </condition>
+    </extension>
+
+    <!-- ── Eavesdrop (listen-only): supervisor joins with mute flag. ─────────── -->
+    <!--   Hears agent + customer; heard by nobody.                               -->
+    <!--   No post-join API calls needed. (S02 PLAN §3.2)                        -->
+    <extension name="supervisor_monitor_listen">
+      <condition field="destination_number" expression="^supervisor_monitor_listen$">
+        <action application="answer"/>
+        <action application="set" data="vici2_role=supervisor_leg"/>
+        <action application="set" data="hangup_after_conference=true"/>
+        <!-- endconf=false: supervisor must NOT own the conference lifecycle. -->
+        <!-- join-only: fails closed if agent conference does not exist.     -->
+        <!-- mute: supervisor's mic is muted into the conference mix.        -->
+        <action application="conference"
+                data="agent_t${vici2_mon_tid}_u${vici2_mon_target}@default+flags{mute,join-only,endconf=false}"/>
+      </condition>
+    </extension>
+
+    <!-- ── Whisper (sup→agent only): supervisor joins unmuted. ──────────────── -->
+    <!--   Post-join: conf-maint handler issues relate nospeak against every      -->
+    <!--   non-agent member (via OnSupervisorJoin in supervisor.Operator).        -->
+    <!--   Agent hears supervisor; customer does NOT. (S02 PLAN §3.3)            -->
+    <extension name="supervisor_monitor_whisper">
+      <condition field="destination_number" expression="^supervisor_monitor_whisper$">
+        <action application="answer"/>
+        <action application="set" data="vici2_role=supervisor_leg"/>
+        <action application="set" data="hangup_after_conference=true"/>
+        <!-- No mute: supervisor speaks into conference.                     -->
+        <!-- conf-maint handler will issue relate nospeak for each customer. -->
+        <action application="conference"
+                data="agent_t${vici2_mon_tid}_u${vici2_mon_target}@default+flags{join-only,endconf=false}"/>
+      </condition>
+    </extension>
+
+    <!-- ── Barge (3-way): supervisor joins unmuted with no relate. ───────────── -->
+    <!--   Agent, customer, and supervisor all hear each other.                   -->
+    <!--   Supervisor voice WILL appear in customer-leg recording. (S02 §3.4)     -->
+    <extension name="supervisor_monitor_barge">
+      <condition field="destination_number" expression="^supervisor_monitor_barge$">
+        <action application="answer"/>
+        <action application="set" data="vici2_role=supervisor_leg"/>
+        <action application="set" data="hangup_after_conference=true"/>
+        <action application="conference"
+                data="agent_t${vici2_mon_tid}_u${vici2_mon_target}@default+flags{join-only,endconf=false}"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>
