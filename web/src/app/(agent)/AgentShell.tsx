@@ -8,6 +8,7 @@ import { TopNav } from "@/components/shell/TopNav";
 import { SideNav } from "@/components/shell/SideNav";
 import { StatusBar } from "@/components/shell/StatusBar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SipProvider } from "@/lib/sip";
 
 export function AgentShell({
   children,
@@ -53,19 +54,21 @@ export function AgentShell({
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <TopNav />
-      <div className="flex flex-1 overflow-hidden">
-        <SideNav />
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="flex-1 overflow-auto bg-[var(--color-surface)] p-6"
-        >
-          {children}
-        </main>
+    <SipProvider>
+      <div className="flex min-h-screen flex-col">
+        <TopNav />
+        <div className="flex flex-1 overflow-hidden">
+          <SideNav />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 overflow-auto bg-[var(--color-surface)] p-6"
+          >
+            {children}
+          </main>
+        </div>
+        <StatusBar />
       </div>
-      <StatusBar />
-    </div>
+    </SipProvider>
   );
 }

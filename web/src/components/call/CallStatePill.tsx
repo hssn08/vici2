@@ -11,6 +11,7 @@ const PHASE_LABEL: Record<CallPhase, string> = {
   hold: "On Hold",
   wrapup: "Wrap-up",
   transferring: "Transferring",
+  reconnecting: "Reconnecting", // A02: SIP.js transport recovery
 };
 
 const PHASE_BG: Record<CallPhase, string> = {
@@ -20,6 +21,7 @@ const PHASE_BG: Record<CallPhase, string> = {
   hold: "bg-[var(--color-state-hold)]",
   wrapup: "bg-[var(--color-state-wrap)]",
   transferring: "bg-[var(--color-state-transfer)]",
+  reconnecting: "bg-[var(--color-state-error)]", // A02: shown as an alert state
 };
 
 export function CallStatePill({
