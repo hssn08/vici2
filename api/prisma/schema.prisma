@@ -183,6 +183,9 @@ model Tenant {
   rndUsageLogs       RndUsageLog[]
   // X04: number pools
   numberPools        NumberPool[]
+  // N05: branded calling
+  brandedCallingProviders   BrandedCallingProvider[]
+  brandedDidRegistrations   BrandedDidRegistration[]
 
   @@map("tenants")
 }
@@ -1189,16 +1192,20 @@ model DidNumber {
   // I02 amendments — IVR language + timeout
   defaultLang     String       @default("en") @map("default_lang") @db.VarChar(5)
   ivrTimeoutSec   Int          @default(300) @map("ivr_timeout_sec") @db.UnsignedSmallInt
+  // N05 amendment — brand reputation score (0-100 normalized; NULL=unregistered or unpolled)
+  brandReputationScore Int?    @map("brand_reputation_score") @db.UnsignedTinyInt
   createdAt       DateTime     @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.DateTime(6)
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_tenant")
-  carrier        Carrier         @relation(fields: [carrierId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_carrier")
-  numberPoolDids NumberPoolDid[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_tenant")
+  carrier                Carrier                 @relation(fields: [carrierId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_dids_carrier")
+  numberPoolDids         NumberPoolDid[]
+  brandedDidRegistrations BrandedDidRegistration[]
 
   @@unique([tenantId, e164], map: "uk_dids_tenant_e164")
   @@index([tenantId, carrierId], map: "idx_dids_t_carrier")
   @@index([tenantId, routeKind, routeTarget], map: "idx_dids_t_route")
+  @@index([tenantId, brandReputationScore], map: "idx_dn_brand_score")
   @@map("did_numbers")
 }
 
@@ -2625,6 +2632,7 @@ enum QuarantineReason {
   high_complaint_rate
   manual
   label_detected
+  brand_reputation
 }
 
 enum AttestLevel {
@@ -2867,4 +2875,107 @@ model RndUsageLog {
 
   @@unique([tenantId, periodYear, periodMonth], map: "uk_rnd_usage_tenant_period")
   @@map("rnd_usage_log")
+}
+
+// =============================================================================
+// N05  Branded Calling — branded_calling_providers, branded_did_registrations
+// =============================================================================
+
+enum BrandedCallingProviderKind {
+  first_orion
+  hiya
+  tns
+}
+
+enum BrandVertical {
+  FINANCIAL_SERVICES
+  HEALTHCARE
+  INSURANCE
+  RETAIL
+  UTILITIES
+  TELEMARKETING
+  NON_PROFIT
+  GOVERNMENT
+  TECHNOLOGY
+  REAL_ESTATE
+  COLLECTIONS
+  OTHER
+}
+
+enum BrandStatus {
+  pending
+  active
+  rejected
+  suspended
+  inactive
+}
+
+enum BrandedDidStatus {
+  pending
+  submitted
+  active
+  rejected
+  deregistering
+  deregistered
+  error
+}
+
+model BrandedCallingProvider {
+  id              BigInt                     @id @default(autoincrement())
+  tenantId        BigInt                     @default(1) @map("tenant_id")
+  provider        BrandedCallingProviderKind
+  credentialsEnc  Bytes                      @map("credentials_enc") @db.VarBinary(512)
+  kekVersion      Int                        @default(1) @map("kek_version") @db.UnsignedSmallInt
+  brandName       String                     @map("brand_name") @db.VarChar(30)
+  logoUrl         String?                    @map("logo_url") @db.VarChar(512)
+  vertical        BrandVertical              @default(OTHER)
+  callReasons     Json                       @default("[]") @map("call_reasons")
+  providerBrandId String?                    @map("provider_brand_id") @db.VarChar(128)
+  brandStatus     BrandStatus                @default(pending) @map("brand_status")
+  brandSyncedAt   DateTime?                  @map("brand_synced_at") @db.DateTime(6)
+  active          Boolean                    @default(true)
+  createdAt       DateTime                   @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt       DateTime                   @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant               Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_bcp_tenant")
+  brandedDidRegistrations BrandedDidRegistration[]
+
+  @@unique([tenantId, provider], map: "uk_bcp_tenant_provider")
+  @@index([tenantId, active], map: "idx_bcp_tenant_active")
+  @@map("branded_calling_providers")
+}
+
+model BrandedDidRegistration {
+  id                      BigInt                     @id @default(autoincrement())
+  tenantId                BigInt                     @default(1) @map("tenant_id")
+  didId                   BigInt                     @map("did_id")
+  providerId              BigInt                     @map("provider_id")
+  provider                BrandedCallingProviderKind
+  providerNumberId        String?                    @map("provider_number_id") @db.VarChar(128)
+  callReason              String                     @default("GENERAL_NOTIFICATION") @map("call_reason") @db.VarChar(64)
+  status                  BrandedDidStatus           @default(pending)
+  attestationLevel        String?                    @map("attestation_level") @db.Char(1)
+  reputationScore         Int?                       @map("reputation_score") @db.UnsignedTinyInt
+  reputationLastPolledAt  DateTime?                  @map("reputation_last_polled_at") @db.DateTime(6)
+  rawScore                Decimal?                   @map("raw_score") @db.Decimal(6, 2)
+  rawScoreAt              DateTime?                  @map("raw_score_at") @db.DateTime(6)
+  disputeOpen             Boolean                    @default(false) @map("dispute_open")
+  disputeSubmittedAt      DateTime?                  @map("dispute_submitted_at") @db.DateTime(6)
+  disputeNotes            String?                    @map("dispute_notes") @db.Text
+  registeredAt            DateTime?                  @map("registered_at") @db.DateTime(6)
+  deregisteredAt          DateTime?                  @map("deregistered_at") @db.DateTime(6)
+  retryCount              Int                        @default(0) @map("retry_count") @db.UnsignedTinyInt
+  lastError               String?                    @map("last_error") @db.Text
+  createdAt               DateTime                   @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt               DateTime                   @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_bdr_tenant")
+  did      DidNumber              @relation(fields: [didId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_bdr_did")
+  providerRow BrandedCallingProvider @relation(fields: [providerId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_bdr_provider")
+
+  @@unique([didId, provider], map: "uk_bdr_did_provider")
+  @@index([tenantId, provider, status], map: "idx_bdr_tenant_provider_status")
+  @@index([tenantId, reputationScore], map: "idx_bdr_tenant_score")
+  @@index([tenantId, status, reputationLastPolledAt], map: "idx_bdr_poll_due")
+  @@map("branded_did_registrations")
 }

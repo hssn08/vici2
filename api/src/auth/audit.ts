@@ -99,7 +99,17 @@ export type AuditAction =
   | "number_pool.did.added"
   | "number_pool.did.removed"
   | "number_pool.did.quarantined"
-  | "number_pool.did.unquarantined";
+  | "number_pool.did.unquarantined"
+  // N05 — branded calling
+  | "branded_calling.provider.created"
+  | "branded_calling.provider.updated"
+  | "branded_calling.provider.deleted"
+  | "branded_calling.did.registration_requested"
+  | "branded_calling.did.deregistration_requested"
+  | "branded_calling.did.bulk_registration_requested"
+  | "branded_calling.did.dispute_submitted"
+  | "branded_calling.did.registered"
+  | "branded_calling.did.deregistered";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
