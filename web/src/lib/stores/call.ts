@@ -60,6 +60,8 @@ export interface CampaignConfig {
   auto_ready_after_wrapup?: boolean;
   preview_allowed_seconds?: number;
   default_dispo?: string | null;
+  // A09 amendment — optional, defaults to OPTIONAL
+  pause_codes_required?: "OFF" | "OPTIONAL" | "FORCE";
 }
 
 export interface ConferenceParticipant {

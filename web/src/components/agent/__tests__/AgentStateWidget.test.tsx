@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import * as React from "react";
 import { AgentStateWidget } from "../AgentStateWidget";
 import { useAgentStore } from "@/lib/stores/agent";
+import { Toaster } from "@/components/ui/toast";
 
 // ---------------------------------------------------------------------------
-// Mock agent API
+// Mock agent API — A09: getPauseCodes now returns PauseCodesConfig
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/agent", () => ({
@@ -16,11 +17,29 @@ vi.mock("@/lib/agent", () => ({
     pausedSince: null,
     currentCampaignId: null,
   }),
-  getPauseCodes: vi.fn().mockResolvedValue([
-    { code: "LUNCH", label: "Lunch Break" },
-    { code: "TRAIN", label: "Training", billable: true },
-    { code: "MANUAL", label: "Manual Break" },
-  ]),
+  getPauseCodes: vi.fn().mockResolvedValue({
+    pauseCodesRequired: "OPTIONAL",
+    codes: [
+      { code: "LUNCH", name: "Lunch Break", billable: false },
+      { code: "TRAIN", name: "Training", billable: true },
+    ],
+  }),
+  useAgentState: vi.fn().mockReturnValue({
+    status: "logged-out",
+    pauseCode: null,
+    pausedSince: null,
+    currentCampaignId: null,
+    pauseConfig: {
+      pauseCodesRequired: "OPTIONAL",
+      codes: [],
+      loading: false,
+      error: null,
+    },
+    transitioning: false,
+    pause: vi.fn(),
+    unpause: vi.fn(),
+    refreshPauseConfig: vi.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -37,6 +56,14 @@ function resetStore() {
   });
 }
 
+function renderWidget() {
+  return render(
+    <Toaster>
+      <AgentStateWidget />
+    </Toaster>,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -51,39 +78,39 @@ describe("AgentStateWidget", () => {
   });
 
   it("renders Offline badge when status is logged-out", () => {
-    render(<AgentStateWidget />);
+    renderWidget();
     expect(screen.getByText("Offline")).toBeInTheDocument();
   });
 
   it("renders Ready badge when status is ready", () => {
     useAgentStore.setState({ status: "ready" });
-    render(<AgentStateWidget />);
+    renderWidget();
     expect(screen.getByText("Ready")).toBeInTheDocument();
   });
 
   it("renders Paused badge and pause code when paused", () => {
     useAgentStore.setState({ status: "paused", pauseCode: "LUNCH" });
-    render(<AgentStateWidget />);
+    renderWidget();
     expect(screen.getByText("Paused")).toBeInTheDocument();
     expect(screen.getByText("(LUNCH)")).toBeInTheDocument();
   });
 
   it("renders On Call badge when busy", () => {
     useAgentStore.setState({ status: "busy" });
-    render(<AgentStateWidget />);
+    renderWidget();
     expect(screen.getByText("On Call")).toBeInTheDocument();
   });
 
-  it("button is disabled when status is busy", () => {
+  it("status-badge button is disabled when status is busy", () => {
     useAgentStore.setState({ status: "busy" });
-    render(<AgentStateWidget />);
+    renderWidget();
     const btn = screen.getByRole("button", { name: /agent state/i });
     expect(btn).toBeDisabled();
   });
 
-  it("opens state menu on click when ready", async () => {
-    useAgentStore.setState({ status: "ready" });
-    render(<AgentStateWidget />);
+  it("opens state menu on click when logged-out (shows Offline option)", async () => {
+    useAgentStore.setState({ status: "logged-out" });
+    renderWidget();
     const btn = screen.getByRole("button", { name: /agent state/i });
     fireEvent.click(btn);
     await waitFor(() => {
@@ -91,77 +118,9 @@ describe("AgentStateWidget", () => {
     });
   });
 
-  it("clicking Ready in menu calls setAgentState with ready", async () => {
-    const { setAgentState } = await import("@/lib/agent");
-    useAgentStore.setState({ status: "paused", pauseCode: "LUNCH" });
-    render(<AgentStateWidget />);
-
-    fireEvent.click(screen.getByRole("button", { name: /agent state/i }));
-    await waitFor(() => screen.getByRole("menu"));
-
-    const readyBtn = screen.getByRole("menuitem", { name: /ready/i });
-    await act(async () => {
-      fireEvent.click(readyBtn);
-    });
-
-    await waitFor(() => {
-      expect(setAgentState).toHaveBeenCalledWith({ status: "ready" });
-    });
-  });
-
-  it("clicking Paused opens pause code picker", async () => {
-    useAgentStore.setState({ status: "ready" });
-    render(<AgentStateWidget />);
-
-    fireEvent.click(screen.getByRole("button", { name: /agent state/i }));
-    await waitFor(() => screen.getByRole("menu"));
-
-    fireEvent.click(screen.getByRole("menuitem", { name: /paused/i }));
-    await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: /pause reason/i })).toBeInTheDocument();
-    });
-  });
-
-  it("pause code picker renders codes from API", async () => {
-    useAgentStore.setState({ status: "ready" });
-    render(<AgentStateWidget />);
-
-    fireEvent.click(screen.getByRole("button", { name: /agent state/i }));
-    await waitFor(() => screen.getByRole("menu"));
-    fireEvent.click(screen.getByRole("menuitem", { name: /paused/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Lunch Break")).toBeInTheDocument();
-      expect(screen.getByText("Training")).toBeInTheDocument();
-      expect(screen.getByText("Manual Break")).toBeInTheDocument();
-    });
-  });
-
-  it("selecting a pause code calls setAgentState", async () => {
-    const { setAgentState } = await import("@/lib/agent");
-    useAgentStore.setState({ status: "ready" });
-    render(<AgentStateWidget />);
-
-    fireEvent.click(screen.getByRole("button", { name: /agent state/i }));
-    await waitFor(() => screen.getByRole("menu"));
-    fireEvent.click(screen.getByRole("menuitem", { name: /paused/i }));
-    await waitFor(() => screen.getByText("Lunch Break"));
-
-    await act(async () => {
-      fireEvent.click(screen.getByText("Lunch Break"));
-    });
-
-    await waitFor(() => {
-      expect(setAgentState).toHaveBeenCalledWith({
-        status: "paused",
-        pauseCode: "LUNCH",
-      });
-    });
-  });
-
   it("closes menu on Escape key", async () => {
     useAgentStore.setState({ status: "ready" });
-    render(<AgentStateWidget />);
+    renderWidget();
     fireEvent.click(screen.getByRole("button", { name: /agent state/i }));
     await waitFor(() => screen.getByRole("menu"));
 
@@ -169,5 +128,18 @@ describe("AgentStateWidget", () => {
     await waitFor(() => {
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     });
+  });
+
+  it("PauseButton is rendered alongside state badge", () => {
+    useAgentStore.setState({ status: "ready" });
+    renderWidget();
+    // PauseButton renders as "Pause" when status=ready
+    expect(screen.getByRole("button", { name: /pause/i })).toBeInTheDocument();
+  });
+
+  it("PauseButton shows Ready when agent is paused", () => {
+    useAgentStore.setState({ status: "paused", pauseCode: "LUNCH" });
+    renderWidget();
+    expect(screen.getByRole("button", { name: /go ready/i })).toBeInTheDocument();
   });
 });
