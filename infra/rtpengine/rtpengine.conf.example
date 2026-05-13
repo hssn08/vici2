@@ -1,0 +1,123 @@
+# infra/rtpengine/rtpengine.conf.example
+# X01 — rtpengine reference configuration.
+#
+# The production container uses CLI flags from entrypoint.sh (more Docker-friendly
+# than file config). This file is for operator reference and non-containerized
+# deployments. It documents all vici2-relevant options with rationale.
+#
+# Docs: https://github.com/sipwise/rtpengine/blob/master/README.md
+# Version target: mr12.5
+
+[rtpengine]
+
+# ---------------------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------------------
+
+# RTP interface. In network_mode: host, 0.0.0.0 binds to all host interfaces,
+# so rtpengine is reachable on the host's public IP as well as loopback.
+# If the host is multi-homed, specify the public-facing interface IP here.
+# Example for multi-homed host: interface = 192.168.1.10
+interface = 0.0.0.0
+
+# ng-control protocol. Bind only to loopback — FS communicates locally.
+# FreeSWITCH mod_rtpengine connects to this UDP socket.
+listen-ng = 127.0.0.1:22222
+
+# ---------------------------------------------------------------------------
+# RTP Port Range
+# ---------------------------------------------------------------------------
+
+# 10,000 ports = 5,000 concurrent RTP streams.
+# Each stream uses 2 ports (RTP + RTCP).
+# Each bridged WebRTC↔carrier call = 2 streams = 4 ports.
+# 10,000 ports / 4 = 2,500 concurrent bridged calls maximum.
+# Target 500 concurrent agents × 2 streams × 2 ports = 2,000 ports.
+# 10,000 provides 5× headroom for call setup/teardown overlap.
+port-min = 30000
+port-max = 40000
+
+# ---------------------------------------------------------------------------
+# QoS
+# ---------------------------------------------------------------------------
+
+# DSCP marking. 184 = 0xB8 = DSCP EF (Expedited Forwarding, RFC 3246).
+# Applied to all RTP/RTCP packets sent by rtpengine.
+# Only effective if the network path honours DSCP (see PLAN.md §2.2).
+tos = 184
+
+# ---------------------------------------------------------------------------
+# Kernel Forwarding
+# ---------------------------------------------------------------------------
+
+# Userspace mode (default for dev/Docker Desktop).
+# Remove this line to allow kernel mode; then set --table=0 in entrypoint.sh.
+# In kernel mode, the xt_RTPENGINE kernel module forwards RTP packets without
+# involving userspace, delivering near-zero CPU overhead for forwarding.
+# Production: load xt_RTPENGINE with 'modprobe xt_RTPENGINE' before starting.
+no-kernel-forwarding = true
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+# 5=INFO is appropriate for production. 7=DEBUG for troubleshooting.
+# Logs go to stderr (captured by Docker's log driver).
+log-level = 5
+log-stderr = true
+
+# ---------------------------------------------------------------------------
+# Prometheus Metrics (mr11.0+)
+# ---------------------------------------------------------------------------
+
+# Built-in Prometheus HTTP endpoint. Scraped by vici2's Prometheus at :9109.
+# Prometheus scrape target configured in infra/observability/prometheus/prometheus.yml.
+prometheus-listen = 0.0.0.0:9109
+prometheus-prefix = rtpengine_
+
+# ---------------------------------------------------------------------------
+# Diagnostic Recording (optional PCAP — NOT the primary recording mechanism)
+# ---------------------------------------------------------------------------
+
+# Primary recording is handled by R01 (FS record_session, stereo WAV).
+# rtpengine PCAP recording is optional diagnostic tooling only.
+# Enable per-call via mod_rtpengine flags or RTPENGINE_DIAG_PCAP=1 env var.
+recording-dir = /var/lib/rtpengine/recordings
+recording-method = pcap
+
+# ---------------------------------------------------------------------------
+# RTCP Generation
+# ---------------------------------------------------------------------------
+# "generate RTCP" is passed as a per-call flag in the ng offer (dialplan XML),
+# not as a global config option. This causes rtpengine to synthesize RTCP
+# toward FS, normalising browser RTCP quirks that FS may not handle gracefully.
+
+# ---------------------------------------------------------------------------
+# Homer/HEPv3 SIP Capture (optional)
+# ---------------------------------------------------------------------------
+# If you run a Homer SIP capture server, enable HEP mirroring.
+# Uncomment and set your Homer endpoint:
+# homer = 127.0.0.1:9060
+# homer-protocol = udp
+# homer-id = 2000
+
+# ---------------------------------------------------------------------------
+# Production Tuning Notes
+# ---------------------------------------------------------------------------
+#
+# 1. Kernel module: see infra/rtpengine/KERNEL_MODULE.md for full setup.
+#    Short form:
+#      apt-get install -y ngcp-rtpengine-kernel-dkms
+#      modprobe xt_RTPENGINE
+#      echo "xt_RTPENGINE" > /etc/modules-load.d/rtpengine.conf
+#      # Set RTPENGINE_KERNEL_MODE=1 in .env or docker-compose override.
+#
+# 2. Port range: expand if > 2,500 concurrent calls are expected.
+#    Each 2-port pair = 1 RTP stream; expand in pairs.
+#
+# 3. CPU affinity: on high-core hosts, pin rtpengine to isolated cores.
+#    Use RTPENGINE_OPTS="--cpu-affinity=2,3,4,5" in entrypoint.
+#
+# 4. DTLS certificate: rtpengine generates its own DTLS cert at startup.
+#    For production, provide a stable cert to avoid reconnect delays on restart:
+#    --dtls-cert=/etc/rtpengine/dtls.pem --dtls-pkey=/etc/rtpengine/dtls.key

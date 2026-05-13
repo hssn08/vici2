@@ -127,6 +127,21 @@ scrape_configs:
           layer: infra
           host_role: app
 
+  # --- X01: rtpengine SRTP offload ---
+  # rtpengine exposes a built-in Prometheus endpoint (mr11.0+) on port 9109.
+  # In network_mode: host, rtpengine is on localhost from the host perspective.
+  # In dev/Mac bridge mode, Prometheus reaches it via the "rtpengine" DNS name.
+  # Metrics prefix: rtpengine_ (set via --prometheus-prefix in entrypoint.sh).
+  - job_name: rtpengine
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 7s
+    static_configs:
+      - targets: ["localhost:9109"]
+        labels:
+          service: rtpengine
+          layer: telephony
+
   # --- Prometheus self-monitoring ---
 
   - job_name: prometheus

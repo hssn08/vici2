@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!--
+  X01 — rtpengine dialplan integration.
+  Intercepts WebRTC (WSS profile) SDP offer/answer exchange and proxies it
+  through rtpengine so that rtpengine — not FreeSWITCH — handles DTLS-SRTP
+  toward the browser.
+
+  Priority: 50 — after 45_safe_harbor.xml, before 60_ingroup.xml.
+
+  How it works:
+    rtpengine_offer: fires on the A-leg (browser → FS). Intercepts the
+      browser's SDP before FS processes it. rtpengine rewrites the SDP so
+      that the browser sends RTP to rtpengine (port 30000-40000), not to FS.
+      rtpengine handles the DTLS handshake with the browser and relays plain
+      RTP to FS on the loopback interface.
+
+    rtpengine_answer: fires on the B-leg (FS → carrier or conference).
+      Completes the rtpengine offer/answer cycle so rtpengine knows both
+      media endpoints and can begin forwarding.
+
+  Flags to rtpengine offer:
+    ICE=remove              Strip ICE candidates; rtpengine is the endpoint.
+    DTLS=passive            rtpengine performs the DTLS handshake as server.
+    SRTP=default            SRTP toward the browser; plain RTP toward FS.
+    replace-origin          Rewrite SDP o= line connection address.
+    replace-session-connection  Rewrite SDP c= connection line.
+    generate-RTCP           rtpengine synthesizes RTCP toward FS (normalises
+                            browser RTCP quirks that FS may reject).
+    codec-transcode-pcmu    Ensure PCMU is available toward FS/carrier legs
+                            even if browser only offers Opus.
+
+  IMPORTANT: continue="true" on each extension ensures that calls fall through
+  to the appropriate routing extension (01_agent_conference, 02_outbound, etc.).
+  These extensions are pure media-plane interceptors; they do not route calls.
+
+  Rollback: remove mod_rtpengine from modules.conf.xml and revert wss.xml.
+  See PLAN.md §7.2 for the full rollback procedure.
+-->
+<include>
+  <context name="default">
+
+    <!--
+      rtpengine_offer — fires on the A-leg (browser WebRTC incoming call).
+
+      Condition: sofia_profile_name = "wss" identifies browser calls arriving
+      via the WSS profile (port 7443). Internal and external SIP profile calls
+      are not intercepted here.
+
+      continue="true": fall through to routing extension after applying offer.
+    -->
+    <extension name="rtpengine_offer_wss" continue="true">
+      <condition field="${sofia_profile_name}" expression="^wss$">
+        <action application="set" data="rtpengine_offer_flags=ICE=remove DTLS=passive SRTP=default replace-origin replace-session-connection generate-RTCP codec-transcode-pcmu"/>
+        <action application="rtpengine_offer" data="${rtpengine_offer_flags}"/>
+        <action application="log" data="INFO [X01] rtpengine_offer applied: profile=${sofia_profile_name} call-id=${call_id} uuid=${uuid}"/>
+      </condition>
+    </extension>
+
+    <!--
+      rtpengine_answer — fires on the B-leg to complete the offer/answer cycle.
+
+      Condition: rtpengine_offer_set=true is set by mod_rtpengine after a
+      successful rtpengine_offer on the A-leg. This ensures rtpengine_answer
+      only runs on B-legs that have a corresponding rtpengine_offer.
+
+      continue="true": fall through to allow further dialplan processing.
+    -->
+    <extension name="rtpengine_answer_bleg" continue="true">
+      <condition field="${rtpengine_offer_set}" expression="^true$">
+        <action application="rtpengine_answer" data=""/>
+        <action application="log" data="INFO [X01] rtpengine_answer applied: call-id=${call_id} uuid=${uuid}"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>

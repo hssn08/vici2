@@ -1,0 +1,73 @@
+# infra/observability/prometheus/rules/rtpengine.rules.yml
+# X01 — rtpengine alert rules.
+# Covers: service availability, port exhaustion, session capacity, ng-protocol errors.
+# Metrics are scraped from rtpengine's built-in Prometheus endpoint (:9109).
+# Metric prefix: rtpengine_ (set via --prometheus-prefix in entrypoint.sh).
+#
+# Severity labels:
+#   critical — page on-call immediately; active WebRTC calls degrading
+#   warning  — investigate within 30 minutes; approaching threshold
+
+groups:
+  - name: rtpengine
+    rules:
+
+      # rtpengine Prometheus endpoint unreachable.
+      # FS mod_rtpengine will fall back to pass-through (FS-native SRTP) after
+      # 500ms timeout per call; existing rtpengine-routed calls will have no RTP.
+      - alert: RtpengineDown
+        expr: up{job="rtpengine"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "rtpengine is down"
+          description: >
+            rtpengine Prometheus endpoint at :9109 has been unreachable for 1 minute.
+            WebRTC call quality degrading: mod_rtpengine in pass-through mode (FS-native SRTP).
+            Action: docker compose restart rtpengine
+            Reference: PLAN.md §7.2 (rollback procedure)
+
+      # Port range exhaustion: rtpengine cannot allocate ports for new calls.
+      # Each occurrence means at least one call was rejected due to no available port.
+      - alert: RtpenginePortExhaustion
+        expr: rtpengine_port_unavailable_total > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "rtpengine RTP port range exhausted"
+          description: >
+            rtpengine cannot allocate ports for new calls (port_unavailable_total={{ $value }}).
+            Current port range: 30000-40000 (10,000 ports = 5,000 streams = ~2,500 calls).
+            Action: expand RTPENGINE_PORT_MIN/RTPENGINE_PORT_MAX or add another FS/rtpengine node.
+
+      # Session count approaching capacity (>90% of 5,000 stream limit = 4,500 streams).
+      # 5 minute sustained window avoids alerting on transient bursts.
+      - alert: RtpengineHighSessionLoad
+        expr: rtpengine_sessions_current > 4500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "rtpengine approaching session capacity"
+          description: >
+            rtpengine has {{ $value }} active sessions (warning threshold: 4500 of 5000 max).
+            At this level, new call setup may begin to fail.
+            Action: scale out — add another FS+rtpengine node and balance incoming WebRTC traffic.
+
+      # ng-protocol errors between FS mod_rtpengine and rtpengine.
+      # Any sustained rate > 0.1/s (1 error per 10s) over 5 minutes is worth investigating.
+      # Common causes: rtpengine overloaded, misconfiguration, network issues on loopback.
+      - alert: RtpengineNgErrors
+        expr: rate(rtpengine_ng_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "rtpengine ng-protocol errors elevated"
+          description: >
+            rtpengine ng-protocol error rate is {{ $value | humanizePercentage }} over 5 minutes.
+            This indicates mod_rtpengine↔rtpengine communication failures.
+            Action: check rtpengine logs (docker compose logs rtpengine), verify
+            127.0.0.1:22222 UDP is reachable from FS, check mod_rtpengine configuration.
