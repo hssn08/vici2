@@ -149,6 +149,9 @@ export const VERBS = [
   'rnd:scrub',
   'rnd:configure',
   'rnd:override',
+  // number pool (X04)
+  'number_pool:read',
+  'number_pool:edit',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -310,6 +313,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'rnd:scrub':               { scope: 'tenant' },
     'rnd:configure':           { scope: 'tenant', sensitive: true },
     'rnd:override':            { scope: 'tenant', sensitive: true },
+    // X04 — number pool
+    'number_pool:read':        { scope: 'tenant' },
+    'number_pool:edit':        { scope: 'tenant' },
   },
 
   admin: {
@@ -401,6 +407,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N06 — rnd scrub (admin: scrub + configure; NOT override — super_admin only)
     'rnd:scrub':               { scope: 'tenant' },
     'rnd:configure':           { scope: 'tenant', sensitive: true },
+    // X04 — number pool
+    'number_pool:read':        { scope: 'tenant' },
+    'number_pool:edit':        { scope: 'tenant' },
   },
 
   supervisor: {
@@ -456,6 +465,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'scorecard:finalize':   { scope: 'group', sensitive: true },
     'feedback:read':        { scope: 'group' },
     'feedback:create':      { scope: 'group' },
+    // X04 — number pool (supervisor: read-only)
+    'number_pool:read':     { scope: 'tenant' },
   },
 
   agent: {
@@ -518,6 +529,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // S05 — coaching (viewer: read all in tenant)
     'scorecard:read':       { scope: 'tenant' },
     'feedback:read':        { scope: 'tenant' },
+    // X04 — number pool (viewer: read-only)
+    'number_pool:read':     { scope: 'tenant' },
   },
 
   integrator: {

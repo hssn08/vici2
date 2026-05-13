@@ -20,11 +20,12 @@ type Service struct {
 	metrics   *Metrics
 	logger    *slog.Logger
 	nowFn     func() time.Time
+	poolSvc   PoolPicker // X04: nil = pool tier skipped
 }
 
 // Opts configures Service construction.
 type Opts struct {
-	DB      *sql.DB
+	DB        *sql.DB
 	T01Client *esl.Client
 	// Gates is the ordered 5-gate pipeline. If nil, the default phase-1 gate
 	// slice is used (requires TCPAChecker and DNCChecker non-nil).
@@ -32,7 +33,9 @@ type Opts struct {
 	Metrics *Metrics
 	Logger  *slog.Logger
 	// NowFn is overridable for tests.
-	NowFn   func() time.Time
+	NowFn func() time.Time
+	// PoolSvc wires the X04 number pool picker (Tier 3). nil = disabled.
+	PoolSvc PoolPicker
 }
 
 // New constructs the Service with all dependencies wired.
@@ -50,6 +53,7 @@ func New(opts Opts) *Service {
 		metrics: opts.Metrics,
 		logger:  opts.Logger,
 		nowFn:   opts.NowFn,
+		poolSvc: opts.PoolSvc,
 	}
 	return s
 }
@@ -92,7 +96,8 @@ func (s *Service) Originate(ctx context.Context, req OriginateRequest) (*Origina
 
 	// ── Step 1: pick caller-ID ─────────────────────────────────────────────────
 	scratch := &GateScratch{}
-	cidNum, cidName, cidSrc, err := PickCallerID(&req)
+	// poolSvc wired via s.poolSvc (nil = pool tier skipped, falls through to campaign default)
+	cidNum, cidName, cidSrc, err := PickCallerID(ctx, &req, s.poolSvc)
 	if err != nil {
 		return nil, fmt.Errorf("originate: caller-id: %w", err)
 	}

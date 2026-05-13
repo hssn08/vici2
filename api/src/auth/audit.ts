@@ -91,7 +91,15 @@ export type AuditAction =
   | "script.created"
   | "script.updated"
   | "script.deleted"
-  | "script.restored";
+  | "script.restored"
+  // X04 — number pool
+  | "number_pool.created"
+  | "number_pool.updated"
+  | "number_pool.deleted"
+  | "number_pool.did.added"
+  | "number_pool.did.removed"
+  | "number_pool.did.quarantined"
+  | "number_pool.did.unquarantined";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
