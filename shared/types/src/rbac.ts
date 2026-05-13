@@ -123,6 +123,10 @@ export const VERBS = [
   'list:delete',
   'list:reset',
   'list:purge',
+  // jobs queue admin (W02)
+  'jobs:view',
+  'jobs:retry',
+  'jobs:drain',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -172,6 +176,8 @@ export const SENSITIVE_VERBS = new Set<Verb>([
   'list:reset',
   'list:purge',
   'list:delete',
+  // W02 — drain is destructive
+  'jobs:drain',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -250,6 +256,10 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:delete':          { scope: 'tenant', sensitive: true },
     'list:reset':           { scope: 'tenant', sensitive: true },
     'list:purge':           { scope: 'tenant', sensitive: true },
+    // W02 — jobs queue admin
+    'jobs:view':            { scope: 'tenant' },
+    'jobs:retry':           { scope: 'tenant' },
+    'jobs:drain':           { scope: 'tenant', sensitive: true },
   },
 
   admin: {
@@ -317,6 +327,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:delete':          { scope: 'tenant', sensitive: true },
     'list:reset':           { scope: 'tenant', sensitive: true },
     'list:purge':           { scope: 'tenant', sensitive: true },
+    // W02 — jobs queue admin
+    'jobs:view':            { scope: 'tenant' },
+    'jobs:retry':           { scope: 'tenant' },
   },
 
   supervisor: {
@@ -356,6 +369,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:edit':        { scope: 'group' },
     'alert:read':           { scope: 'group' },
     'list:read':            { scope: 'group' },
+    // W02 — jobs queue admin (supervisor: view-only)
+    'jobs:view':            { scope: 'tenant' },
   },
 
   agent: {
