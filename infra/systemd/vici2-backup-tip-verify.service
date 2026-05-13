@@ -1,0 +1,13 @@
+[Unit]
+Description=vici2 nightly backup tip-integrity verification
+Documentation=file:spec/runbooks/restore.md
+After=network.target
+
+[Service]
+Type=oneshot
+User=vici2-backup
+EnvironmentFile=/etc/vici2/backup.env
+ExecStart=/opt/vici2/scripts/backup/tip-verify.sh --env prod
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=600
