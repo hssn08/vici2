@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+  X01 — mod_rtpengine module configuration.
+  mod_rtpengine connects FreeSWITCH to the rtpengine sidecar via the ng-protocol
+  UDP socket. In the sidecar topology (network_mode: host), rtpengine is always
+  reachable on 127.0.0.1:22222.
+
+  pass-through = true is the critical safety net: if rtpengine is unreachable
+  (restarting, unhealthy), mod_rtpengine falls back to FS-native SRTP for new
+  calls. In-flight calls routed through rtpengine will drop on rtpengine restart
+  (no persistent state in userspace mode). Kernel mode preserves in-flight calls
+  across rtpengine userspace restarts.
+
+  See PLAN.md §7 for rollback and migration procedures.
+-->
+<configuration name="rtpengine.conf" description="rtpengine SRTP offload (X01)">
+  <settings>
+    <!-- ng-control UDP address of rtpengine sidecar (loopback). -->
+    <param name="proxy-ip" value="127.0.0.1"/>
+    <param name="proxy-port" value="22222"/>
+
+    <!-- UDP timeout for ng-protocol responses (milliseconds).
+         500ms is generous; healthy rtpengine responds in < 5ms locally. -->
+    <param name="timeout" value="500"/>
+
+    <!-- Safety net: if rtpengine is unreachable, fall back to FS-native SRTP.
+         New calls degrade gracefully rather than failing entirely.
+         Existing calls on rtpengine are not affected by this flag — they drop
+         only if rtpengine itself restarts in userspace mode. -->
+    <param name="pass-through" value="true"/>
+
+    <!-- Cookie prefix for ng-protocol requests (aids log correlation). -->
+    <param name="cookie" value="vici2"/>
+  </settings>
+</configuration>

@@ -65,6 +65,51 @@ services:
       start_period: 5s
     networks: [vici2_default]
 
+  # ---------------------------------------------------------------------------
+  # X01: rtpengine sidecar — SRTP offload for FreeSWITCH WebRTC sessions.
+  # Runs in network_mode: host (same as freeswitch) so loopback RTP works and
+  # the kernel module (xt_RTPENGINE) can be used in production.
+  # Dev default: RTPENGINE_KERNEL_MODE=0 (userspace mode, no kernel module needed).
+  # Production: set RTPENGINE_KERNEL_MODE=1 after loading xt_RTPENGINE on host.
+  # See infra/rtpengine/KERNEL_MODULE.md for kernel module setup instructions.
+  # ---------------------------------------------------------------------------
+  rtpengine:
+    build:
+      context: ./infra/rtpengine
+    image: vici2/rtpengine:mr12.5
+    container_name: vici2_rtpengine
+    restart: unless-stopped
+    # Must share host network with freeswitch for loopback RTP and kernel mode.
+    network_mode: host
+    cap_add:
+      # NET_ADMIN: required for kernel mode nftables rule installation.
+      # SYS_MODULE: required for kernel module interaction.
+      # In userspace mode (dev), these caps are unused but harmless.
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      RTPENGINE_INTERFACE: "0.0.0.0"
+      RTPENGINE_NG_PORT: "22222"
+      RTPENGINE_PORT_MIN: "30000"
+      RTPENGINE_PORT_MAX: "40000"
+      RTPENGINE_TOS: "184"
+      RTPENGINE_LOG_LEVEL: "${RTPENGINE_LOG_LEVEL:-5}"
+      RTPENGINE_PROMETHEUS_PORT: "9109"
+      # Set to "1" on Linux production hosts after loading xt_RTPENGINE kernel module.
+      RTPENGINE_KERNEL_MODE: "${RTPENGINE_KERNEL_MODE:-0}"
+      RTPENGINE_RECORDING_DIR: "/var/lib/rtpengine/recordings"
+    volumes:
+      - rtpengine_recordings:/var/lib/rtpengine/recordings
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # rtpengine does not join vici2_default (network_mode: host bypasses bridge).
+    # freeswitch's mod_rtpengine communicates via 127.0.0.1:22222 (loopback).
+    # pass-through=true in rtpengine.conf.xml handles startup races gracefully.
+
   freeswitch:
     build:
       context: ./freeswitch
@@ -450,6 +495,8 @@ volumes:
   prometheus_data:
   alertmanager_data:
   grafana_data:
+  # X01: rtpengine diagnostic PCAP recordings (not primary recording; see R01).
+  rtpengine_recordings:
 
 networks:
   vici2_default:
