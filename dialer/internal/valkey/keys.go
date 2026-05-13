@@ -179,6 +179,30 @@ func (k Keys) DNCBypassToken(token string) string {
 	return fmt.Sprintf("t:%d:dnc:bypass:%s", k.tid, token)
 }
 
+// --- S02 monitor session keys ------------------------------------------------
+
+// MonitorSession is the per-supervisor-session HASH.
+// Format: t:{tid}:monitor:{supCallUUID}
+// S02 PLAN §12.1.
+func (k Keys) MonitorSession(tenantID int64, supCallUUID string) string {
+	return fmt.Sprintf("t:%d:monitor:%s", tenantID, supCallUUID)
+}
+
+// AgentMonitors is the ZSET of active supervisor call-UUIDs for a given agent.
+// Members: supCallUUIDs, Scores: started_at Unix milliseconds.
+// Format: t:{tid}:agent:{uid}:monitors
+// S02 PLAN §12.1.
+func (k Keys) AgentMonitors(tenantID, userID int64) string {
+	return fmt.Sprintf("t:%d:agent:%d:monitors", tenantID, userID)
+}
+
+// MonitorJTI is the one-time-use JTI lock for a monitor grant token.
+// Format: vici2:monitor:jti:{jti}
+// S02 PLAN §12.1: SET NX EX 90.
+func MonitorJTI(jti string) string {
+	return fmt.Sprintf("vici2:monitor:jti:%s", jti)
+}
+
 // --- F05 refresh-token keys --------------------------------------------------
 
 func (k Keys) AuthRefresh(familyID, tokenHash string) string {
