@@ -8,6 +8,7 @@ import { useCallStore } from "@/lib/stores/call";
 import { useAgentStore } from "@/lib/stores/agent";
 import { useSoftphone } from "@/lib/sip";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface TopBarProps {
   className?: string;
@@ -67,8 +68,9 @@ export function TopBar({ className }: TopBarProps): React.ReactElement {
         <SoftphoneStatusBadge />
       </div>
 
-      {/* Right: recording badge */}
+      {/* Right: notification bell + recording badge */}
       <div className="flex items-center gap-2">
+        <NotificationBell />
         <RecordingBadge />
       </div>
     </header>
