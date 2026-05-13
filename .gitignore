@@ -1,6 +1,4 @@
 # --- env files ---
-.env
-.env.*
 !.env.example
 
 # --- node ---
@@ -62,3 +60,4 @@ logs/
 # --- OS junk ---
 .tool-versions.local
 infra/kamailio/scripts/__pycache__/
+config.bat
