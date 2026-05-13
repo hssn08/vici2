@@ -25,11 +25,12 @@ type PoolMember struct {
 
 // PoolConfig is the pool-level configuration cached alongside members.
 type PoolConfig struct {
-	Strategy      string
-	DailyCap      int
-	MaxConcurrent int
-	ARFloor       float64
-	ARMinSample   int
+	Strategy             string
+	DailyCap             int
+	MaxConcurrent        int
+	ARFloor              float64
+	ARMinSample          int
+	LocalPresenceEnabled bool // X05: when true, run NPA-matching tiers before pool round-robin
 }
 
 // PickRequest is passed to PickFromPool.

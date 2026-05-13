@@ -142,13 +142,14 @@ func (c *Cache) Subscribe(ctx context.Context, tenantID int64) {
 
 // poolRow is a scan target for the DB query.
 type poolRow struct {
-	id            int64
-	tenantID      int64
-	strategy      string
-	dailyCap      int
-	maxConcurrent int
-	arFloor       float64
-	arMinSample   int
+	id                   int64
+	tenantID             int64
+	strategy             string
+	dailyCap             int
+	maxConcurrent        int
+	arFloor              float64
+	arMinSample          int
+	localPresenceEnabled bool // X05
 }
 
 type memberRow struct {
@@ -165,7 +166,8 @@ type memberRow struct {
 // loadFromDB queries MySQL for the pool config and non-quarantined members.
 func (c *Cache) loadFromDB(ctx context.Context, tenantID, poolID int64) ([]PoolMember, PoolConfig, error) {
 	poolQuery := `
-		SELECT id, tenant_id, strategy, daily_cap, max_concurrent, ar_floor, ar_min_sample
+		SELECT id, tenant_id, strategy, daily_cap, max_concurrent, ar_floor, ar_min_sample,
+		       local_presence_enabled
 		FROM number_pools
 		WHERE id = ? AND tenant_id = ? AND active = 1
 		LIMIT 1`
@@ -174,6 +176,7 @@ func (c *Cache) loadFromDB(ctx context.Context, tenantID, poolID int64) ([]PoolM
 	err := c.db.QueryRowContext(ctx, poolQuery, poolID, tenantID).Scan(
 		&pr.id, &pr.tenantID, &pr.strategy, &pr.dailyCap,
 		&pr.maxConcurrent, &pr.arFloor, &pr.arMinSample,
+		&pr.localPresenceEnabled,
 	)
 	if err == sql.ErrNoRows {
 		return nil, PoolConfig{}, fmt.Errorf("pool %d not found", poolID)
@@ -183,11 +186,12 @@ func (c *Cache) loadFromDB(ctx context.Context, tenantID, poolID int64) ([]PoolM
 	}
 
 	config := PoolConfig{
-		Strategy:      pr.strategy,
-		DailyCap:      pr.dailyCap,
-		MaxConcurrent: pr.maxConcurrent,
-		ARFloor:       pr.arFloor,
-		ARMinSample:   pr.arMinSample,
+		Strategy:             pr.strategy,
+		DailyCap:             pr.dailyCap,
+		MaxConcurrent:        pr.maxConcurrent,
+		ARFloor:              pr.arFloor,
+		ARMinSample:          pr.arMinSample,
+		LocalPresenceEnabled: pr.localPresenceEnabled,
 	}
 
 	memberQuery := `
