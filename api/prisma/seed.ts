@@ -90,42 +90,25 @@ async function seedAuthConfig(): Promise<void> {
   });
 }
 
+interface D04StatusSeed {
+  status: string;
+  description: string;
+  selectable: boolean;
+  humanAnswered: boolean;
+  sale: boolean;
+  dnc: boolean;
+  callback: boolean;
+  notInterested: boolean;
+  hotkey: string | null;
+  recycleDelaySeconds: number | null;
+  category: string | null;
+  systemOwner: string | null;
+}
+
 async function seedStatuses(): Promise<void> {
-  console.log('[seed] statuses (system defaults)');
-  type StatusSeed = {
-    status: string;
-    description: string;
-    selectable: boolean;
-    humanAnswered: boolean;
-    sale: boolean;
-    dnc: boolean;
-    callback: boolean;
-    notInterested: boolean;
-    hotkey: string | null;
-  };
-  const defaults: StatusSeed[] = [
-    { status: 'NEW', description: 'New lead', selectable: false, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'NEW_PEND', description: 'Pre-loaded', selectable: false, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'NA', description: 'No answer', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: 'a' },
-    { status: 'B', description: 'Busy', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: 'b' },
-    { status: 'AB', description: 'Answering machine', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'AA', description: 'Voicemail', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'AL', description: 'AM left msg', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'ADC', description: 'Disconnected', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'AVMA', description: 'AMD VM auto', selectable: false, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'N', description: 'No interest', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: true, hotkey: 'n' },
-    { status: 'NI', description: 'Not interested', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: true, hotkey: 'i' },
-    { status: 'NP', description: 'Not in party', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'LB', description: 'Lang barrier', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'WN', description: 'Wrong number', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: false, hotkey: 'w' },
-    { status: 'DNC', description: 'Internal DNC', selectable: true, humanAnswered: true, sale: false, dnc: true, callback: false, notInterested: false, hotkey: 'd' },
-    { status: 'DEC', description: 'Declined', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: true, hotkey: null },
-    { status: 'CALLBK', description: 'Callback set', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: true, notInterested: false, hotkey: 'c' },
-    { status: 'XFER', description: 'Transferred', selectable: true, humanAnswered: true, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'SALE', description: 'Sale', selectable: true, humanAnswered: true, sale: true, dnc: false, callback: false, notInterested: false, hotkey: 's' },
-    { status: 'DROP', description: 'Dropped (TCPA)', selectable: false, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-    { status: 'DC', description: 'Disconnected', selectable: true, humanAnswered: false, sale: false, dnc: false, callback: false, notInterested: false, hotkey: null },
-  ];
+  console.log('[seed] statuses (D04 canonical 35-row taxonomy)');
+  const seedPath = join(repoRoot, 'db', 'seeds', 'system-statuses.json');
+  const defaults: D04StatusSeed[] = JSON.parse(readFileSync(seedPath, 'utf8')) as D04StatusSeed[];
   for (const s of defaults) {
     await prisma.status.upsert({
       where: { tenantId_campaignId_status: { tenantId: 1n, campaignId: '__SYS__', status: s.status } },
@@ -138,6 +121,9 @@ async function seedStatuses(): Promise<void> {
         callback: s.callback,
         notInterested: s.notInterested,
         hotkey: s.hotkey,
+        recycleDelaySeconds: s.recycleDelaySeconds,
+        category: s.category,
+        systemOwner: s.systemOwner,
       },
       create: {
         tenantId: 1n,
@@ -151,9 +137,13 @@ async function seedStatuses(): Promise<void> {
         callback: s.callback,
         notInterested: s.notInterested,
         hotkey: s.hotkey,
+        recycleDelaySeconds: s.recycleDelaySeconds,
+        category: s.category,
+        systemOwner: s.systemOwner,
       },
     });
   }
+  console.log(`[seed] statuses: ${defaults.length} rows`);
 }
 
 async function seedPauseCodes(): Promise<void> {
