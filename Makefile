@@ -158,13 +158,28 @@ fs-reload: ## Reload FS XML + rescan sofia profiles.
 fs-cli: ## Drop into fs_cli.
 	$(COMPOSE) exec freeswitch fs_cli
 
-# ----- redis / mysql shells --------------------------------------------------
+# ----- valkey / mysql shells -------------------------------------------------
 
-redis-cli: ## Drop into redis-cli.
-	$(COMPOSE) exec redis redis-cli
+valkey-cli: ## Drop into valkey-cli.
+	$(COMPOSE) exec valkey valkey-cli
+
+# Back-compat alias for muscle memory.
+redis-cli: valkey-cli ## Alias of valkey-cli (Redis → Valkey rename, F04 PLAN §1).
 
 mysql-cli: ## Drop into mysql shell.
 	$(COMPOSE) exec mysql sh -c 'mysql -u$$VICI2_DB_USER -p$$VICI2_DB_PASSWORD $$VICI2_DB_NAME'
+
+# ----- F04 Valkey Lua sync ---------------------------------------------------
+# `shared/lua/` is the single source of truth (F04 PLAN §7.5). The dialer
+# binary uses go:embed which can only reach files inside its package, and
+# the api package reads via fs from a sibling `lua/` dir. This target
+# keeps both copies in sync.
+valkey-sync-lua: ## Copy shared/lua/*.lua → dialer + api embed dirs.
+	@cp shared/lua/*.lua dialer/internal/valkey/lua/
+	@cp shared/lua/*.lua api/src/lib/valkey/lua/
+	@diff -r shared/lua/ dialer/internal/valkey/lua/ >/dev/null \
+		&& diff -r shared/lua/ api/src/lib/valkey/lua/ >/dev/null \
+		&& echo "[valkey] lua sync OK"
 
 # ----- housekeeping ----------------------------------------------------------
 
@@ -183,5 +198,5 @@ hooks: ## Install lefthook git hooks.
 	ci ci-lint ci-test ci-migrations ci-actionlint ci-workflows \
 	db-generate db-migrate db-migrate-dev db-deploy db-reset db-seed \
 	db-studio db-bootstrap-superadmin \
-	fs-up fs-down fs-reload fs-cli redis-cli mysql-cli \
-	clean reset hooks
+	fs-up fs-down fs-reload fs-cli valkey-cli redis-cli mysql-cli \
+	valkey-sync-lua clean reset hooks
