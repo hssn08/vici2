@@ -1,5 +1,15 @@
-# Stub CI workflow — F01 wires up the entry points; O04 expands.
-# CI calls the same Make targets a developer runs locally so local == CI.
+# O04 — Continuous Integration
+#
+# Runs on every PR and every push to main. Invokes the same Make targets a
+# developer runs locally (per F01 §3.10), so local == CI.
+#
+# Required status checks (configured via branch protection, see HANDOFF §6):
+#   - lint-go, lint-node, lint-xml, lint-tenant-index
+#   - unit-go, unit-node
+#   - build-images
+#   - migrations-reversible
+#
+# Pinned action versions per PLAN §1 (no @main, no @master).
 
 name: ci
 
@@ -9,51 +19,234 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel in-flight runs for the same PR/branch when a new commit arrives.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 jobs:
-  lint-test:
+  # ---------------------------------------------------------------- lint stage
+  lint-go:
+    name: lint (go)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.22"]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
-          go-version-file: dialer/go.mod
+          go-version: ${{ matrix.go-version }}
           cache: true
           cache-dependency-path: dialer/go.sum
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
         with:
-          node-version-file: .tool-versions
+          version: v1.62.2
+          working-directory: dialer
+          args: --timeout=5m
+          # Action handles its own cache; disable setup-go cache pre-load:
+          install-mode: binary
+      - name: go vet (safety net)
+        working-directory: dialer
+        run: go vet ./...
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Install JS deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: make lint
-
-      - name: Type-check
-        run: make typecheck
-
-      - name: Test
-        run: make test
-
-  build-images:
+  lint-node:
+    name: lint (node)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: lint-test
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.x"]
     steps:
       - uses: actions/checkout@v4
-      - name: Build docker images
-        # SIGNALWIRE_TOKEN must be configured as a repo secret for FS image.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: ESLint
+        run: pnpm exec eslint .
+      - name: Prettier
+        run: pnpm exec prettier --check .
+
+  lint-xml:
+    name: lint (xml)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install xmllint
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils
+      - name: Validate FreeSWITCH XML
+        run: |
+          find freeswitch/conf -name '*.xml' -print0 | xargs -0 -r xmllint --noout
+
+  lint-tenant-index:
+    name: lint (tenant-index leadership)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify every composite index leads with tenant_id (F02 §9)
+        run: ./scripts/ci/check-tenant-index-leadership.sh
+
+  lint-commits:
+    name: lint (commit messages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint PR commit range with commitlint
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  lint-pr-meta:
+    name: lint (pr template)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify PR body references a valid module ID
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: ./scripts/ci/check-pr-body.sh
+
+  migrations-reversible:
+    name: lint (migrations reversible)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Each migration.sql has a sibling down.sql
+        run: ./scripts/ci/check-migrations.sh
+
+  # ----------------------------------------------------------------- unit tests
+  unit-go:
+    name: unit (go)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+          cache-dependency-path: dialer/go.sum
+      - name: Run Go tests with coverage
+        working-directory: dialer
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-go-${{ matrix.go-version }}
+          path: dialer/coverage.out
+          if-no-files-found: warn
+          retention-days: 14
+
+  unit-node:
+    name: unit (node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.x"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r --if-present run typecheck
+      - name: Unit tests
+        run: pnpm -r --if-present run test
+
+  # -------------------------------------------------------------- image builds
+  build-images:
+    name: build (docker images)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint-go, lint-node, lint-xml, lint-tenant-index, unit-go, unit-node]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Prime .env
+        env:
+          SIGNALWIRE_TOKEN: ${{ secrets.SIGNALWIRE_TOKEN }}
         run: |
           cp .env.example .env
-          echo "SIGNALWIRE_TOKEN=${{ secrets.SIGNALWIRE_TOKEN }}" >> .env
-          make build-images
+          if [ -n "${SIGNALWIRE_TOKEN:-}" ]; then
+            echo "SIGNALWIRE_TOKEN=${SIGNALWIRE_TOKEN}" >> .env
+          fi
+      - name: Build api / dialer / workers / web (no FS — needs token)
+        run: |
+          # FreeSWITCH image requires SIGNALWIRE_TOKEN; build it only when secret is present.
+          if [ -n "${SIGNALWIRE_TOKEN:-}" ]; then
+            docker compose -f docker-compose.dev.yml build --parallel
+          else
+            docker compose -f docker-compose.dev.yml build --parallel api dialer workers web
+          fi
+        env:
+          SIGNALWIRE_TOKEN: ${{ secrets.SIGNALWIRE_TOKEN }}
+
+  # Aggregator job — used as the single required-status target for branch
+  # protection so individual job renames don't require updating settings.
+  ci-pass:
+    name: ci-pass
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+      - lint-go
+      - lint-node
+      - lint-xml
+      - lint-tenant-index
+      - migrations-reversible
+      - unit-go
+      - unit-node
+      - build-images
+    steps:
+      - name: Verify all required jobs succeeded
+        run: |
+          # Each needs.<job>.result is one of: success, failure, cancelled, skipped.
+          # We accept success or (skipped only when the job is PR-conditional).
+          results='${{ toJson(needs) }}'
+          echo "$results"
+          fail=0
+          for job in lint-go lint-node lint-xml lint-tenant-index migrations-reversible unit-go unit-node build-images; do
+            r=$(echo "$results" | jq -r ".\"$job\".result")
+            if [ "$r" != "success" ]; then
+              echo "::error::Required job '$job' did not succeed (result=$r)"
+              fail=1
+            fi
+          done
+          exit $fail

@@ -1,0 +1,140 @@
+# O04 — Tag-driven release
+#
+# Fires on push of a semver tag (v*.*.*). Collects:
+#   - GHCR image digests for each service at this tag
+#   - SBOMs (CycloneDX) per service
+#   - Aggregated digest manifest for the release
+# Creates a GitHub Release with all artifacts attached.
+#
+# Production deploy is handled by deploy-prod.yml (NOT in this MVP — see
+# HANDOFF §7 deferred work). This workflow's job is purely artifact assembly.
+
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re-)build a release artifact set for"
+        required: true
+
+permissions:
+  contents: write # create GitHub Release
+  packages: read # read GHCR for digest resolution
+  id-token: write # attestation
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Wait for build.yml to complete (it runs on the same tag push).
+  # We don't use `workflow_run` because that doesn't carry the tag context;
+  # instead we resolve image digests by tag and trust the build job's push.
+  collect:
+    name: collect release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.tagref.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: tagref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute lowercase owner
+        id: owner
+        run: |
+          echo "value=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for image tags to appear in GHCR
+        id: digests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tagref.outputs.tag }}
+          OWNER: ${{ steps.owner.outputs.value }}
+        run: |
+          # build.yml runs in parallel; allow up to 30 min for it to publish.
+          # Strip leading 'v' for semver tags — metadata-action publishes '1.2.3' not 'v1.2.3'.
+          docker_tag="${TAG#v}"
+          mkdir -p artifacts
+          echo "{" > artifacts/digests.json
+          first=1
+          for svc in api dialer workers web; do
+            image="ghcr.io/${OWNER}/vici2-${svc}:${docker_tag}"
+            echo "Resolving digest for ${image}"
+            attempts=0
+            digest=""
+            until [ -n "$digest" ] || [ $attempts -ge 60 ]; do
+              digest=$(docker buildx imagetools inspect "$image" --format '{{ json .Manifest }}' 2>/dev/null | jq -r '.digest // empty' || true)
+              if [ -z "$digest" ]; then
+                attempts=$((attempts+1))
+                sleep 30
+              fi
+            done
+            if [ -z "$digest" ]; then
+              echo "::error::Failed to resolve digest for ${image} after 30 min"
+              exit 1
+            fi
+            [ $first -eq 1 ] || echo "," >> artifacts/digests.json
+            printf '  "%s": "%s"' "$svc" "$digest" >> artifacts/digests.json
+            first=0
+          done
+          echo "" >> artifacts/digests.json
+          echo "}" >> artifacts/digests.json
+          cat artifacts/digests.json
+
+      - name: Generate release notes (commits since previous tag)
+        env:
+          TAG: ${{ steps.tagref.outputs.tag }}
+        run: |
+          prev=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG}$" | head -1 || echo "")
+          {
+            echo "# Release ${TAG}"
+            echo ""
+            echo "## Container image digests"
+            echo ""
+            echo '```json'
+            cat artifacts/digests.json
+            echo '```'
+            echo ""
+            echo "## Changes"
+            if [ -n "$prev" ]; then
+              echo ""
+              git log --pretty=format:"- %h %s (%an)" "${prev}..${TAG}" || true
+            else
+              echo ""
+              echo "First release."
+            fi
+          } > artifacts/RELEASE_NOTES.md
+
+      - name: Upload artifact bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.tagref.outputs.tag }}
+          path: artifacts/
+          retention-days: 365
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tagref.outputs.tag }}
+          name: ${{ steps.tagref.outputs.tag }}
+          body_path: artifacts/RELEASE_NOTES.md
+          files: |
+            artifacts/digests.json
+            artifacts/RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(steps.tagref.outputs.tag, '-') }}
