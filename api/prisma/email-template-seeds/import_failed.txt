@@ -1,0 +1,16 @@
+IMPORT FAILED — ACTION REQUIRED
+================================
+
+Hi {{user.name}},
+
+Your import of {{import.fileName}} into list {{import.listName}} failed.
+
+Error: {{import.errorSummary}}
+
+Failed At: {{formatDate import.failedAt "MMMM d, yyyy h:mm a"}}
+
+View Details: {{import.link}}
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}

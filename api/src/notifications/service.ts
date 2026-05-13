@@ -48,6 +48,8 @@ export interface NotifyParams {
   link?: string;
   severity?: NotifSeverity;
   channels?: NotifChannel[]; // override category defaults
+  // N02: template variable context (passed through to email-delivery worker)
+  vars?: Record<string, unknown>;
 }
 
 export interface NotificationDto {
@@ -155,7 +157,7 @@ export async function notify(
       }
 
       if (channel === "email" && emailQueue !== null) {
-        await enqueueEmail(emailQueue, prisma, BigInt(userId), BigInt(tenantId), notif.id, subject, body);
+        await enqueueEmail(emailQueue, prisma, BigInt(userId), BigInt(tenantId), notif.id, subject, body, category, (params as { vars?: Record<string, unknown> }).vars);
       }
     } catch (err) {
       logger.error({ err, channel, category, userId: String(userId) }, "n01: failed to create notification row");
@@ -196,15 +198,20 @@ async function enqueueEmail(
   notificationId: bigint,
   subject: string,
   body: string,
+  // N02 extensions
+  category?: string,
+  vars?: Record<string, unknown>,
 ): Promise<void> {
-  // Fetch user email
+  // Fetch user email + preferred_lang
   let toEmail: string | null = null;
+  let preferredLang = "en";
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true },
+      select: { email: true, preferredLang: true },
     });
     toEmail = user?.email ?? null;
+    preferredLang = user?.preferredLang ?? "en";
   } catch (err) {
     logger.error({ err, userId: String(userId) }, "n01: failed to fetch user email");
     return;
@@ -225,6 +232,10 @@ async function enqueueEmail(
         to: toEmail,
         subject,
         body,
+        // N02 additions
+        category,
+        vars,
+        userPreferredLang: preferredLang,
       },
       {
         attempts: 3,

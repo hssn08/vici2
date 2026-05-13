@@ -1,0 +1,15 @@
+UPCOMING CALLBACK REMINDER
+==========================
+
+Hi {{user.name}},
+
+Your callback with {{callback.leadName}} ({{phoneFormat callback.leadPhone}})
+is due in {{callback.minutesUntilDue}} minutes.
+
+Scheduled: {{formatDate callback.scheduledAtLocal "MMMM d, yyyy 'at' h:mm a"}}
+
+View Callback: {{callback.link}}
+
+--
+{{tenant.name}}
+To manage your notification preferences: {{{unsubscribeUrl}}}

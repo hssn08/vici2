@@ -127,6 +127,9 @@ export const VERBS = [
   'jobs:view',
   'jobs:retry',
   'jobs:drain',
+  // email templates (N02)
+  'email_templates:read',
+  'email_templates:edit',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -260,6 +263,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'jobs:view':            { scope: 'tenant' },
     'jobs:retry':           { scope: 'tenant' },
     'jobs:drain':           { scope: 'tenant', sensitive: true },
+    // N02 — email templates
+    'email_templates:read': { scope: 'tenant' },
+    'email_templates:edit': { scope: 'tenant' },
   },
 
   admin: {
@@ -330,6 +336,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // W02 — jobs queue admin
     'jobs:view':            { scope: 'tenant' },
     'jobs:retry':           { scope: 'tenant' },
+    // N02 — email templates
+    'email_templates:read': { scope: 'tenant' },
+    'email_templates:edit': { scope: 'tenant' },
   },
 
   supervisor: {
@@ -371,6 +380,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'list:read':            { scope: 'group' },
     // W02 — jobs queue admin (supervisor: view-only)
     'jobs:view':            { scope: 'tenant' },
+    // N02 — email templates (read-only at supervisor)
+    'email_templates:read': { scope: 'tenant' },
   },
 
   agent: {
