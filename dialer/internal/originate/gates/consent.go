@@ -57,6 +57,32 @@ func (g *ConsentGate) Check(
 		ConsentState:    req.LeadState,
 	}
 
+	// I05: TCPA VM drop consent gate extension.
+	// When amd_action=vmdrop and vmdrop_requires_consent=true, the call is
+	// treated as requiring OPTIN consent (FCC 2023 ringless voicemail ruling).
+	// If the lead does not have OPTIN (captured via C02 consent_log), block
+	// origination with ErrConsentBlocked so no VM drop occurs.
+	//
+	// We map the C02 consent decision: only "ALLOW" (no-consent-required state)
+	// passes. "PROMPT" / "SKIP_RECORDING" are not sufficient for pre-recorded
+	// cell phone TCPA compliance.
+	if req.AMDAction == "vmdrop" && req.VMDropRequiresConsent {
+		// Check if the consent decision indicates OPTIN is absent.
+		// A decision of "ALLOW" means the state requires no special consent
+		// (e.g., one-party consent, landline). "PROMPT" means consent is
+		// required and has not been obtained yet.
+		if decision != "ALLOW" {
+			patch.ErrorMessage = fmt.Sprintf("vmdrop consent required; lead state=%s decision=%s", req.LeadState, decision)
+			patch.ConsentDecision = "BLOCK"
+			scratch.ConsentDecision = "BLOCK"
+			return originate.GateResult{
+				Outcome:    originate.GateBlock,
+				Block:      consentBlockErr(req.AttemptUUID, fmt.Sprintf("vmdrop_consent:%s", req.LeadState)),
+				AuditPatch: patch,
+			}
+		}
+	}
+
 	// ConsentBlock is reserved for future states — currently unreachable.
 	// If we ever return ModeSkip and the campaign policy is ALLFORCE, keep
 	// the law: we cannot force recording in a state that bans it.

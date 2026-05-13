@@ -50,6 +50,8 @@ const BoxCreateSchema = z.object({
   userId: z.coerce.bigint().optional().nullable(),
   didId: z.coerce.bigint().optional().nullable(),
   maxDurationSec: z.number().int().min(10).max(600).default(120),
+  // I05: optional team email for new-VM notifications
+  notifyEmail: z.string().email().max(255).optional().nullable(),
   transcribe: z.boolean().default(false),
   active: z.boolean().default(true),
 });
@@ -121,6 +123,7 @@ async function handleCreate(
       userId: data.userId ?? null,
       didId: data.didId ?? null,
       maxDurationSec: data.maxDurationSec,
+      notifyEmail: data.notifyEmail ?? null,
       transcribe: data.transcribe,
       active: data.active,
     },
@@ -131,6 +134,19 @@ async function handleCreate(
     await renderer.render(box.id);
   } catch (err) {
     req.log.error({ err, boxId: String(box.id) }, "vm: render failed after create");
+  }
+
+  // I05: write DID→box Valkey cache entry for I01 overflow routing
+  if (data.didId) {
+    try {
+      const { getRedis } = await import("../../lib/redis.js");
+      const redis = getRedis();
+      const cacheKey = `t:${tenantId}:did:${String(data.didId)}:vm_box_id`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (redis as any).set(cacheKey, String(box.id));
+    } catch (err) {
+      req.log.error({ err }, "i05: failed to write DID→box Valkey cache");
+    }
   }
 
   void reply.code(201).send(serializeBox(box as unknown as Record<string, unknown>));
@@ -163,6 +179,7 @@ async function handleUpdate(
       ...(data.userId !== undefined && { userId: data.userId }),
       ...(data.didId !== undefined && { didId: data.didId }),
       ...(data.maxDurationSec !== undefined && { maxDurationSec: data.maxDurationSec }),
+      ...(data.notifyEmail !== undefined && { notifyEmail: data.notifyEmail }),
       ...(data.transcribe !== undefined && { transcribe: data.transcribe }),
       ...(data.active !== undefined && { active: data.active }),
     },
@@ -173,6 +190,27 @@ async function handleUpdate(
     await renderer.render(updated.id);
   } catch (err) {
     req.log.error({ err, boxId: String(updated.id) }, "vm: render failed after update");
+  }
+
+  // I05: update DID→box Valkey cache if didId changed
+  if (data.didId !== undefined) {
+    try {
+      const { getRedis } = await import("../../lib/redis.js");
+      const redis = getRedis();
+      // Remove old cache entry if didId changed
+      if (existing.didId && existing.didId !== data.didId) {
+        const oldKey = `t:${updated.tenantId}:did:${String(existing.didId)}:vm_box_id`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (redis as any).del(oldKey);
+      }
+      if (data.didId) {
+        const newKey = `t:${updated.tenantId}:did:${String(data.didId)}:vm_box_id`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (redis as any).set(newKey, String(updated.id));
+      }
+    } catch (err) {
+      req.log.error({ err }, "i05: failed to update DID→box Valkey cache");
+    }
   }
 
   void reply.send(serializeBox(updated as unknown as Record<string, unknown>));
@@ -202,6 +240,19 @@ async function handleDelete(
     await renderer.render(existing.id);
   } catch (err) {
     req.log.error({ err, boxId: String(existing.id) }, "vm: render failed after delete");
+  }
+
+  // I05: invalidate DID→box Valkey cache entry
+  if (existing.didId) {
+    try {
+      const { getRedis } = await import("../../lib/redis.js");
+      const redis = getRedis();
+      const cacheKey = `t:${existing.tenantId}:did:${String(existing.didId)}:vm_box_id`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (redis as any).del(cacheKey);
+    } catch (err) {
+      req.log.error({ err }, "i05: failed to delete DID→box Valkey cache");
+    }
   }
 
   void reply.code(204).send();

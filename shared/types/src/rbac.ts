@@ -133,6 +133,9 @@ export const VERBS = [
   // voicemail (I03)
   'voicemail:read',
   'voicemail:manage',
+  // voicemail drop assets (I05)
+  'vmdrop:read',
+  'vmdrop:edit',
   // inbound callback queue (I04)
   'callback:view_inbound_queue',
   // coaching / quality management (S05)
@@ -284,6 +287,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // I03 — voicemail
     'voicemail:read':       { scope: 'tenant' },
     'voicemail:manage':     { scope: 'tenant' },
+    // I05 — voicemail drop assets
+    'vmdrop:read':          { scope: 'tenant' },
+    'vmdrop:edit':          { scope: 'tenant' },
     // I04 — inbound callback queue
     'callback:view_inbound_queue': { scope: 'tenant' },
     // S05 — coaching
@@ -369,6 +375,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // I03 — voicemail
     'voicemail:read':       { scope: 'tenant' },
     'voicemail:manage':     { scope: 'tenant' },
+    // I05 — voicemail drop assets
+    'vmdrop:read':          { scope: 'tenant' },
+    'vmdrop:edit':          { scope: 'tenant' },
     // I04 — inbound callback queue
     'callback:view_inbound_queue': { scope: 'tenant' },
     // S05 — coaching
@@ -423,6 +432,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'email_templates:read': { scope: 'tenant' },
     // I03 — voicemail (supervisor: group scope)
     'voicemail:read':       { scope: 'group' },
+    // I05 — voicemail drop assets (supervisor: read-only)
+    'vmdrop:read':          { scope: 'tenant' },
     // I04 — inbound callback queue (supervisor: group scope)
     'callback:view_inbound_queue': { scope: 'group' },
     // S05 — coaching (supervisor: group scope)

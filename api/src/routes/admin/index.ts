@@ -22,6 +22,8 @@ import { registerAdminDidRoutes } from "./dids/index.js";
 import { registerAdminJobRoutes } from "./jobs/index.js";
 // I03 — Voicemail box admin
 import { registerAdminVoicemailBoxRoutes } from "./voicemail-boxes.js";
+// I05 — VM drop asset admin
+import { registerAdminVmDropRoutes } from "./vm-drops/index.js";
 // S05 — Coaching admin
 import { registerAdminCoachingRoutes } from "./coaching/index.js";
 // M07 — Pause codes, statuses, scripts
@@ -62,6 +64,9 @@ export async function registerAdminRoutes(app: any): Promise<void> {
 
   // I03 — Voicemail box admin
   await registerAdminVoicemailBoxRoutes(app);
+
+  // I05 — VM drop asset admin
+  await registerAdminVmDropRoutes(app);
 
   // S05 — Coaching admin (templates, unlock, calibration stubs)
   await registerAdminCoachingRoutes(app);

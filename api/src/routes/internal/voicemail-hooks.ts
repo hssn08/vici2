@@ -29,13 +29,18 @@ function requireInternalSecret(req: FastifyRequest, reply: FastifyReply): boolea
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
+// I05: extended schema — accepts optional partial flag; file_path is now optional
+// (api_hangup_hook fires even if caller drops before record starts, in which
+// case file_path may be empty and duration_sec=0).
 const RecordedSchema = z.object({
   box_id: z.coerce.bigint(),
   call_uuid: z.string().min(1).max(40),
   tenant_id: z.coerce.bigint().default(BigInt(1)),
   caller_number: z.string().max(20).optional().nullable(),
   duration_sec: z.coerce.number().int().min(0).default(0),
-  file_path: z.string().min(1).max(512),
+  file_path: z.string().max(512).optional().default(""),
+  // I05: explicit partial flag; also auto-set when duration_sec < 3 or file_path=""
+  partial: z.coerce.boolean().default(false),
 });
 
 // ─── Transcription event ──────────────────────────────────────────────────────
@@ -89,7 +94,10 @@ export async function registerInternalVoicemailRoutes(app: any): Promise<void> {
         return;
       }
 
-      const { box_id, call_uuid, tenant_id, caller_number, duration_sec, file_path } = parsed.data;
+      const { box_id, call_uuid, tenant_id, caller_number, duration_sec, file_path, partial: partialFlag } = parsed.data;
+
+      // I05: auto-detect partial recording (caller hung up before 3s or no file)
+      const isPartial = partialFlag || duration_sec < 3 || !file_path;
 
       // Verify mailbox exists
       const box = await prisma.voicemailBox.findFirst({
@@ -101,28 +109,52 @@ export async function registerInternalVoicemailRoutes(app: any): Promise<void> {
         return;
       }
 
-      // Create voicemail row
+      // Create voicemail row (I05: include partial flag)
       const vm = await prisma.voicemail.create({
         data: {
           tenantId: tenant_id,
           mailboxId: box.id,
           callUuid: call_uuid,
-          recordingUri: file_path,
+          recordingUri: file_path || "",
           durationSec: duration_sec,
           callerNumber: caller_number ?? null,
+          partial: isPartial,
           status: "NEW",
           transcribed: false,
         },
       });
 
       req.log.info(
-        { vmId: String(vm.id), boxId: String(box_id), callUuid: call_uuid },
-        "i03: voicemail created",
+        { vmId: String(vm.id), boxId: String(box_id), callUuid: call_uuid, partial: isPartial },
+        "i05: voicemail created",
       );
 
       // Notify all assigned users
       const { getRedis } = await import("../../lib/redis.js");
       const redis = getRedis();
+
+      // I05: emit audit event for voicemail capture
+      const auditAction = isPartial ? "voicemail_partial" : "voicemail_captured";
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (redis as any).xadd(
+          "events:vici2.audit.voicemail",
+          "*",
+          "data",
+          JSON.stringify({
+            action: auditAction,
+            entity_type: "voicemail_box",
+            entity_id: String(box_id),
+            tenant_id: String(tenant_id),
+            call_uuid,
+            voicemail_id: String(vm.id),
+            duration_sec: String(duration_sec),
+            partial: String(isPartial),
+          }),
+        );
+      } catch (err) {
+        req.log.error({ err }, "i05: failed to emit voicemail audit event");
+      }
 
       for (const { userId } of box.boxUsers) {
         try {
@@ -135,18 +167,49 @@ export async function registerInternalVoicemailRoutes(app: any): Promise<void> {
               userId,
               category: "voicemail_new",
               subject: "New voicemail",
-              body: `New voicemail in mailbox "${box.name}" from ${caller_number ?? "unknown"} (${duration_sec}s)`,
+              body: `New voicemail in mailbox "${box.name}" from ${caller_number ?? "unknown"} (${duration_sec}s)${isPartial ? " [partial]" : ""}`,
               link: `/voicemail`,
               severity: "info",
             },
           );
         } catch (err) {
-          req.log.error({ err, userId: String(userId) }, "i03: notify failed for user");
+          req.log.error({ err, userId: String(userId) }, "i05: notify failed for user");
         }
       }
 
-      // Emit transcription event if box has transcribe=true
-      if (box.transcribe) {
+      // I05: send email notification to box.notifyEmail if configured
+      const boxWithEmail = box as typeof box & { notifyEmail?: string | null };
+      if (boxWithEmail.notifyEmail) {
+        try {
+          const appBaseUrl = process.env.APP_BASE_URL ?? "http://localhost:3001";
+          const playbackLink = `${appBaseUrl}/voicemail?id=${String(vm.id)}`;
+          // Enqueue email via Valkey stream (N01/N02 consumer picks up)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (redis as any).xadd(
+            "events:vici2.email.requested",
+            "*",
+            "data",
+            JSON.stringify({
+              to: boxWithEmail.notifyEmail,
+              template_slug: "new-voicemail",
+              tenant_id: String(tenant_id),
+              variables: {
+                mailbox_name: box.name,
+                caller_number: caller_number ?? "unknown",
+                duration_sec: String(duration_sec),
+                playback_link: playbackLink,
+                partial: String(isPartial),
+              },
+            }),
+          );
+          req.log.info({ notifyEmail: boxWithEmail.notifyEmail, vmId: String(vm.id) }, "i05: enqueued VM email notification");
+        } catch (err) {
+          req.log.error({ err, notifyEmail: boxWithEmail.notifyEmail }, "i05: failed to enqueue VM email notification");
+        }
+      }
+
+      // Emit transcription event if box has transcribe=true (only non-partial VMs)
+      if (box.transcribe && !isPartial && file_path) {
         await emitTranscriptionRequested({
           voicemailId: vm.id,
           fileUri: file_path,
@@ -154,7 +217,7 @@ export async function registerInternalVoicemailRoutes(app: any): Promise<void> {
         });
       }
 
-      void reply.code(201).send({ id: String(vm.id), status: "created" });
+      void reply.code(201).send({ id: String(vm.id), status: "created", partial: isPartial });
     },
   );
 

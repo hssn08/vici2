@@ -169,6 +169,8 @@ model Tenant {
   // I03: voicemail
   voicemailBoxes    VoicemailBox[]
   voicemailBoxUsers VoicemailBoxUser[]
+  // I05: voicemail drop assets
+  voicemailDropAssets VoicemailDropAsset[]
   // S05: coaching
   scorecardTemplates ScorecardTemplate[]
   callScorecards     CallScorecard[]
@@ -225,6 +227,8 @@ model User {
   notificationPrefs NotificationPref[]
   // I03: voicemail box access
   voicemailBoxUsers VoicemailBoxUser[]
+  // I05: voicemail drop assets created by this user
+  voicemailDropAssetsCreated VoicemailDropAsset[] @relation("VmdaCreatedBy")
   // S05: coaching
   scorecardTemplatesCreated ScorecardTemplate[] @relation("TemplateCreator")
   scorecardsSupervisor      CallScorecard[]     @relation("ScorecardSupervisor")
@@ -421,6 +425,10 @@ model Campaign {
   amdEnabled             Boolean            @default(false) @map("amd_enabled")
   amdAction              AmdAction          @default(drop) @map("amd_action")
   vmdropAudio            String?            @map("vmdrop_audio") @db.VarChar(255)
+  /// I05: FK → voicemail_drop_assets.id; replaces vmdropAudio (legacy kept for compat)
+  vmdropAssetId          BigInt?            @map("vmdrop_asset_id")
+  /// I05: when true, consent gate blocks VM drop for cell numbers (TCPA)
+  vmdropRequiresConsent  Boolean            @default(true) @map("vmdrop_requires_consent")
   safeHarborAudio        String?            @map("safe_harbor_audio") @db.VarChar(255)
   scriptId               BigInt?            @map("script_id")
   webformUrl             String?            @map("webform_url") @db.VarChar(512)
@@ -501,6 +509,8 @@ model Campaign {
   callerIdCarrier Carrier?                 @relation("CampaignCallerCarrier", fields: [callerIdCarrierId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_caller_carrier")
   script          Script?                  @relation(fields: [scriptId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_script")
   callTime        CallTime?                @relation(fields: [callTimeId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_calltime")
+  /// I05: VM drop audio asset
+  vmdropAsset     VoicemailDropAsset?      @relation(fields: [vmdropAssetId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_camp_vmdrop_asset")
   campaignLists   CampaignList[]
   pauseCodes      PauseCode[]
   scripts         Script[]                 @relation("ScriptCampaign")
@@ -2390,6 +2400,8 @@ model VoicemailBox {
   didId          BigInt?  @map("did_id")
   greetingUri    String?  @map("greeting_uri") @db.VarChar(512)
   maxDurationSec Int      @default(120) @map("max_duration_sec") @db.UnsignedSmallInt
+  /// I05: optional team email for new-VM notification (in addition to boxUsers)
+  notifyEmail    String?  @map("notify_email") @db.VarChar(255)
   transcribe     Boolean  @default(false)
   active         Boolean  @default(true)
   createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(6)
@@ -2436,6 +2448,8 @@ model Voicemail {
   recordingUri  String          @map("recording_uri") @db.VarChar(512)
   durationSec   Int             @default(0) @map("duration_sec") @db.UnsignedSmallInt
   callerNumber  String?         @map("caller_number") @db.VarChar(20)
+  /// I05: true when caller hung up before recording completed (duration_sec < 3)
+  partial       Boolean         @default(false)
   status        VoicemailStatus @default(NEW)
   transcribed   Boolean         @default(false)
   transcriptUri String?         @map("transcript_uri") @db.VarChar(512)
@@ -2448,6 +2462,39 @@ model Voicemail {
   @@index([tenantId, createdAt], map: "idx_vm_tenant_created")
   @@index([tenantId, callUuid], map: "idx_vm_call_uuid")
   @@map("voicemails")
+}
+
+// =============================================================================
+// I05 — Voicemail Drop Assets
+// Admin-uploaded pre-recorded audio files for outbound AMD voicemail drops.
+// FreeSWITCH plays via uuid_broadcast play_and_hangup,{local_path} aleg.
+// =============================================================================
+
+model VoicemailDropAsset {
+  id             BigInt   @id @default(autoincrement())
+  tenantId       BigInt   @default(1) @map("tenant_id")
+  name           String   @db.VarChar(128)
+  /// S3 URI (canonical storage); NULL in Phase 1 local-only mode
+  s3Uri          String?  @map("s3_uri") @db.VarChar(512)
+  /// Absolute local FS path; used by FreeSWITCH uuid_broadcast at call time
+  localPath      String   @map("local_path") @db.VarChar(512)
+  /// Duration detected by ffprobe at upload time
+  durationSec    Int      @default(0) @map("duration_sec") @db.UnsignedSmallInt
+  sizeBytes      Int      @default(0) @map("size_bytes") @db.UnsignedInt
+  /// Original upload format: wav | mp3
+  originalFormat String   @default("wav") @map("original_format") @db.VarChar(8)
+  active         Boolean  @default(true)
+  createdBy      BigInt   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_vmda_tenant")
+  createdByUser User       @relation("VmdaCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_vmda_created_by")
+  campaigns     Campaign[]
+
+  @@unique([tenantId, name], map: "uk_vmda_tenant_name")
+  @@index([tenantId, active], map: "idx_vmda_tenant_active")
+  @@map("voicemail_drop_assets")
 }
 
 // =============================================================================
