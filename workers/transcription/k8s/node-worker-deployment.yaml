@@ -1,0 +1,74 @@
+# N07 Node.js BullMQ Worker Deployment
+# N07 PLAN §3.2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n07-node-worker
+  namespace: vici2
+  labels:
+    app: n07-node-worker
+    module: n07
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n07-node-worker
+  template:
+    metadata:
+      labels:
+        app: n07-node-worker
+        module: n07
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9107"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: n07-node-worker
+          image: ${ECR_REGISTRY}/vici2/n07-node-worker:${IMAGE_TAG}
+          ports:
+            - containerPort: 9107
+              name: metrics
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vici2-db-secret
+                  key: url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vici2-redis-secret
+                  key: url
+            - name: N07_PYTHON_SIDECAR_URL
+              value: "http://n07-python-worker-svc:8765"
+            - name: N07_DEFAULT_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: vici2-config
+                  key: recordings_bucket
+            - name: N07_CONCURRENCY
+              value: "4"
+            - name: N07_METRICS_PORT
+              value: "9107"
+            - name: LOG_LEVEL
+              value: "info"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9107
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9107
+            initialDelaySeconds: 30
+            periodSeconds: 30

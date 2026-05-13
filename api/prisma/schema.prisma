@@ -1256,6 +1256,17 @@ enum ConsentStatus {
   assumed
 }
 
+// N07 amendment — transcript pipeline status state machine.
+enum TranscriptStatus {
+  pending          // recording uploaded; not yet enqueued
+  queued           // BullMQ job created
+  processing       // GPU worker has audio
+  completed        // transcript.json uploaded; URI set
+  failed           // terminal failure after retries
+  skipped          // no transcription configured for this tenant
+  consent_blocked  // consent_status blocks transcription
+}
+
 // R02 amendment §6.1 — recording upload lifecycle state machine.
 enum RecordingLogLifecycle {
   recording_complete          // R01 wrote row; awaiting R02
@@ -1278,7 +1289,12 @@ model RecordingLog {
   campaignId     String?               @map("campaign_id") @db.VarChar(32)
   userId         BigInt?               @map("user_id")
   filename       String                @db.VarChar(255)
-  storageUrl     String?               @map("storage_url") @db.VarChar(512)
+  storageUrl          String?               @map("storage_url") @db.VarChar(512)
+  // N07 amendment — transcript pipeline columns
+  transcriptUri       String?               @map("transcript_uri") @db.VarChar(512)
+  transcriptStatus    TranscriptStatus      @default(pending) @map("transcript_status")
+  transcriptLang      String?               @map("transcript_lang") @db.VarChar(16)
+  transcriptWordCount Int?                  @map("transcript_word_count")
   // R02 amendment §6.1 — SHA-256 of WAV bytes (written post-upload)
   sha256         Bytes?                @map("sha256") @db.Binary(32)
   // R02 amendment §6.1 — upload pipeline lifecycle state
@@ -1300,6 +1316,7 @@ model RecordingLog {
   @@index([tenantId, callLogId], map: "idx_recording_log_t_call")
   @@index([tenantId, userId, startTime], map: "idx_recording_log_t_user_started")
   @@index([tenantId, lifecycleState], map: "idx_recording_log_t_lifecycle")
+  @@index([tenantId, transcriptStatus, startTime], map: "idx_recording_log_t_transcript")
   @@map("recording_log")
 }
 

@@ -1,0 +1,83 @@
+# N07 GPU Worker Deployment — Python FastAPI sidecar
+# N07 PLAN §3.2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n07-python-worker
+  namespace: vici2
+  labels:
+    app: n07-python-worker
+    module: n07
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n07-python-worker
+  template:
+    metadata:
+      labels:
+        app: n07-python-worker
+        module: n07
+      annotations:
+        prometheus.io/scrape: "false" # Python sidecar has no /metrics
+    spec:
+      nodeSelector:
+        karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
+        karpenter.k8s.aws/instance-gpu-memory: "24576" # A10G = 24 GB
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: n07-python-worker
+          image: ${ECR_REGISTRY}/vici2/n07-python-worker:${IMAGE_TAG}
+          ports:
+            - containerPort: 8765
+              name: http
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "2"
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "20Gi"
+              cpu: "4"
+              nvidia.com/gpu: "1"
+          env:
+            - name: WHISPER_MODEL
+              value: "large-v3-turbo"
+            - name: WHISPER_DEVICE
+              value: "cuda"
+            - name: WHISPER_COMPUTE_TYPE
+              value: "int8"
+            - name: N07_SIDECAR_PORT
+              value: "8765"
+            - name: HF_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: n07-secrets
+                  key: hf_auth_token
+            - name: LOG_LEVEL
+              value: "info"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8765
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8765
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
