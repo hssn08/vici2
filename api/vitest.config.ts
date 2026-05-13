@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts", "src/**/__tests__/**/*.spec.ts"],
+    include: ["test/**/*.test.ts", "src/**/__tests__/**/*.spec.ts", "src/**/__tests__/**/*.test.ts"],
     exclude: ["test/db/**", "node_modules/**"],
     environment: "node",
     setupFiles: ["./test/setup.ts"],
@@ -21,6 +21,7 @@ export default defineConfig({
         "src/import/**/*.ts",
         "src/statuses/**/*.ts",
         "src/reporting/**/*.ts",
+        "src/scripts/**/*.ts",
       ],
       exclude: ["src/auth/lua/**", "src/auth/index.ts", "src/dnc/lua/**"],
       thresholds: {

@@ -140,6 +140,7 @@ model Tenant {
   statuses       Status[]
   pauseCodes     PauseCode[]
   scripts        Script[]
+  scriptVersions ScriptVersion[]
   callTimes      CallTime[]
   dnc            Dnc[]
   callbacks      Callback[]
@@ -620,15 +621,43 @@ model Script {
   name       String   @db.VarChar(64)
   body       String   @db.MediumText
   campaignId String?  @map("campaign_id") @db.VarChar(32)
+  // S03 additions — versioning + active flag + declarative variable registry
+  active     Boolean  @default(true)
+  version    Int      @default(1) @db.SmallInt
+  variables  Json     @default("[]")
   createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(6)
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_scripts_tenant")
-  campaign  Campaign?  @relation("ScriptCampaign", fields: [tenantId, campaignId], references: [tenantId, id], onDelete: NoAction, onUpdate: NoAction, map: "fk_scripts_campaign")
-  campaigns Campaign[] // back-relation for campaigns.scriptId
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_scripts_tenant")
+  campaign  Campaign?       @relation("ScriptCampaign", fields: [tenantId, campaignId], references: [tenantId, id], onDelete: NoAction, onUpdate: NoAction, map: "fk_scripts_campaign")
+  campaigns Campaign[]      // back-relation for campaigns.scriptId
+  versions  ScriptVersion[]
 
   @@index([tenantId, campaignId], map: "idx_scripts_t_camp")
+  @@index([tenantId, active], map: "idx_scripts_t_active")
   @@map("scripts")
+}
+
+// =============================================================================
+// 4.11a  script_versions  (S03 — keeps last 10 versions per script)
+// =============================================================================
+
+model ScriptVersion {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @map("tenant_id")
+  scriptId  BigInt   @map("script_id")
+  version   Int      @db.SmallInt
+  name      String   @db.VarChar(64)
+  body      String   @db.MediumText
+  variables Json     @default("[]")
+  savedAt   DateTime @default(now()) @map("saved_at") @db.DateTime(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_script_versions_tenant")
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_script_versions_script")
+
+  @@unique([scriptId, version], map: "uk_script_versions_id_v")
+  @@index([tenantId, scriptId], map: "idx_script_versions_t_s")
+  @@map("script_versions")
 }
 
 // =============================================================================

@@ -254,6 +254,131 @@ async function seedZipCodes(): Promise<void> {
   console.log(`[seed] zip_codes: ${rows.length} rows`);
 }
 
+// =============================================================================
+// S03 — Script starter templates
+// =============================================================================
+
+async function seedScripts(): Promise<void> {
+  const TENANT_ID = 1n;
+
+  const templates = [
+    {
+      name: 'Default Outbound',
+      campaignId: null,
+      body: `<h2>Outbound Greeting</h2>
+<p>Hello, may I speak with <strong>{lead.first_name} {lead.last_name}</strong>?</p>
+<p>Hi {lead.first_name}, this is <strong>{agent.name}</strong> calling on behalf of <em>{campaign.name}</em>.</p>
+<p>Is now a good time to talk?</p>
+
+<h3>Purpose of Call</h3>
+<p>I'm reaching out today to discuss an opportunity that may interest you.</p>
+<p><em>[Pause and wait for response]</em></p>
+
+<h3>Closing</h3>
+<p>Thank you for your time today, {lead.first_name}. Have a wonderful day!</p>`,
+      active: true,
+      version: 1,
+      variables: [
+        { name: 'lead.first_name' },
+        { name: 'lead.last_name' },
+        { name: 'agent.name' },
+        { name: 'campaign.name' },
+      ],
+    },
+    {
+      name: 'Survey Script',
+      campaignId: null,
+      body: `<h2>Customer Survey</h2>
+<p>Hello, is this <strong>{lead.first_name} {lead.last_name}</strong>?</p>
+<p>Hi {lead.first_name}, I'm <strong>{agent.name}</strong> and I'm conducting a brief survey today. This will only take about 3 minutes.</p>
+
+<h3>Question 1</h3>
+<p>On a scale of 1 to 10, how satisfied are you with our service?</p>
+<p><em>[Record answer: ___]</em></p>
+
+<h3>Question 2</h3>
+<p>What is the primary reason you chose us?</p>
+<ul>
+  <li>Price</li>
+  <li>Quality</li>
+  <li>Recommendation</li>
+  <li>Other: ___</li>
+</ul>
+
+<h3>Question 3</h3>
+<p>Would you recommend us to a friend or colleague?</p>
+<p><em>[Record answer: Yes / No / Maybe]</em></p>
+
+<h3>Close</h3>
+<p>Thank you so much for your feedback, {lead.first_name}! Your input helps us improve. Have a great day!</p>`,
+      active: true,
+      version: 1,
+      variables: [
+        { name: 'lead.first_name' },
+        { name: 'lead.last_name' },
+        { name: 'agent.name' },
+      ],
+    },
+    {
+      name: 'Compliance Disclosure',
+      campaignId: null,
+      body: `<h2>Regulatory Disclosure</h2>
+<p>Hello, this is <strong>{agent.name}</strong>. This call may be recorded for quality assurance purposes.</p>
+
+<h3>Required State Disclosure</h3>
+<p>We are required to inform you that this is an outbound call from a call center.</p>
+<p>
+  <em>
+    [If calling {lead.state} resident — check state-specific requirements]
+  </em>
+</p>
+
+<h3>TCPA Acknowledgment</h3>
+<p>You are receiving this call because you previously provided consent to be contacted at {lead.phone_formatted}.</p>
+<p>If you wish to be removed from our calling list at any time, please say "Remove me" and I will add you to our Do Not Call list immediately.</p>
+
+<h3>Call Duration Notice</h3>
+<p>We have been speaking for {call.duration}.</p>
+
+<blockquote>
+  <p><strong>Do Not Call Request Received?</strong> End this call and mark as DNC immediately.</p>
+</blockquote>`,
+      active: true,
+      version: 1,
+      variables: [
+        { name: 'agent.name' },
+        { name: 'lead.state' },
+        { name: 'lead.phone_formatted' },
+        { name: 'call.duration' },
+      ],
+    },
+  ];
+
+  // Idempotent create: insert only if a script with that name+tenant doesn't exist.
+  for (const tpl of templates) {
+    const exists = await prisma.script.findFirst({
+      where: { tenantId: TENANT_ID, name: tpl.name },
+      select: { id: true },
+    });
+    if (!exists) {
+      await prisma.script.create({
+        data: {
+          tenantId: TENANT_ID,
+          name: tpl.name,
+          campaignId: tpl.campaignId,
+          body: tpl.body,
+          active: tpl.active,
+          version: tpl.version,
+          variables: tpl.variables,
+        },
+      });
+      console.log(`[seed] scripts: created "${tpl.name}"`);
+    } else {
+      console.log(`[seed] scripts: "${tpl.name}" already exists, skipping`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   await seedTenants();
   await seedAuthConfig();
@@ -262,6 +387,7 @@ async function main(): Promise<void> {
   await seedCallTimes();
   await seedPhoneCodes();
   await seedZipCodes();
+  await seedScripts();
   console.log('[seed] done');
   console.log('[seed] note: super_admin user is NOT created here (per F02 amendment A6).');
   console.log('[seed]       Run F05 bootstrap (`make db-bootstrap-superadmin`) after F05 IMPLEMENT lands.');
