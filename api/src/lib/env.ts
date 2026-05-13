@@ -41,6 +41,14 @@ export const env = {
   bootstrapSuperadminEmail: process.env.BOOTSTRAP_SUPERADMIN_EMAIL ?? "",
   bootstrapSuperadminPassword: process.env.BOOTSTRAP_SUPERADMIN_PASSWORD ?? "",
   bootstrapSuperadminTenantId: num(process.env.BOOTSTRAP_SUPERADMIN_TENANT_ID, 1),
+
+  // N01 SMTP (Phase 1 — plain nodemailer; SES/Postmark Phase 2)
+  smtpHost: process.env.VICI2_SMTP_HOST ?? "",
+  smtpPort: num(process.env.VICI2_SMTP_PORT, 587),
+  smtpUser: process.env.VICI2_SMTP_USER ?? "",
+  smtpPass: process.env.VICI2_SMTP_PASS ?? "",
+  smtpFrom: process.env.VICI2_SMTP_FROM ?? "Vici2 <noreply@example.com>",
+  smtpTls: bool(process.env.VICI2_SMTP_TLS, true),
 } as const;
 
 export function kekVersionEnv(version: number): string {

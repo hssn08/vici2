@@ -84,6 +84,7 @@ import { registerSupervisorRoutes } from "./routes/supervisor/index.js";
 import { registerReportingRoutes } from "./reporting/index.js";
 import { registerInternalQueueRoutes } from "./routes/internal/queue.js";
 import { registerSupIngroupRoutes } from "./routes/sup/ingroups.js";
+import { registerNotificationRoutes } from "./notifications/index.js";
 
 const start = async (): Promise<void> => {
   try {
@@ -100,6 +101,7 @@ const start = async (): Promise<void> => {
     await registerReportingRoutes(app);
     await registerInternalQueueRoutes(app);
     await registerSupIngroupRoutes(app);
+    await registerNotificationRoutes(app);
     await app.listen({ host: "0.0.0.0", port: env.port });
     logger.info({ port: env.port, module: "main" }, "api listening");
   } catch (err) {
