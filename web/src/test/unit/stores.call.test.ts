@@ -98,10 +98,88 @@ describe("useCallStore", () => {
         id: 1, name: "Test Campaign", recording_mode: "ONDEMAND",
         wrapup_seconds: 45, hangup_grace_seconds: 5,
         hot_keys_active: true, webform_url: null,
+        dial_method: "MANUAL", auto_ready_after_wrapup: true, preview_allowed_seconds: 0,
       },
     });
     const s = useCallStore.getState();
     expect(s.campaign?.name).toBe("Test Campaign");
     expect(s.campaign?.recording_mode).toBe("ONDEMAND");
+  });
+
+  // A06 additions
+  describe("A06 fields", () => {
+    const sampleLead = { id: "lead-a06", phoneE164: "+15559876543" };
+    const sampleCampaign = {
+      id: 99, name: "AUTO_TEST", dial_method: "PROGRESSIVE" as const,
+      recording_mode: "ALL" as const, wrapup_seconds: 30, hangup_grace_seconds: 5,
+      hot_keys_active: true, webform_url: null,
+      auto_ready_after_wrapup: true, preview_allowed_seconds: 15,
+    };
+
+    it("setReservation populates A06 fields", () => {
+      useCallStore.getState().setReservation({
+        callUuid: "call-a06",
+        attemptUuid: "attempt-a06",
+        lead: sampleLead,
+        campaign: sampleCampaign,
+        reservationExpiresAt: "2026-05-13T00:00:10Z",
+        previewExpiresAt: "2026-05-13T00:00:15Z",
+        dialMode: "progressive",
+      });
+      const s = useCallStore.getState();
+      expect(s.callUuid).toBe("call-a06");
+      expect(s.attemptUuid).toBe("attempt-a06");
+      expect(s.dialMode).toBe("progressive");
+      expect(s.reservationExpiresAt).toBe("2026-05-13T00:00:10Z");
+      expect(s.previewExpiresAt).toBe("2026-05-13T00:00:15Z");
+      expect(s.campaign?.auto_ready_after_wrapup).toBe(true);
+      expect(s.campaign?.preview_allowed_seconds).toBe(15);
+    });
+
+    it("clearReservation nullifies reservation fields", () => {
+      useCallStore.getState().setReservation({
+        callUuid: "call-a06",
+        attemptUuid: "attempt-a06",
+        lead: sampleLead,
+        campaign: sampleCampaign,
+        reservationExpiresAt: "2026-05-13T00:00:10Z",
+        previewExpiresAt: null,
+        dialMode: "predictive",
+      });
+      useCallStore.getState().clearReservation();
+      const s = useCallStore.getState();
+      expect(s.callUuid).toBeNull();
+      expect(s.attemptUuid).toBeNull();
+      expect(s.lead).toBeNull();
+      expect(s.reservationExpiresAt).toBeNull();
+      expect(s.previewExpiresAt).toBeNull();
+    });
+
+    it("setPendingPause sets pendingPauseAfterCall and code", () => {
+      useCallStore.getState().setPendingPause(true, "BREAK");
+      const s = useCallStore.getState();
+      expect(s.pendingPauseAfterCall).toBe(true);
+      expect(s.pendingPauseCode).toBe("BREAK");
+    });
+
+    it("setPendingPause(false) clears code", () => {
+      useCallStore.getState().setPendingPause(true, "BREAK");
+      useCallStore.getState().setPendingPause(false);
+      const s = useCallStore.getState();
+      expect(s.pendingPauseAfterCall).toBe(false);
+      expect(s.pendingPauseCode).toBeNull();
+    });
+
+    it("incrementMissedReservations increments counter", () => {
+      useCallStore.getState().incrementMissedReservations();
+      useCallStore.getState().incrementMissedReservations();
+      expect(useCallStore.getState().missedReservationsCount).toBe(2);
+    });
+
+    it("resetMissedReservations resets counter", () => {
+      useCallStore.getState().incrementMissedReservations();
+      useCallStore.getState().resetMissedReservations();
+      expect(useCallStore.getState().missedReservationsCount).toBe(0);
+    });
   });
 });

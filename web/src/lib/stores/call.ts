@@ -50,11 +50,16 @@ export interface LeadSnapshot {
 export interface CampaignConfig {
   id: number;
   name: string;
+  dial_method?: "MANUAL" | "PROGRESSIVE" | "PREDICTIVE" | "PREVIEW" | null;
   recording_mode: "NEVER" | "ONDEMAND" | "ALL" | "ALLFORCE";
   wrapup_seconds: number;
   hangup_grace_seconds: number;
   hot_keys_active: boolean;
   webform_url: string | null;
+  // A06 amendment A06.A1 — optional so existing A05 callers don't break
+  auto_ready_after_wrapup?: boolean;
+  preview_allowed_seconds?: number;
+  default_dispo?: string | null;
 }
 
 export interface ConferenceParticipant {
@@ -85,6 +90,15 @@ export interface CallState {
   hangupGraceTimer: ReturnType<typeof setTimeout> | null;
   wrapupStartAt: number | null;
 
+  // A06 additions
+  dialMode: "manual" | "progressive" | "predictive" | null;
+  reservationExpiresAt: string | null;
+  previewExpiresAt: string | null;
+  pendingPauseAfterCall: boolean;
+  pendingPauseCode: string | null;
+  missedReservationsCount: number;
+  attemptUuid: string | null;
+
   setActiveCall: (args: {
     callUuid: string;
     direction: CallDirection;
@@ -103,6 +117,20 @@ export interface CallState {
   updateParticipant: (uuid: string, patch: Partial<ConferenceParticipant>) => void;
   setHangupGrace: (active: boolean, timer?: ReturnType<typeof setTimeout> | null) => void;
   patchFromEvent: (event: { seq: number; patch: Partial<CallState> }) => void;
+  // A06 actions
+  setReservation: (data: {
+    callUuid: string;
+    attemptUuid: string;
+    lead: LeadSnapshot;
+    campaign: CampaignConfig;
+    reservationExpiresAt: string;
+    previewExpiresAt: string | null;
+    dialMode: "progressive" | "predictive";
+  }) => void;
+  clearReservation: () => void;
+  setPendingPause: (pending: boolean, code?: string | null) => void;
+  incrementMissedReservations: () => void;
+  resetMissedReservations: () => void;
 }
 
 const EMPTY_CALL = {
@@ -121,6 +149,14 @@ const EMPTY_CALL = {
   hangupGraceActive: false,
   hangupGraceTimer: null as ReturnType<typeof setTimeout> | null,
   wrapupStartAt: null as number | null,
+  // A06
+  dialMode: null as "manual" | "progressive" | "predictive" | null,
+  reservationExpiresAt: null as string | null,
+  previewExpiresAt: null as string | null,
+  pendingPauseAfterCall: false,
+  pendingPauseCode: null as string | null,
+  missedReservationsCount: 0,
+  attemptUuid: null as string | null,
 };
 
 export const useCallStore = create<CallState>()(
@@ -189,5 +225,35 @@ export const useCallStore = create<CallState>()(
 
     patchFromEvent: ({ seq, patch }) =>
       set((s) => (seq > s.lastEventSeq ? { ...patch, lastEventSeq: seq } : s)),
+
+    // A06 actions
+    setReservation: ({ callUuid, attemptUuid, lead, campaign, reservationExpiresAt, previewExpiresAt, dialMode }) =>
+      set({
+        callUuid,
+        attemptUuid,
+        lead,
+        campaign,
+        reservationExpiresAt,
+        previewExpiresAt,
+        dialMode,
+      }),
+
+    clearReservation: () =>
+      set({
+        callUuid: null,
+        attemptUuid: null,
+        lead: null,
+        reservationExpiresAt: null,
+        previewExpiresAt: null,
+      }),
+
+    setPendingPause: (pending, code = null) =>
+      set({ pendingPauseAfterCall: pending, pendingPauseCode: pending ? code : null }),
+
+    incrementMissedReservations: () =>
+      set((s) => ({ missedReservationsCount: s.missedReservationsCount + 1 })),
+
+    resetMissedReservations: () =>
+      set({ missedReservationsCount: 0 }),
   })),
 );

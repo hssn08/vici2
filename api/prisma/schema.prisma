@@ -380,6 +380,9 @@ model Campaign {
   dropTargetMax          Decimal            @default(1.50) @map("drop_target_max") @db.Decimal(4, 2)
   dialTimeoutSec         Int                @default(22) @map("dial_timeout_sec") @db.SmallInt
   wrapupSeconds          Int                @default(10) @map("wrapup_seconds") @db.SmallInt
+  // A06 amendment A06.A1 — auto-dial / predictive-mode agent UI
+  autoReadyAfterWrapup   Boolean            @default(true) @map("auto_ready_after_wrapup")
+  previewAllowedSeconds  Int                @default(0) @map("preview_allowed_seconds") @db.SmallInt
   nextAgentCall          NextAgentCall      @default(longest_wait) @map("next_agent_call")
   availableOnlyTally     Boolean            @default(false) @map("available_only_tally")
   hopperSizeTarget       Int                @default(0) @map("hopper_size_target")
