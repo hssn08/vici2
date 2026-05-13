@@ -1,0 +1,35 @@
+# =============================================================================
+# fail2ban action: vici2-audit.local
+# =============================================================================
+# On every ban event, POST an audit record to the vici2 API so security
+# events appear in the audit_event table for compliance.
+#
+# The API endpoint /admin/audit/fail2ban-ban requires a service-token with
+# integrator role (F05). Configure VICI2_API_SERVICE_TOKEN in the host env
+# or /etc/fail2ban/fail2ban.env.
+#
+# Phase 1: HTTP call. Phase 2: may switch to direct MySQL INSERT if HTTP
+# coupling proves brittle during incident response.
+#
+# Usage: add `action = %(action_)s vici2-audit` in jail.local files
+# =============================================================================
+
+[Definition]
+# Environment variable sourced at startup; can also be set in
+# /etc/fail2ban/fail2ban.env (EnvironmentFile for fail2ban systemd service).
+# Required: VICI2_API_URL and VICI2_API_SERVICE_TOKEN
+
+actionban = curl -s -o /dev/null -w "%%{http_code}" \
+              -X POST \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${VICI2_API_SERVICE_TOKEN}" \
+              "${VICI2_API_URL:-http://127.0.0.1:3000}/admin/audit/fail2ban-ban" \
+              --data-raw "{\"jail\":\"<name>\",\"ip\":\"<ip>\",\"attempts\":<failures>,\"bantime\":<bantime>}" \
+              | grep -qE "^(200|201|204)$" || true
+
+actionunban = true
+
+[Init]
+# Defaults — override via jail.local or environment.
+VICI2_API_URL = http://127.0.0.1:3000
+VICI2_API_SERVICE_TOKEN =

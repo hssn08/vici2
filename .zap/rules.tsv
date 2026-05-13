@@ -1,0 +1,23 @@
+# =============================================================================
+# .zap/rules.tsv — OWASP ZAP baseline known false-positive allowlist
+# =============================================================================
+# Format: <plugin-id> TAB <IGNORE|WARN|FAIL> TAB <comment>
+#
+# Policy:
+#   - IGNORE: Known false-positive; waiver requires security-team review
+#             (CODEOWNERS rule). Each entry MUST include CVE/ZAP-ID + reason.
+#   - WARN:   Track but do not block PR. Default for informational items.
+#   - FAIL:   Override default WARN to make it block PRs.
+#
+# Waiver format: <ZAP-rule-id> TAB IGNORE TAB CVE:<id> waived-until:<date> ticket:<url> reason:<text>
+#
+# DO NOT add waivers for HIGH or CRITICAL findings without a security-team
+# review in a GitHub PR with CODEOWNERS approval. See docs/security/scan-policy.md.
+# =============================================================================
+
+# Example waivers (uncomment and fill in when needed):
+# 10035	IGNORE	Strict-Transport-Security header: HSTS not seen on all responses — Caddy sets it; ZAP scans HTTP redirect which lacks it. Waived. ticket:https://github.com/org/vici2/issues/XXX
+# 10036	WARN	Server leaks version — suppressed via Caddy `-Server` header; ZAP may still see it on error pages.
+# 10038	WARN	Content Security Policy (CSP) — informational check; CSP is set via Caddy header directive.
+
+# ZAP plugin IDs reference: https://www.zaproxy.org/docs/alerts/
