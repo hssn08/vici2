@@ -4,6 +4,7 @@ import * as React from "react";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/toast";
 import { AuthRefreshScheduler } from "@/components/providers/AuthRefreshScheduler";
+import { HotkeyProvider } from "@/components/providers/HotkeyProvider";
 
 export function Providers({
   children,
@@ -13,8 +14,10 @@ export function Providers({
   return (
     <ThemeProvider>
       <Toaster>
-        <AuthRefreshScheduler />
-        {children}
+        <HotkeyProvider>
+          <AuthRefreshScheduler />
+          {children}
+        </HotkeyProvider>
       </Toaster>
     </ThemeProvider>
   );
