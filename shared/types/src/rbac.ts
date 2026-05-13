@@ -158,6 +158,9 @@ export const VERBS = [
   // branded calling (N05)
   'branded_calling:configure',   // manage provider credentials + brand profile
   'branded_calling:register_did', // register/deregister individual DIDs + submit disputes
+  // HubSpot integration (N04)
+  'integration:hs:configure',
+  'integration:hs:click_to_dial',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -331,6 +334,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N05 — branded calling
     'branded_calling:configure':    { scope: 'tenant', sensitive: true },
     'branded_calling:register_did': { scope: 'tenant', sensitive: true },
+    // N04 — HubSpot integration
+    'integration:hs:configure':    { scope: 'tenant' },
+    'integration:hs:click_to_dial': { scope: 'tenant' },
   },
 
   admin: {
@@ -431,6 +437,9 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     // N05 — branded calling
     'branded_calling:configure':    { scope: 'tenant', sensitive: true },
     'branded_calling:register_did': { scope: 'tenant', sensitive: true },
+    // N04 — HubSpot integration
+    'integration:hs:configure':    { scope: 'tenant' },
+    'integration:hs:click_to_dial': { scope: 'tenant' },
   },
 
   supervisor: {
@@ -490,6 +499,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'number_pool:read':     { scope: 'tenant' },
     // N03 — SF integration (supervisor: click-to-dial only)
     'integration:sf:click_to_dial': { scope: 'group' },
+    // N04 — HubSpot integration (supervisor: click-to-dial only)
+    'integration:hs:click_to_dial': { scope: 'tenant' },
   },
 
   agent: {
@@ -520,6 +531,8 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'feedback:read':        { scope: 'own' },
     // N03 — SF integration (agent: click-to-dial)
     'integration:sf:click_to_dial': { scope: 'own' },
+    // N04 — HubSpot integration (agent: click-to-dial)
+    'integration:hs:click_to_dial': { scope: 'tenant' },
   },
 
   viewer: {
