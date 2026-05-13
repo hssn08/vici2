@@ -80,7 +80,18 @@ export type AuditAction =
   | "coaching.annotation.updated"
   | "coaching.annotation.deleted"
   | "coaching.feedback.created"
-  | "coaching.feedback.acknowledged";
+  | "coaching.feedback.acknowledged"
+  // M07 — Pause codes, statuses, scripts
+  | "pause_code.created"
+  | "pause_code.updated"
+  | "pause_code.deleted"
+  | "status.created"
+  | "status.updated"
+  | "status.deleted"
+  | "script.created"
+  | "script.updated"
+  | "script.deleted"
+  | "script.restored";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 

@@ -34,17 +34,18 @@ interface ScriptResponse {
 }
 
 // Frozen variable vocabulary for the reference sidebar
+// M07: migrated to {{double_brace}} syntax (Handlebars-compatible)
 const VARIABLE_VOCAB: Array<{ token: string; description: string }> = [
-  { token: "{lead.first_name}", description: "Lead's first name" },
-  { token: "{lead.last_name}", description: "Lead's last name" },
-  { token: "{lead.phone_formatted}", description: "Formatted phone number (e.g. (555) 123-4567)" },
-  { token: "{lead.email}", description: "Lead's email address" },
-  { token: "{lead.city}", description: "Lead's city" },
-  { token: "{lead.state}", description: "Lead's state (2-letter code)" },
-  { token: "{lead.custom.FIELD}", description: "Custom data field — replace FIELD with key name" },
-  { token: "{agent.name}", description: "Agent's full name" },
-  { token: "{campaign.name}", description: "Campaign name" },
-  { token: "{call.duration}", description: "Call duration as MM:SS" },
+  { token: "{{lead.first_name}}", description: "Lead's first name" },
+  { token: "{{lead.last_name}}", description: "Lead's last name" },
+  { token: "{{lead.phone}}", description: "Formatted phone number (E.164)" },
+  { token: "{{lead.email}}", description: "Lead's email address" },
+  { token: "{{lead.city}}", description: "Lead's city" },
+  { token: "{{lead.state}}", description: "Lead's state (2-letter code)" },
+  { token: "{{lead.custom.FIELD}}", description: "Custom data field — replace FIELD with key name" },
+  { token: "{{agent.name}}", description: "Agent's full name" },
+  { token: "{{campaign.name}}", description: "Campaign name" },
+  { token: "{{call.duration}}", description: "Call duration as MM:SS" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -71,10 +72,10 @@ export function ScriptForm({ mode, scriptId }: ScriptFormProps): React.ReactElem
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
-  // Detected variables (auto-scanned from body)
+  // Detected variables (auto-scanned from body) — {{double_brace}} syntax
   const detectedVars = React.useMemo(() => {
     const found = new Set<string>();
-    for (const [, token] of body.matchAll(/\{([a-z][a-z0-9_.]*)\}/gi)) {
+    for (const [, token] of body.matchAll(/\{\{([a-z][a-z0-9_.]*)\}\}/gi)) {
       found.add(token.toLowerCase());
     }
     return [...found].sort();
@@ -245,12 +246,12 @@ export function ScriptForm({ mode, scriptId }: ScriptFormProps): React.ReactElem
               "focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]",
               "resize-y min-h-[400px]",
             )}
-            placeholder="<p>Hello {lead.first_name}, this is {agent.name} calling from {campaign.name}...</p>"
-            aria-label="Script body — supports HTML and {variable} tokens"
+            placeholder="<p>Hello {{lead.first_name}}, this is {{agent.name}} calling from {{campaign.name}}...</p>"
+            aria-label="Script body — supports HTML and {{variable}} tokens"
           />
           <div className="flex items-center justify-between">
             <p className="text-xs text-[var(--color-fg-muted)]">
-              HTML and <code>{"{variable}"}</code> tokens are supported.
+              HTML and <code>{"{{variable}}"}</code> tokens are supported.
             </p>
             <span className="text-xs text-[var(--color-fg-muted)]">
               {body.length.toLocaleString()} / 65,535 chars
@@ -294,7 +295,7 @@ export function ScriptForm({ mode, scriptId }: ScriptFormProps): React.ReactElem
               <div className="space-y-1">
                 {detectedVars.map((v: string) => (
                   <div key={v} className="font-mono text-xs text-[var(--color-fg-muted)]">
-                    {"{" + v + "}"}
+                    {"{{" + v + "}}"}
                   </div>
                 ))}
               </div>
