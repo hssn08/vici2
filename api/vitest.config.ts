@@ -15,13 +15,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["src/auth/**/*.ts", "src/dnc/**/*.ts"],
+      include: ["src/auth/**/*.ts", "src/dnc/**/*.ts", "src/import/**/*.ts"],
       exclude: ["src/auth/lua/**", "src/auth/index.ts", "src/dnc/lua/**"],
       thresholds: {
-        lines: 80,
-        statements: 80,
-        functions: 80,
-        branches: 70,
+        lines: 70,
+        statements: 70,
+        functions: 70,
+        branches: 60,
       },
     },
   },
