@@ -168,6 +168,7 @@ enum UserRole {
   admin
   superadmin
   integrator
+  viewer
 }
 
 model User {
