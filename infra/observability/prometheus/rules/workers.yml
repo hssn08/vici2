@@ -1,0 +1,39 @@
+# workers.yml — Prometheus alert rules for vici2 BullMQ workers (W01 PLAN §9.4)
+groups:
+  - name: workers
+    rules:
+      - alert: WorkerDlqGrowing
+        expr: vici2_worker_dlq_depth > 0
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Worker DLQ has entries: {{ $labels.worker }}"
+          description: "DLQ stream events:vici2.dlq.{{ $labels.worker }} has {{ $value }} entries."
+
+      - alert: WorkerDlqCritical
+        expr: vici2_worker_dlq_depth > 10
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Worker DLQ > 10 entries: {{ $labels.worker }}"
+          description: "DLQ stream events:vici2.dlq.{{ $labels.worker }} has {{ $value }} entries. Operator intervention required."
+
+      - alert: BullMQQueueBacklog
+        expr: vici2_bullmq_jobs_waiting{queue=~"vici2:queue:.*"} > 500
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "BullMQ queue backlog: {{ $labels.queue }}"
+          description: "Queue {{ $labels.queue }} has {{ $value }} waiting jobs for > 10 minutes."
+
+      - alert: WorkerJobDurationHigh
+        expr: histogram_quantile(0.95, rate(vici2_bullmq_job_duration_seconds_bucket[5m])) > 300
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "P95 job duration > 5 min: {{ $labels.queue }}"
+          description: "Queue {{ $labels.queue }} P95 job duration is {{ $value }}s."

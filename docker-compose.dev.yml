@@ -226,12 +226,13 @@ services:
     depends_on:
       mysql: { condition: service_healthy }
       valkey: { condition: service_healthy }
+    stop_grace_period: 300s
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:9103/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     develop:
       watch:
         - action: sync
@@ -242,6 +243,38 @@ services:
           target: /app/shared
         - action: rebuild
           path: ./workers/package.json
+    networks: [vici2_default]
+
+  recording-uploader:
+    build:
+      context: .
+      dockerfile: workers/recording-uploader/Dockerfile
+      target: dev
+    image: vici2/recording-uploader:dev
+    container_name: vici2_recording_uploader
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      R02_METRICS_PORT: ${R02_METRICS_PORT:-9104}
+      R02_CONCURRENCY: ${R02_CONCURRENCY:-10}
+      R02_SWEEPER_INTERVAL_SEC: ${R02_SWEEPER_INTERVAL_SEC:-300}
+      DATABASE_URL: mysql://${VICI2_DB_USER}:${VICI2_DB_PASSWORD}@mysql:3306/${VICI2_DB_NAME}?connection_limit=20
+      VALKEY_URL: redis://valkey:6379/0
+      REDIS_URL: redis://valkey:6379/0
+    volumes:
+      - recordings:/recordings
+    ports:
+      - "${R02_METRICS_PORT:-9104}:9104"
+    depends_on:
+      mysql: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9104/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks: [vici2_default]
 
   web:
