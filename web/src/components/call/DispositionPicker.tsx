@@ -7,6 +7,7 @@ import { useDispositionPicker } from "@/lib/hooks/useDispositionPicker";
 import { useWrapupTimer } from "@/lib/hooks/useWrapupTimer";
 import { useHangupGrace } from "@/lib/hooks/useHangupGrace";
 import { cn } from "@/lib/utils";
+import { CallbackPicker } from "./CallbackPicker";
 
 interface WrapupTimerDisplayProps {
   secondsLeft: number;
@@ -59,9 +60,9 @@ export function DispositionPicker(): React.ReactElement | null {
     error,
   } = useDispositionPicker();
 
+  const lead = useCallStore((s) => s.lead);
   const [comments, setComments] = React.useState("");
-  const [callbackChecked, setCallbackChecked] = React.useState(false);
-  const [callbackAt, setCallbackAt] = React.useState("");
+  const [callbackOpen, setCallbackOpen] = React.useState(false);
 
   const total = campaign?.wrapup_seconds ?? 60;
   const { secondsLeft, resetTimer } = useWrapupTimer();
@@ -85,14 +86,14 @@ export function DispositionPicker(): React.ReactElement | null {
   const handleHotkeySelect = async (code: string) => {
     select(code);
     if (!confirmHotkeyDispo) {
-      await submit({ comments, callbackAt: callbackChecked ? callbackAt : undefined });
+      await submit({ comments });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCode) return;
-    await submit({ comments, callbackAt: callbackChecked ? callbackAt : undefined });
+    await submit({ comments });
   };
 
   const handleSkip = async () => {
@@ -163,26 +164,28 @@ export function DispositionPicker(): React.ReactElement | null {
             />
           </div>
 
-          {/* Callback */}
+          {/* Callback — A08 */}
           <div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={callbackChecked}
-                onChange={(e) => setCallbackChecked(e.target.checked)}
+            <button
+              type="button"
+              onClick={() => setCallbackOpen(true)}
+              className="rounded border border-[var(--color-surface-border)] px-3 py-1.5 text-sm hover:bg-[var(--color-surface-muted)]"
+            >
+              Schedule Callback
+            </button>
+            {lead && campaign && (
+              <CallbackPicker
+                open={callbackOpen}
+                onOpenChange={setCallbackOpen}
+                leadId={String(lead.id)}
+                leadName={`${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim()}
+                phoneE164={lead.phoneE164}
+                campaignId={String(campaign.id)}
+                leadTzIana={null}
+                onSuccess={() => {
+                  select("CALLBK");
+                }}
               />
-              Schedule callback
-            </label>
-            {callbackChecked && (
-              <div className="mt-2 flex items-center gap-3">
-                <input
-                  type="datetime-local"
-                  value={callbackAt}
-                  onChange={(e) => setCallbackAt(e.target.value)}
-                  aria-label="Callback date and time"
-                  className="rounded border border-[var(--color-surface-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-600)]"
-                />
-              </div>
             )}
           </div>
 

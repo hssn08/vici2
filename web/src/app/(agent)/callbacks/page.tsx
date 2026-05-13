@@ -1,18 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import * as React from "react";
+import { CallbackListClient } from "@/components/call/CallbackList";
 
 export const metadata = { title: "Callbacks" };
 
 export default function CallbacksPage(): React.ReactElement {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Callbacks</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-[var(--color-fg-muted)]">
-          Callbacks list lands with module A08.
-        </p>
-      </CardContent>
-    </Card>
-  );
+  return <CallbackListClient />;
 }
