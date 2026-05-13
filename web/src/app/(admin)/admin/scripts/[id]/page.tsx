@@ -1,7 +1,7 @@
-// S03 — Admin edit script page.
+// M07 — Admin edit script page (upgraded from S03 ScriptForm to Tiptap ScriptEditor).
 // URL: /admin/scripts/[id]
 
-import { ScriptForm } from "@/components/admin/ScriptForm";
+import { ScriptEditorClient } from "@/components/admin/scripts/ScriptEditorClient";
 
 export const metadata = { title: "Edit Script · vici2 Admin" };
 
@@ -14,15 +14,13 @@ export default function EditScriptPage({
     <main>
       <div className="mb-6">
         <nav className="flex items-center gap-2 text-sm text-[var(--color-fg-muted)] mb-2">
-          <a href="/admin/scripts" className="hover:text-[var(--color-fg)]">
-            Scripts
-          </a>
+          <a href="/admin/scripts" className="hover:text-[var(--color-fg)]">Scripts</a>
           <span>/</span>
           <span className="text-[var(--color-fg)]">Edit</span>
         </nav>
         <h1 className="text-2xl font-semibold text-[var(--color-fg)]">Edit script</h1>
       </div>
-      <ScriptForm mode="edit" scriptId={params.id} />
+      <ScriptEditorClient mode="edit" scriptId={params.id} />
     </main>
   );
 }

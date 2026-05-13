@@ -24,6 +24,10 @@ import { registerAdminJobRoutes } from "./jobs/index.js";
 import { registerAdminVoicemailBoxRoutes } from "./voicemail-boxes.js";
 // S05 — Coaching admin
 import { registerAdminCoachingRoutes } from "./coaching/index.js";
+// M07 — Pause codes, statuses, scripts
+import { registerAdminPauseCodeRoutes } from "./pause-codes/index.js";
+import { registerAdminStatusRoutes } from "./statuses/index.js";
+import { registerAdminScriptRoutes } from "./scripts/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -61,4 +65,9 @@ export async function registerAdminRoutes(app: any): Promise<void> {
 
   // S05 — Coaching admin (templates, unlock, calibration stubs)
   await registerAdminCoachingRoutes(app);
+
+  // M07 — Pause codes, statuses, scripts
+  await registerAdminPauseCodeRoutes(app);
+  await registerAdminStatusRoutes(app);
+  await registerAdminScriptRoutes(app);
 }
