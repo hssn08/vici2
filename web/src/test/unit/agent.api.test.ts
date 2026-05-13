@@ -78,17 +78,21 @@ describe("agent api", () => {
   });
 
   describe("getPauseCodes", () => {
-    it("calls GET /api/agent/pause-codes", async () => {
-      const codes = [
-        { code: "LUNCH", label: "Lunch Break" },
-        { code: "TRAIN", label: "Training", billable: true },
-      ];
-      mockGet.mockResolvedValue(codes);
+    it("calls GET /api/agent/pause-codes and returns PauseCodesConfig", async () => {
+      const response = {
+        pauseCodesRequired: "OPTIONAL" as const,
+        codes: [
+          { code: "LUNCH", name: "Lunch Break", billable: false },
+          { code: "TRAIN", name: "Training", billable: true },
+        ],
+      };
+      mockGet.mockResolvedValue(response);
 
       const result = await getPauseCodes();
       expect(mockGet).toHaveBeenCalledWith("/api/agent/pause-codes");
-      expect(result).toHaveLength(2);
-      expect(result[0].code).toBe("LUNCH");
+      expect(result.pauseCodesRequired).toBe("OPTIONAL");
+      expect(result.codes).toHaveLength(2);
+      expect(result.codes[0].code).toBe("LUNCH");
     });
   });
 });

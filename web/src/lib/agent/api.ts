@@ -9,7 +9,9 @@ import type { AgentStatus } from "@/lib/stores/agent";
 
 export interface PauseCode {
   code: string;
-  label: string;
+  /** @deprecated Use `name` — kept for backward compat with A03 inline picker */
+  label?: string;
+  name?: string;
   billable?: boolean;
 }
 
@@ -23,6 +25,17 @@ export interface AgentStateResponse {
 export interface SetAgentStatePayload {
   status: AgentStatus;
   pauseCode?: string | null;
+  pauseReason?: string | null;
+}
+
+/** A09: shape returned by GET /api/agent/pause-codes */
+export interface PauseCodesConfig {
+  pauseCodesRequired: "OFF" | "OPTIONAL" | "FORCE";
+  codes: Array<{
+    code: string;
+    name: string;
+    billable: boolean;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,8 +63,9 @@ export async function setAgentState(
 
 /**
  * GET /api/agent/pause-codes
- * Returns available pause codes for the agent's tenant.
+ * Returns available pause codes + pauseCodesRequired for agent's current campaign.
+ * A09: extended from PauseCode[] to PauseCodesConfig.
  */
-export async function getPauseCodes(): Promise<PauseCode[]> {
-  return api.get<PauseCode[]>("/api/agent/pause-codes");
+export async function getPauseCodes(): Promise<PauseCodesConfig> {
+  return api.get<PauseCodesConfig>("/api/agent/pause-codes");
 }
