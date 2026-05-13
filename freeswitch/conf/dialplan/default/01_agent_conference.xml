@@ -32,7 +32,9 @@
       </condition>
     </extension>
 
-    <!-- conf_<tid>_<uid> = customer leg lands here on bridge from T04 originate inline target -->
+    <!-- conf_<tid>_<uid> = customer leg lands here on bridge from T04 originate inline target.
+         R01 amendment (§11.2): inline recording vars replaced with execute_extension calls
+         so R01 owns all recording-related logic in 30_recording.xml. -->
     <extension name="customer_into_agent_conf">
       <condition field="destination_number" expression="^conf_(\d+)_(\d+)$">
         <action application="answer"/>
@@ -40,11 +42,13 @@
         <action application="set" data="vici2_user_id=$2"/>
         <action application="set" data="vici2_role=customer_leg"/>
         <action application="set" data="vici2_conf_name=agent_t${vici2_tenant_id}_u${vici2_user_id}"/>
-        <action application="set" data="RECORD_STEREO=true"/>
-        <action application="set" data="RECORD_MIN_SEC=2"/>
-        <action application="set" data="recording_follow_transfer=true"/>
-        <!-- C02 consent gate (R01 reads consent_record_enabled before record_session) -->
+        <!-- R01 §11.2: set recording channel-vars (media_bug_answer_req, RECORD_STEREO, etc.) -->
+        <action application="execute_extension" data="recording_vars XML default"/>
+        <!-- C02 consent gate (sets consent_record_enabled from vici2_consent_mode) -->
         <action application="execute_extension" data="recording_consent_check XML default"/>
+        <!-- R01 §11.2: conditionally start record_session (gated on consent + mode) -->
+        <action application="execute_extension" data="record_session_if_enabled XML default"/>
+        <!-- Join the agent's conference -->
         <action application="conference" data="agent_t${vici2_tenant_id}_u${vici2_user_id}@default+flags{endconf=false}"/>
         <action application="hangup"/>
       </condition>

@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<!--
+  R01 — Per-call recording extensions.
+  Owned by R01; patched into the default dialplan context.
+
+  Two extensions:
+    1. recording_vars       (continue=true) — sets channel-vars on the customer leg
+                                              BEFORE consent gate and conference join.
+    2. record_session_if_enabled             — conditional record_session gated on:
+                                              - consent_record_enabled=true  (set by C02 gate)
+                                              - recording_mode_skip != true  (set by T04 from campaign config)
+
+  Path convention (R01 PLAN §3, F03 PLAN §14.2):
+    ${recordings_dir}/${tenant_id}/${YYYY}/${MM}/${DD}/${campaign_id}_${lead_id}_${uuid}.wav
+
+  ${start_epoch} is intentionally NOT included (R01 PLAN §3.1 — dropped).
+
+  recording_mode_skip is set true by T04 for campaign.recording_mode IN ('NEVER','ONDEMAND').
+  For ALL / ALLFORCE, T04 leaves it unset (falsy) so record_session fires here.
+
+  For ONDEMAND, recording starts mid-call via API → Go recording.StartRecording →
+  uuid_record start (T01 UUIDRecord primitive). See R01 PLAN §4.1.
+
+  PCI caveat (must also appear in admin UI tooltip):
+    Mask/unmask reduces but does not eliminate PCI scope. Per PCI DSS 4.0.1 and
+    PCI SSC 2024+ guidance, manual pause/resume is treated as obsolete for PCI
+    compliance. Use a certified payment IVR sidecar for Phase 2+ cardholder data.
+-->
+<include>
+  <context name="default">
+
+    <!-- Set recording channel-vars on the customer leg.
+         Called via execute_extension from customer_into_agent_conf BEFORE C02 consent gate.
+         continue=true so the calling extension continues after this one returns. -->
+    <extension name="recording_vars" continue="true">
+      <condition>
+        <!-- Defense-in-depth: delay all media bugs until the channel is answered.
+             Prevents record_session from writing silence pre-answer. -->
+        <action application="set" data="media_bug_answer_req=true"/>
+        <!-- Stereo capture: left=customer (read), right=agent (write via bridge). -->
+        <action application="set" data="RECORD_STEREO=true"/>
+        <!-- Filter out sub-2-second recordings (FS auto-deletes; still get recording_log row). -->
+        <action application="set" data="RECORD_MIN_SEC=2"/>
+        <!-- Follow the call through uuid_transfer (single contiguous WAV). -->
+        <action application="set" data="recording_follow_transfer=true"/>
+        <!-- Single pre-start beep (jurisdictions requiring notification; Phase 1).
+             Phase 2: continuous beep via displace_session beep.wav loop. -->
+        <action application="set" data="record_beep_pre=tone_stream://%(500,0,800)"/>
+      </condition>
+    </extension>
+
+    <!-- Conditional record_session — gated on consent + campaign mode.
+         T04 sets recording_mode_skip=true for NEVER and ONDEMAND campaigns.
+         C02 sets consent_record_enabled=true after the consent prompt passes.
+         Both must pass for record_session to fire. -->
+    <extension name="record_session_if_enabled">
+      <!-- Mode gate: skip if NEVER or ONDEMAND. -->
+      <condition field="${recording_mode_skip}" expression="^true$" break="on-true">
+        <action application="log" data="INFO [R01] recording skipped: mode=${vici2_recording_mode} recording_mode_skip=true"/>
+      </condition>
+      <!-- Consent gate: only record if C02 gave the green light. -->
+      <condition field="${consent_record_enabled}" expression="^true$" break="on-false">
+        <action application="log" data="INFO [R01] recording skipped: consent_record_enabled=${consent_record_enabled}"/>
+      </condition>
+      <condition>
+        <action application="log" data="INFO [R01] starting record_session path=${recordings_dir}/${vici2_tenant_id}/${strftime(%Y/%m/%d)}/${vici2_campaign_id}_${vici2_lead_id}_${uuid}.wav"/>
+        <action application="record_session"
+                data="${recordings_dir}/${vici2_tenant_id}/${strftime(%Y/%m/%d)}/${vici2_campaign_id}_${vici2_lead_id}_${uuid}.wav"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>
