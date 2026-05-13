@@ -1,28 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import "./globals.css";
+
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "vici2",
-  description: "Open-source Vicidial alternative",
+  title: { default: "vici2", template: "%s · vici2" },
+  description: "Open-source Vicidial alternative on FreeSWITCH + MySQL + BYOC",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0d10",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode;
-}>) {
+}>): React.ReactElement {
   return (
-    <html lang="en">
-      <body
-        style={{
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          margin: 0,
-          padding: 0,
-          background: "#0b0d10",
-          color: "#e6e6e6",
-        }}
-      >
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
