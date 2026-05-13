@@ -8,6 +8,12 @@ import { registerAdminUserRoutes } from "./users/index.js";
 import { registerAdminSettingsRoutes } from "./settings/index.js";
 import { registerAdminIngroupRoutes } from "./ingroups.js";
 import { registerAdminAlertReceiverRoutes } from "./alert-receivers/index.js";
+import { registerAuditLogRoutes } from "./audit/index.js";
+import { AuditLogViewerService } from "./audit/service.js";
+import { AuditReader } from "../../services/audit/reader.js";
+import { AuditVerifier } from "../../services/audit/verifier.js";
+import { AuditWriter } from "../../services/audit/writer.js";
+import { getPrisma } from "../../lib/prisma.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerAdminRoutes(app: any): Promise<void> {
@@ -15,4 +21,18 @@ export async function registerAdminRoutes(app: any): Promise<void> {
   await registerAdminSettingsRoutes(app);
   await registerAdminIngroupRoutes(app);
   await registerAdminAlertReceiverRoutes(app);
+
+  // M04 — Audit log viewer
+  const db = getPrisma();
+  const auditWriter = new AuditWriter(db);
+  const auditVerifier = new AuditVerifier({
+    db,
+    pubKeys: {
+      // Phase 1: no public-key validation (returns null → signature check skipped)
+      async getPublicKey(_keyId: string) { return null; },
+    },
+  });
+  const auditReader = new AuditReader({ db, writer: auditWriter, verifier: auditVerifier });
+  const auditViewerService = new AuditLogViewerService(auditReader, auditVerifier);
+  await registerAuditLogRoutes(app, auditViewerService);
 }
