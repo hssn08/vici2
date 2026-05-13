@@ -91,6 +91,28 @@ test-node: ## Run Node unit tests.
 smoke: ## Smoke-test running stack against /metrics + /health endpoints.
 	./scripts/smoke.sh
 
+# ----- ci ---------------------------------------------------------------------
+# `make ci` runs everything CI does on a PR. Useful before pushing.
+ci: ci-lint ci-test ci-migrations ## Mirror of CI on a PR (lint+test+migration-check).
+	@echo "[ci] all local checks passed"
+
+ci-lint: lint ## Run all linters (alias for `make lint`).
+
+ci-test: test ## Run all unit tests (alias for `make test`).
+
+ci-migrations: ## Verify every prisma migration has a down.sql.
+	@./scripts/ci/check-migrations.sh
+
+ci-actionlint: ## Lint GitHub Actions workflow YAML (requires actionlint).
+	@if command -v actionlint >/dev/null 2>&1; then \
+		actionlint -color ; \
+	else \
+		echo "[ci-actionlint] actionlint not installed — install via 'go install github.com/rhysd/actionlint/cmd/actionlint@latest'"; \
+		exit 1; \
+	fi
+
+ci-workflows: ci-actionlint ## Alias — lint workflow YAML.
+
 # ----- database --------------------------------------------------------------
 
 db-generate: ## Regenerate Prisma client without touching the DB.
@@ -158,6 +180,7 @@ hooks: ## Install lefthook git hooks.
 .PHONY: help dev dev-watch dev-down logs logs-fs ps build build-images \
 	lint lint-fix lint-go lint-node lint-xml lint-tenant-index typecheck \
 	test test-go test-node smoke \
+	ci ci-lint ci-test ci-migrations ci-actionlint ci-workflows \
 	db-generate db-migrate db-migrate-dev db-deploy db-reset db-seed \
 	db-studio db-bootstrap-superadmin \
 	fs-up fs-down fs-reload fs-cli redis-cli mysql-cli \

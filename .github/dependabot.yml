@@ -1,0 +1,85 @@
+# O04 — Dependabot
+# Weekly updates per ecosystem; groups patch+minor to keep PR noise low.
+# Major-version bumps come as individual PRs for review.
+
+version: 2
+
+updates:
+  # ------------------------------------------------------------------ pnpm / npm
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: UTC
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: ["dependencies", "ecosystem/npm"]
+    groups:
+      eslint:
+        patterns: ["eslint", "eslint-*", "@typescript-eslint/*"]
+      typescript:
+        patterns: ["typescript", "@types/*"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+      next:
+        patterns: ["next", "@next/*", "react", "react-*"]
+      minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Pin Node-side major version bumps; they go through manual review.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # -------------------------------------------------------------------------- go
+  - package-ecosystem: gomod
+    directory: /dialer
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: UTC
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: ["dependencies", "ecosystem/go"]
+    groups:
+      minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ------------------------------------------------------------- GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    labels: ["dependencies", "ecosystem/actions"]
+
+  # ------------------------------------------------------------------- Docker
+  - package-ecosystem: docker
+    directories:
+      - /api
+      - /dialer
+      - /workers
+      - /web
+      - /freeswitch
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:30"
+      timezone: UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: ["dependencies", "ecosystem/docker"]

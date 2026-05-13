@@ -1,0 +1,16 @@
+# Legacy migrations grandfathered before O04 PLAN §10.1.6 enforced
+# the "every migration ships a down.sql" rule. F02 owns backfilling
+# these or replacing them with reversible variants; tracked in
+# spec/modules/F02/HANDOFF.md.
+#
+# One migration-directory basename per line. NEW migrations created
+# after O04 lands must NOT appear here.
+
+20260506201114_init
+20260506201500_partition_log_tables
+20260506201600_drop_partition_fks
+20260506201700_audit_grants
+20260506201800_pause_codes_unique
+20260506204550_f02_amendments
+20260506204600_partition_amendment_tables
+20260506204700_audit_grants_amendments
