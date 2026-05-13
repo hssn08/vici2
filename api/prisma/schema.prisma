@@ -354,6 +354,13 @@ enum MultiListMix {
   NONE
 }
 
+// D06 amendment D06.A1 — what to do when a CALLBK lead is dialed and not answered.
+enum CallbackNoAnswerPolicy {
+  leave_callbk
+  reschedule_24h
+  terminate_NA
+}
+
 model Campaign {
   tenantId               BigInt             @default(1) @map("tenant_id")
   id                     String             @db.VarChar(32)
@@ -428,9 +435,20 @@ model Campaign {
   leadLockTtlSeconds     Int                @default(30) @map("lead_lock_ttl_seconds")
   // E04 amendment §3.3 — agent-selection strategy for PROGRESSIVE dial.
   // Phase 3 ships random/fewest_calls/rank; today only longest_wait is implemented.
-  callStrategy           CallStrategy       @default(longest_wait) @map("call_strategy")
-  createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
-  updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
+  callStrategy                  CallStrategy           @default(longest_wait) @map("call_strategy")
+  // D06 amendment D06.A1 — what to do when CALLBK lead gets a no-answer disposition.
+  // leave_callbk = keep LIVE, agent manually re-dials (default, least surprise).
+  // reschedule_24h = LIVE→PENDING with callback_at += 86400s (auto-reschedule).
+  // terminate_NA = LIVE→DONE and expose lead to D04 normal NA recycle-delay.
+  callbackNoAnswerPolicy        CallbackNoAnswerPolicy @default(leave_callbk) @map("callback_no_answer_policy")
+  // D06 amendment D06.A2 — seconds before callback_at the worker may fire early.
+  // Compensates for 30-s tick jitter; customer-facing impact ≤ 30 s early.
+  callbackGraceWindowSeconds    Int                    @default(30) @map("callback_grace_window_seconds")
+  // D06 amendment D06.A3 — seconds after callback_at before a LIVE callback is flagged stale.
+  // Default 14400 s = 4 h. Stale = metric + event; no auto-cancel Phase 1.
+  callbackStaleThresholdSeconds Int                    @default(14400) @map("callback_stale_threshold_seconds")
+  createdAt                     DateTime               @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt                     DateTime               @updatedAt @map("updated_at") @db.DateTime(6)
 
   tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_campaigns_tenant")
   callerIdCarrier Carrier?                 @relation("CampaignCallerCarrier", fields: [callerIdCarrierId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_campaigns_caller_carrier")
