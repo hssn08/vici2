@@ -395,6 +395,15 @@ model Campaign {
   // C02 amendment §9.3 — FS-local path to consent audio played before bridge.
   // nil = system default (freeswitch/sounds/consent/default/en-US/vici2_consent_msg.wav).
   consentMsgAudio        String?            @map("consent_msg_audio") @db.VarChar(255)
+  // E02 amendment A2/E02 §11 — four pacing-engine tunables (additive).
+  // calls_per_second: token-bucket CPS ceiling for E04 dispatch.
+  callsPerSecond         Int                @default(5) @map("calls_per_second") @db.UnsignedSmallInt
+  // ramp_up_factor: multiplier for ramp_up_rate_clamp; prevents wake-up storms.
+  rampUpFactor           Decimal            @default(2.00) @map("ramp_up_factor") @db.Decimal(4, 2)
+  // min_call_buffer_seconds: FCC 2-s safe-harbor clamp for min_call_buffer.
+  minCallBufferSeconds   Decimal            @default(2.00) @map("min_call_buffer_seconds") @db.Decimal(4, 2)
+  // pacing_tick_ms: per-campaign tick interval [200,5000]. Default 1000 ms (1 Hz).
+  pacingTickMs           Int                @default(1000) @map("pacing_tick_ms") @db.UnsignedSmallInt
   createdAt              DateTime           @default(now()) @map("created_at") @db.DateTime(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.DateTime(6)
 
