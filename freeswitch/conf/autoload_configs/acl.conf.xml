@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+  Named ACLs — F03 PLAN §15.
+    domestic           : trusted internal source range (loopback + Docker bridge)
+    esl_clients        : who may connect to mod_event_socket (T01 contract)
+    carriers           : carrier IP allowlist (T02 populates from carriers.ip_allowlist JSON)
+    webrtc_candidates  : ICE candidate filter for the wss profile (X01 may tighten)
+-->
+<configuration name="acl.conf" description="Network Lists">
+  <network-lists>
+    <list name="domestic" default="deny">
+      <node type="allow" cidr="127.0.0.0/8"/>
+      <node type="allow" cidr="172.16.0.0/12"/>
+      <node type="allow" cidr="10.0.0.0/8"/>
+      <node type="allow" cidr="192.168.0.0/16"/>
+    </list>
+    <list name="esl_clients" default="deny">
+      <node type="allow" cidr="127.0.0.0/8"/>
+      <node type="allow" cidr="172.16.0.0/12"/>
+      <node type="allow" cidr="10.0.0.0/8"/>
+      <node type="allow" cidr="192.168.0.0/16"/>
+    </list>
+    <list name="carriers" default="deny">
+      <!-- T02 populates from MySQL carriers table; F03 ships empty. -->
+    </list>
+    <list name="webrtc_candidates" default="allow">
+      <!-- X01 (rtpengine) may tighten. -->
+    </list>
+  </network-lists>
+</configuration>

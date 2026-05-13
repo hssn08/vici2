@@ -1,0 +1,19 @@
+<!--
+  RingCentral BYOC carrier template — F03 PLAN §3.2.
+  Credentials trunk; registers with TLS transport.
+-->
+<include>
+  <gateway name="${CARRIER_NAME}">
+    <param name="username" value="${RC_AUTHID}"/>
+    <param name="password" value="${RC_PASSWORD}"/>
+    <param name="realm" value="sip.ringcentral.com"/>
+    <param name="proxy" value="sip.ringcentral.com"/>
+    <param name="register" value="true"/>
+    <param name="register-transport" value="tls"/>
+    <param name="expire-seconds" value="600"/>
+    <param name="caller-id-in-from" value="true"/>
+    <param name="codec-prefs" value="PCMU,PCMA"/>
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="ping" value="25"/>
+  </gateway>
+</include>

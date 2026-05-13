@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<!--
+  Conference profile — F03 PLAN §5.
+  Single shared profile `default`; per-channel behavior set via uuid_setvar
+  and conference flags at join (NOT in this profile).
+
+  Naming convention (RFC-002 — HARD CONSTRAINT):
+    agent_t<tenant_id>_u<user_id>@default
+  The advertise glob below covers it.
+
+  Per-channel overrides (set by T03 dialplan or T04 originate):
+    Agent leg     : flags{moderator,nomoh}
+    Customer leg  : flags{endconf=false}     (conf survives customer hangup)
+    Supervisor    : flags{mute,deaf=false}   (whisper) / flags{mute,deaf=true} (listen)
+
+  rate=8000 deliberately matches PSTN customer leg to minimize transcoding
+  cost (PLAN §10).  Switch to 16k/48k via single-param edit later.
+-->
+<configuration name="conference.conf" description="Audio Conference">
+  <advertise>
+    <room name="agent_*@default" status="FREE"/>
+  </advertise>
+
+  <caller-controls>
+    <!-- Empty: caller-controls=none in profile disables DTMF mute/kick. -->
+    <group name="none">
+    </group>
+  </caller-controls>
+
+  <profiles>
+    <profile name="default">
+      <param name="rate" value="8000"/>
+      <param name="interval" value="20"/>
+      <param name="energy-level" value="100"/>
+      <param name="channels" value="1"/>
+      <param name="comfort-noise" value="true"/>
+      <param name="comfort-noise-level" value="800"/>
+
+      <!-- Silent on every transition — agent doesn't want beeps -->
+      <param name="enter-sound" value="silence_stream://1"/>
+      <param name="exit-sound" value="silence_stream://1"/>
+      <param name="alone-sound" value="silence_stream://1"/>
+      <param name="muted-sound" value="silence_stream://1"/>
+      <param name="unmuted-sound" value="silence_stream://1"/>
+      <param name="kicked-sound" value="silence_stream://1"/>
+      <param name="locked-sound" value="silence_stream://1"/>
+      <param name="is-locked-sound" value="silence_stream://1"/>
+      <param name="is-unlocked-sound" value="silence_stream://1"/>
+      <param name="moh-sound" value="local_stream://moh"/>
+
+      <param name="caller-id-name" value="${conference_caller_name}"/>
+      <param name="caller-id-number" value="${conference_caller_number}"/>
+      <param name="sound-prefix" value="$${sounds_dir}/en/us/callie"/>
+
+      <param name="caller-controls" value="none"/>
+      <param name="member-flags" value="endconf"/>
+
+      <!-- No auto-record; R01 owns recording via record_session on the customer leg -->
+      <param name="auto-record" value=""/>
+
+      <!-- Limits: 2 typical, 20 hard cap to allow 3-way + supervisor whisper/barge -->
+      <param name="max-members" value="20"/>
+    </profile>
+  </profiles>
+</configuration>

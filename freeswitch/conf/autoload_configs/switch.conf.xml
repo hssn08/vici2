@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+  vici2 core switch configuration — F03 PLAN §11.1.
+  max-sessions=3000 is above Artoo's protective ~1796 cap on purpose so
+  operators see the protective log line, not a silent rejection.
+  Per-FS practical ceiling is ~750 simultaneous bridged calls (1500 legs).
+-->
+<configuration name="switch.conf" description="Core Configuration">
+  <cli-keybindings>
+    <key name="1" value="help"/>
+    <key name="2" value="status"/>
+    <key name="3" value="show channels"/>
+    <key name="4" value="show calls"/>
+    <key name="5" value="sofia status"/>
+    <key name="6" value="reloadxml"/>
+    <key name="7" value="console loglevel 0"/>
+    <key name="8" value="console loglevel 7"/>
+  </cli-keybindings>
+
+  <default-ptimes/>
+
+  <settings>
+    <!-- Concurrency caps -->
+    <param name="max-sessions" value="3000"/>
+    <param name="sessions-per-second" value="50"/>
+    <param name="max-dtmf-duration" value="192000"/>
+    <param name="min-dtmf-duration" value="400"/>
+
+    <!-- Threading -->
+    <param name="threadsmax" value="4000"/>
+    <param name="auto-create-schemas" value="true"/>
+    <param name="enable-monotonic-timing" value="true"/>
+
+    <!-- Logging -->
+    <param name="loglevel" value="info"/>
+    <param name="colorize-console" value="true"/>
+
+    <!-- RTP -->
+    <param name="rtp-start-port" value="16384"/>
+    <param name="rtp-end-port" value="32768"/>
+
+    <!-- Dialplan -->
+    <param name="dialplan-timestamps" value="false"/>
+
+    <!-- Core DB (small; file in container) -->
+    <param name="core-db-dsn" value="sqlite:///$${db_dir}/core.db"/>
+  </settings>
+</configuration>

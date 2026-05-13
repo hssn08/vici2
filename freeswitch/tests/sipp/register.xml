@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+<!--
+  SIPp scenario — register a fake agent against the internal profile on
+  port 5060. NOT against wss (SIPp can't do WSS handshake easily; use a
+  browser SIP.js test there).
+
+  Usage:
+    sipp -sf register.xml -s 1001 \
+         -au 1001 -ap "$FS_DEFAULT_SIP_PASSWORD" \
+         -i 127.0.0.1 -p 5061 127.0.0.1:5060
+-->
+<scenario name="vici2 SIP register">
+  <send retrans="500">
+    <![CDATA[
+      REGISTER sip:[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: sipp <sip:[service]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
+      To: sipp <sip:[service]@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 REGISTER
+      Contact: sip:[service]@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Expires: 60
+      Content-Length: 0
+
+    ]]>
+  </send>
+  <recv response="401" auth="true"/>
+  <send retrans="500">
+    <![CDATA[
+      REGISTER sip:[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: sipp <sip:[service]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
+      To: sipp <sip:[service]@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 2 REGISTER
+      Contact: sip:[service]@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Expires: 60
+      [authentication]
+      Content-Length: 0
+
+    ]]>
+  </send>
+  <recv response="200"/>
+  <pause milliseconds="1000"/>
+</scenario>
