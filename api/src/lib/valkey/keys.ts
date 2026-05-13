@@ -117,6 +117,38 @@ export class Keys {
     return `t:${this.tenantId}:dnc:bypass:${token}`;
   }
 
+  // --- E05 drop-gate (FROZEN: E05 PLAN §5.2, §6.3) ---
+
+  /** 30-day rolling drop rate (decimal text, e.g. "1.2300"). Read by E02, E03, T04, S01. */
+  campaignDropPct30d(cid: number): string {
+    return `t:${this.tenantId}:campaign:{${cid}}:drop_pct_30d`;
+  }
+  /** Cached numerator (drop_log count, last 30d). */
+  campaignDropCount30d(cid: number): string {
+    return `t:${this.tenantId}:campaign:{${cid}}:drop_count_30d`;
+  }
+  /** Cached denominator (live-answered calls, last 30d). */
+  campaignDropDenominator30d(cid: number): string {
+    return `t:${this.tenantId}:campaign:{${cid}}:drop_denominator_30d`;
+  }
+  /**
+   * Drop-gate STRING. FROZEN contract:
+   *   SET key "1"  (no TTL)  → gate engaged
+   *   DEL key               → gate released
+   *   EXISTS key            → E02 reads this (not GET)
+   */
+  campaignDropGated(cid: number): string {
+    return `t:${this.tenantId}:campaign:{${cid}}:drop_gated`;
+  }
+  /** RFC3339 timestamp of last hard-gate engagement. */
+  campaignDropGateEngagedAt(cid: number): string {
+    return `t:${this.tenantId}:campaign:{${cid}}:drop_gate_engaged_at`;
+  }
+  /** STREAM of gate engage/release events (mirrored to drop_gate_transition_log). */
+  campaignDropGateTransitions(cid: number): string {
+    return `t:${this.tenantId}:campaign:{${cid}}:drop_gate_transitions`;
+  }
+
   // --- F05 refresh-token ---
   authRefresh(familyId: string, tokenHash: string): string {
     return `t:${this.tenantId}:auth:refresh:${familyId}:${tokenHash}`;

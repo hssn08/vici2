@@ -207,6 +207,44 @@ func (k Keys) DNCBypassToken(token string) string {
 	return fmt.Sprintf("t:%d:dnc:bypass:%s", k.tid, token)
 }
 
+// --- E05 drop-gate keys (FROZEN: E05 PLAN §5.2, §6.3) -----------------------
+
+// CampaignDropPct30d is the per-campaign 30-day rolling drop rate (decimal text, e.g. "1.23").
+// Read by: E02, E03, T04, S01. Written by: E05 ticker (every 15 s).
+func (k Keys) CampaignDropPct30d(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_pct_30d", k.tid, cid)
+}
+
+// CampaignDropCount30d is the cached numerator (drop_log count).
+func (k Keys) CampaignDropCount30d(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_count_30d", k.tid, cid)
+}
+
+// CampaignDropDenominator30d is the cached denominator (live-answered calls).
+func (k Keys) CampaignDropDenominator30d(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_denominator_30d", k.tid, cid)
+}
+
+// CampaignDropGated is the drop-gate STRING key. FROZEN contract:
+//   Set:    SET key "1"   (no TTL; persistent until DEL)
+//   Read:   EXISTS key    (E02 uses EXISTS, not GET)
+//   Clear:  DEL key
+//   Absent: gate NOT engaged
+func (k Keys) CampaignDropGated(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gated", k.tid, cid)
+}
+
+// CampaignDropGateEngagedAt records when the hard gate was last engaged (RFC3339 text).
+func (k Keys) CampaignDropGateEngagedAt(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gate_engaged_at", k.tid, cid)
+}
+
+// CampaignDropGateTransitions is the Valkey STREAM for gate engage/release events.
+// Mirrored to drop_gate_transition_log MySQL table for 7-year TCPA retention.
+func (k Keys) CampaignDropGateTransitions(cid int64) string {
+	return fmt.Sprintf("t:%d:campaign:{%d}:drop_gate_transitions", k.tid, cid)
+}
+
 // --- F05 refresh-token keys --------------------------------------------------
 
 func (k Keys) AuthRefresh(familyID, tokenHash string) string {
