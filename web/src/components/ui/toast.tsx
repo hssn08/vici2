@@ -4,12 +4,21 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export type ToastTone = "neutral" | "success" | "warning" | "danger";
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
+}
+
 export interface Toast {
   id: string;
   title: string;
   description?: string;
   tone?: ToastTone;
   duration?: number;
+  /** Optional action buttons rendered below the description (A08 extension). */
+  actions?: ToastAction[];
 }
 
 interface ToasterContextValue {
@@ -73,6 +82,25 @@ export function Toaster({
             {t.description ? (
               <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
                 {t.description}
+              </div>
+            ) : null}
+            {t.actions && t.actions.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {t.actions.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={action.onClick}
+                    className={cn(
+                      "rounded px-3 py-1 text-xs font-medium transition-colors",
+                      action.variant === "primary"
+                        ? "bg-[var(--color-brand-600)] text-white hover:bg-[var(--color-brand-700)]"
+                        : "border border-[var(--color-surface-border)] hover:bg-[var(--color-surface-muted)]",
+                    )}
+                  >
+                    {action.label}
+                  </button>
+                ))}
               </div>
             ) : null}
           </div>
