@@ -2,6 +2,11 @@
 # Docker Desktop on macOS doesn't truly support `network_mode: host`, so we
 # fall back to bridge mode and explicit port mappings. RTP range is reduced
 # (~25 simultaneous calls) for sanity; raise as needed for load testing.
+#
+# X01 note: rtpengine also overrides to bridge mode on Mac. The ng-control
+# address for mod_rtpengine changes from 127.0.0.1 to the Docker service name
+# "rtpengine". Full DTLS-SRTP media flow from browsers is limited on Mac Docker
+# Desktop due to NAT; use a Linux VM for full load testing. See PLAN.md §4.10.
 
 services:
   freeswitch:
@@ -17,3 +22,22 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks: [vici2_default]
+
+  # X01: rtpengine Mac bridge override.
+  # On Mac, network_mode: host doesn't share the host network stack, so we
+  # switch to bridge mode. mod_rtpengine must reach rtpengine via the bridge
+  # DNS name "rtpengine" instead of 127.0.0.1.
+  # Note: port publishing 30000-31000 (1,000 ports) is intentionally smaller
+  # than the Linux range to avoid Docker Desktop startup delays with 10k ports.
+  rtpengine:
+    network_mode: ""
+    networks: [vici2_default]
+    environment:
+      # Kernel module is never available on Mac; force userspace mode.
+      RTPENGINE_KERNEL_MODE: "0"
+    ports:
+      - "22222:22222/udp"
+      - "9109:9109/tcp"
+      # Reduced port range for Mac Docker Desktop (avoids slow 10k-port publish).
+      # Supports ~250 concurrent bridged calls (1000 ports / 4 ports per call).
+      - "30000-31000:30000-31000/udp"

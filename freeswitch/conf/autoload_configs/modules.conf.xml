@@ -26,6 +26,12 @@
     <load module="mod_sofia"/>
     <load module="mod_loopback"/>
 
+    <!-- X01: rtpengine SDP proxy for SRTP offload. Must load after mod_sofia.
+         Offloads DTLS-SRTP to the rtpengine sidecar; FS handles plain RTP only.
+         pass-through=true in rtpengine.conf.xml ensures graceful fallback if
+         rtpengine is unreachable. Dialplan: freeswitch/conf/dialplan/default/50_rtpengine.xml -->
+    <load module="mod_rtpengine"/>
+
     <!-- Conference — the SACRED primitive per SPEC §4.4 -->
     <load module="mod_conference"/>
 
