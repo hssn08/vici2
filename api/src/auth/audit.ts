@@ -41,7 +41,21 @@ export type AuditAction =
   | "tenant.settings.updated"
   // R03 recording playback UI access
   | "recording.list"
-  | "recording.accessed";
+  | "recording.accessed"
+  // M06 carrier / gateway / DID admin
+  | "carrier.created"
+  | "carrier.updated"
+  | "carrier.deleted"
+  | "carrier.credential.rotated"
+  | "carrier.test_connect"
+  | "carrier.gateway.created"
+  | "carrier.gateway.updated"
+  | "carrier.gateway.deleted"
+  | "carrier.gateway.reloaded"
+  | "did.created"
+  | "did.updated"
+  | "did.deleted"
+  | "did.bulk_imported";
 
 export type ActorKind = "user" | "system" | "worker" | "external_api";
 
