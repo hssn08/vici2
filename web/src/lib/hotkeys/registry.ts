@@ -1,6 +1,6 @@
 "use client";
 
-export type HotkeyScope = "global" | "in-call" | "wrapup" | "modal";
+export type HotkeyScope = "global" | "in-call" | "wrapup" | "modal" | "auto-dial";
 
 export interface HotkeyBinding {
   id: string;
