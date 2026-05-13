@@ -30,6 +30,9 @@ export interface UiState {
   autoDialChimeVolume: number;
   autoDialChimeMuted: boolean;
 
+  // A09 pause code persistence (persisted)
+  lastUsedPauseCode: string | null;
+
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: Theme) => void;
@@ -46,6 +49,9 @@ export interface UiState {
   setHotkeyMap: (map: Record<string, string>) => void;
   setAutoDialChimeVolume: (v: number) => void;
   setAutoDialChimeMuted: (v: boolean) => void;
+
+  // A09
+  setLastUsedPauseCode: (code: string | null) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -73,6 +79,9 @@ export const useUiStore = create<UiState>()(
       autoDialChimeVolume: 0.7,
       autoDialChimeMuted: false,
 
+      // A09 defaults
+      lastUsedPauseCode: null,
+
       toggleSidebar: () =>
         set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
@@ -91,10 +100,13 @@ export const useUiStore = create<UiState>()(
       setHotkeyMap: (map) => set({ hotkeyMap: map }),
       setAutoDialChimeVolume: (v) => set({ autoDialChimeVolume: Math.max(0, Math.min(1, v)) }),
       setAutoDialChimeMuted: (v) => set({ autoDialChimeMuted: v }),
+
+      // A09
+      setLastUsedPauseCode: (code) => set({ lastUsedPauseCode: code }),
     }),
     {
       name: "vici2.ui",
-      version: 4, // bumped for A06 auto-dial chime prefs
+      version: 5, // bumped for A09 lastUsedPauseCode
       storage: createJSONStorage(() =>
         typeof window !== "undefined" ? window.localStorage : noopStorage(),
       ),
@@ -118,6 +130,10 @@ export const useUiStore = create<UiState>()(
           // A06 new fields — apply defaults
           state.autoDialChimeVolume = 0.7;
           state.autoDialChimeMuted = false;
+        }
+        if (version < 5) {
+          // A09 new fields — apply defaults
+          state.lastUsedPauseCode = null;
         }
         return state as UiState;
       },
