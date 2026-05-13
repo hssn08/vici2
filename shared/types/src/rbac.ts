@@ -117,6 +117,12 @@ export const VERBS = [
   // alert / on-call (O03)
   'alert:read',
   'alert:configure',
+  // list management (D07)
+  'list:read',
+  'list:write',
+  'list:delete',
+  'list:reset',
+  'list:purge',
 ] as const;
 
 export type Verb = (typeof VERBS)[number];
@@ -162,6 +168,10 @@ export const SENSITIVE_VERBS = new Set<Verb>([
   'sip:credentials:view',
   'kek:rotate',
   'eavesdrop:any',
+  // D07 — bulk list operations are sensitive (mass data modification)
+  'list:reset',
+  'list:purge',
+  'list:delete',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -235,6 +245,11 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:edit':        { scope: 'tenant' },
     'alert:read':           { scope: 'tenant' },
     'alert:configure':      { scope: 'tenant' },
+    'list:read':            { scope: 'tenant' },
+    'list:write':           { scope: 'tenant' },
+    'list:delete':          { scope: 'tenant', sensitive: true },
+    'list:reset':           { scope: 'tenant', sensitive: true },
+    'list:purge':           { scope: 'tenant', sensitive: true },
   },
 
   admin: {
@@ -297,6 +312,11 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:edit':        { scope: 'tenant' },
     'alert:read':           { scope: 'tenant' },
     'alert:configure':      { scope: 'tenant' },
+    'list:read':            { scope: 'tenant' },
+    'list:write':           { scope: 'tenant' },
+    'list:delete':          { scope: 'tenant', sensitive: true },
+    'list:reset':           { scope: 'tenant', sensitive: true },
+    'list:purge':           { scope: 'tenant', sensitive: true },
   },
 
   supervisor: {
@@ -335,6 +355,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'callback:read':        { scope: 'group' },
     'callback:edit':        { scope: 'group' },
     'alert:read':           { scope: 'group' },
+    'list:read':            { scope: 'group' },
   },
 
   agent: {
@@ -388,6 +409,7 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
     'wallboard:view':       { scope: 'tenant' },
     'callback:read':        { scope: 'tenant' },
     'alert:read':           { scope: 'tenant' },
+    'list:read':            { scope: 'tenant' },
   },
 
   integrator: {
@@ -397,14 +419,14 @@ const RAW_MATRIX: Record<Role, Partial<Record<Verb, Grant>>> = {
 };
 
 /** Exported map: Role -> Verb -> Grant */
-export const ROLE_VERBS: Record<Role, ReadonlyMap<Verb, Grant>> = Object.fromEntries(
+export const ROLE_VERBS: Record<Role, ReadonlyMap<Verb, Grant>> = (Object.fromEntries(
   ROLES.map((role) => [role, new Map(Object.entries(RAW_MATRIX[role]) as [Verb, Grant][])]),
-) as Record<Role, ReadonlyMap<Verb, Grant>>;
+) as unknown) as Record<Role, ReadonlyMap<Verb, Grant>>;
 
 // Flat list for backward compat with F05 consumers
-export const ROLE_PERMISSIONS: Record<Role, ReadonlyArray<Verb>> = Object.fromEntries(
+export const ROLE_PERMISSIONS: Record<Role, ReadonlyArray<Verb>> = (Object.fromEntries(
   ROLES.map((role) => [role, [...ROLE_VERBS[role].keys()]]),
-) as Record<Role, ReadonlyArray<Verb>>;
+) as unknown) as Record<Role, ReadonlyArray<Verb>>;
 
 // ---------------------------------------------------------------------------
 // Helpers
