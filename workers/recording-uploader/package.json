@@ -14,12 +14,12 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.700.0",
-    "@aws-sdk/lib-storage": "^3.700.0",
-    "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "@aws-sdk/lib-storage": "^3.1053.0",
+    "@aws-sdk/s3-request-presigner": "^3.1053.0",
     "@prisma/client": "^5.22.0",
     "@vici2/types": "workspace:*",
-    "bullmq": "^5.76.8",
+    "bullmq": "^5.77.3",
     "dotenv-flow": "^4.1.0",
     "ioredis": "^5.4.2",
     "pino": "^9.5.0",
@@ -27,8 +27,8 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/node": "^20.16.0",
-    "tsx": "^4.19.2",
+    "@types/node": "^20.19.41",
+    "tsx": "^4.22.3",
     "typescript": "^5.6.3"
   }
 }
