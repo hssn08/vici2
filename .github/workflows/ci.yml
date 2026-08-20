@@ -162,7 +162,7 @@ jobs:
         working-directory: dialer
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-go-${{ matrix.go-version }}
           path: dialer/coverage.out
